@@ -36,6 +36,7 @@ Two things mattered when picking what to build: proving out these patterns in so
 |---|---|---|
 | Saga pattern | `deploy-orchestrator-service` runs the deployment saga; `billing-service` runs a payment and provisioning saga | Hand rolled state machine over Kafka commands and events |
 | Event backbone | Every service that produces or reacts to a platform event | Apache Kafka, `spring-kafka` |
+| Edge routing and config | `api-gateway`, `config-server` | Spring Cloud Gateway, Spring Cloud Config Server |
 | Retries, timeouts, circuit breakers | Calls to GitHub, the container registry, ACME, the DNS provider, Paystack | Resilience4j |
 | Identity and multi-tenancy | `identity-service`, `org-team-service`, and every service that checks the org claim on a token | Keycloak, Spring Security OAuth2 |
 | Distributed tracing | Every service | Micrometer Tracing, OpenTelemetry, Jaeger or Grafana Tempo |
@@ -78,7 +79,7 @@ For observability: Micrometer Tracing, the Spring Boot 3 replacement for Sleuth,
 
 For configuration and secrets: Spring Cloud Config Server early on, moving to Kubernetes ConfigMaps and Secrets once the platform actually runs on Kubernetes, and Spring Cloud Vault for anything genuinely sensitive along the way.
 
-For service discovery: Eureka to start, specifically because watching it become unnecessary once Kubernetes DNS based discovery takes over is a useful thing to build and document, not because Eureka is meant to be the long term answer.
+For service discovery: DNS based discovery throughout, Docker Compose's built in DNS by service name during local development, then Kubernetes DNS once the platform runs on a cluster. No Eureka or other registry service in between.
 
 For testing: Testcontainers wherever integration tests touch Kafka, Postgres, or Keycloak, since mocking those away would hide the exact failure modes this project is meant to explore.
 
@@ -86,7 +87,13 @@ For infrastructure: Docker, Kubernetes, Helm, Terraform, and ArgoCD for the GitO
 
 ## Microservices catalog
 
-Twenty two services, grouped by what part of the system they own.
+Twenty four services, grouped by what part of the system they own.
+
+### Platform infrastructure
+
+`api-gateway` is the single entry point for tenant-facing API and dashboard traffic, built on `spring-cloud-gateway`. It validates tokens at the edge, routes requests to the right backend service, and is the first natural home for per-org rate limiting once a tenant's plan needs enforcing. Routing to backend services relies on DNS based discovery, Docker Compose service names locally and Kubernetes DNS in the cluster, so there's no registry service to keep in sync.
+
+`config-server` is the Spring Cloud Config Server, centralizing configuration for every service in the reactor. Per the tech stack notes above, this is a starting point, not the end state, it's meant to be replaced by Kubernetes ConfigMaps and Secrets once the platform runs on Kubernetes, with Spring Cloud Vault covering anything sensitive along the way.
 
 ### Identity and tenancy
 
@@ -199,6 +206,8 @@ pallet/
 │   ├── platform-common-security/      # Keycloak / OAuth2 resource server config
 │   └── platform-common-observability/ # shared tracing and metrics config
 ├── services/
+│   ├── api-gateway/
+│   ├── config-server/
 │   ├── identity-service/
 │   ├── org-team-service/
 │   ├── audit-log-service/
@@ -241,7 +250,7 @@ Once `platform-infra` exists as its own repository, deployment follows GitOps: a
 
 ## Build roadmap
 
-1. Identity and access. Keycloak, `identity-service`, `org-team-service`, and the API gateway working end to end, with a working login before anything else exists.
+1. Identity and access. `config-server` stood up first as the reactor's spine, then Keycloak, `identity-service`, `org-team-service`, and `api-gateway` working end to end, with a working login before anything else exists.
 2. The build pipeline. `git-integration-service`, `build-queue-service`, `build-service`, and `registry-service`. Done when a git push produces a tagged image sitting in a registry.
 3. A naive deploy path. A first pass of `deploy-orchestrator-service`, without saga rollback yet, plus enough of the networking layer to get one app live at a real URL.
 4. The event backbone. Move the pipeline onto Kafka, add the saga's compensating actions, and wrap every external call in retries and a circuit breaker.
