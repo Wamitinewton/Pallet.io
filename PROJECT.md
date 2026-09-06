@@ -42,7 +42,7 @@ Two things mattered when picking what to build: proving out these patterns in so
 | Distributed tracing | Every service | Micrometer Tracing, OpenTelemetry, Jaeger or Grafana Tempo |
 | Payments | `billing-service` | Paystack |
 | Metrics and dashboards | `metrics-service`, plus an Actuator endpoint on every service | Prometheus, Grafana, Micrometer |
-| Deep networking | `ingress-config-service`, `dns-service`, `tls-service`, `traffic-routing-service` | Envoy or Traefik, ACME, DNS provider APIs, SNI based routing |
+| Deep networking | `ingress-config-service`, `dns-service`, `tls-service`, `traffic-routing-service` | Traefik or Contour, cert-manager, Argo Rollouts, DNS provider APIs, SNI based routing |
 | DevOps and platform engineering | The `platform-infra` repository and the deploy pipeline itself | Terraform, Helm, ArgoCD, GitHub Actions |
 
 ## Architecture overview
@@ -83,7 +83,7 @@ For service discovery: DNS based discovery throughout, Docker Compose's built in
 
 For testing: Testcontainers wherever integration tests touch Kafka, Postgres, or Keycloak, since mocking those away would hide the exact failure modes this project is meant to explore.
 
-For infrastructure: Docker, Kubernetes, Helm, Terraform, and ArgoCD for the GitOps handoff described later in this document.
+For infrastructure: Docker, Kubernetes, Helm, Terraform, and ArgoCD for the GitOps handoff described later in this document. Kubernetes doubles as the orchestration layer for tenant workloads themselves, not just the platform's own services, running each tenant app as a namespaced `Deployment`. `cert-manager` handles ACME and Let's Encrypt certificate issuance and renewal in-cluster, and Argo Rollouts drives blue/green and canary rollouts as a native controller instead of a hand rolled traffic shifter.
 
 ## Microservices catalog
 
@@ -115,21 +115,21 @@ Twenty four services, grouped by what part of the system they own.
 
 ### Deployment and networking
 
-`deploy-orchestrator-service` is the saga coordinator. It owns the state machine for a deployment (queued, building, pushing, provisioning, routing, health checking, live, failed, rolled back) and issues the compensating commands described in the architecture section above when a downstream step fails.
+`deploy-orchestrator-service` is the saga coordinator. It owns the state machine for a deployment (queued, building, pushing, provisioning, routing, health checking, live, failed, rolled back) and issues the compensating commands described in the architecture section above when a downstream step fails. Each saga step acts through the Kubernetes API, creating or patching a `Deployment`, `Service`, and `Ingress` for the tenant app; compensating actions are the same API calls in reverse, deleting or reverting whatever resource a failed step created. This is the piece that would graduate from a plain API client into a proper Kubernetes controller, with a `PalletApp` CRD and a reconciliation loop, if the operator pattern is worth demonstrating on its own later.
 
-`scheduler-service` decides which node or cluster a workload runs on, based on current load and the tenant's resource plan.
+`scheduler-service` no longer places workloads itself, since Kubernetes' own scheduler handles bin packing and node placement. What's left is translating a tenant's resource plan into `resources.requests` and `limits` on the pod spec, and optionally into node selectors or taints so higher tiers land on dedicated node pools.
 
-`ingress-config-service` generates and pushes configuration to the reverse proxy, Envoy or Traefik, so a new deployment gets a working virtual host, including SNI based TLS termination.
+`ingress-config-service` creates the Kubernetes `Ingress` (or Gateway API `HTTPRoute`) object for a new deployment, which an in-cluster ingress controller, Traefik or Contour, picks up to configure the virtual host and SNI based TLS termination. No config files get pushed by hand; the ingress controller reconciles off the Kubernetes API the same way any other controller does.
 
-`dns-service` automates DNS records, both for the platform's own wildcard subdomains and for any custom domain a tenant attaches, against a provider API.
+`dns-service` automates DNS records, both for the platform's own wildcard subdomains and for any custom domain a tenant attaches, against a provider API. It triggers off the `Ingress` or `Service` for a deployment receiving an external address from the cluster's load balancer, rather than being told the address directly by the orchestrator.
 
-`tls-service` handles certificate issuance and renewal through ACME and Let's Encrypt, including the retry and backoff logic that ACME's rate limits make necessary.
+`tls-service` delegates the actual ACME workflow to `cert-manager` running in-cluster, which issues a `Certificate` resource per domain and handles the retry and backoff logic that ACME's rate limits make necessary. This service's own job narrows to requesting a certificate for a custom domain a tenant attaches and watching that `Certificate`'s status, rather than driving ACME directly.
 
-`traffic-routing-service` implements blue and green or canary rollouts by controlling traffic weight between deployment versions.
+`traffic-routing-service` is built on Argo Rollouts, a Kubernetes native progressive delivery controller, rather than a hand rolled weight shifter. It defines the rollout strategy, blue/green or canary, and feeds `metrics-service`'s Prometheus data into an Argo Rollouts `AnalysisRun` so promotion or automatic rollback between deployment versions is driven by real request latency and error rate instead of a fixed timer.
 
-`health-check-service` runs active probes against live deployments and consumes passive signals from `metrics-service`, feeding both the orchestrator's rollback decisions and the platform's own circuit breakers.
+`health-check-service` no longer needs to run pod level liveness probes itself, since Kubernetes already restarts unhealthy pods on its own. Its job is aggregating that signal up to deployment level health, whether a new version's replicas ever collectively became Ready, and combining it with passive signals from `metrics-service` to feed the orchestrator's rollback decisions and the platform's own circuit breakers. It plays the same role Argo Rollouts' analysis step plays for a single rollout, but at the scope of the whole deployment.
 
-`autoscaler-service` watches per-deployment metrics and scales replica counts up or down within the tenant's plan limits.
+`autoscaler-service` is implemented as a Kubernetes `HorizontalPodAutoscaler` per tenant deployment, driven by custom metrics served through the Prometheus Adapter off `metrics-service`'s data, scaling replica counts within the tenant's plan limits instead of a hand rolled polling loop.
 
 ### Observability
 
@@ -187,6 +187,8 @@ An example of what one of these looks like on the wire:
 
 Rather than a Keycloak realm per organization, which gets unwieldy past a few hundred tenants, Pallet uses one realm for the whole platform, with an org id claim baked into every access token. Every service that touches tenant data checks that claim against the resource being requested, and that check is also what makes the tenant log isolation described below possible. Realm per org stays on the table as a heavier isolation option if a customer ever needs it contractually.
 
+At the infrastructure level, that same org boundary maps to one Kubernetes namespace per organization, which gives each tenant a `ResourceQuota` and RBAC boundary for free, and is the natural place to attach the `NetworkPolicy` rules that the network isolation open question below still needs to settle.
+
 Roles inside an org (owner, admin, developer, viewer) map to Keycloak client roles. Service to service calls use the client credentials grant, with a dedicated Keycloak client per service, so `identity-service` can tell "the billing service asked for this" apart from "a tenant asked for this."
 
 ## Tenant-facing features
@@ -242,6 +244,8 @@ Once ArgoCD or Flux enters the picture, `platform-infra` becomes a second, sibli
 
 Running all 22 services at once eats memory fast; a JVM under docker-compose easily takes a few hundred megabytes just sitting idle. Two practical fixes: define docker-compose profiles so a working session only starts the services relevant to what's changing (the build pipeline group on its own, or `deploy-orchestrator-service` plus its direct dependencies), and treat Spring Boot 3's GraalVM native image support as a later optimization once the reactor build is stable. Native compiled services start in milliseconds instead of seconds and use a fraction of the memory, which matters for local development now and will matter again once Pallet is running actual tenant workloads.
 
+Testing the tenant deploy path itself needs an actual Kubernetes API to talk to, not just docker-compose. A local `kind` or `k3d` cluster running alongside the compose stack covers this without needing a cloud cluster for every iteration; `deploy-orchestrator-service` and friends point at it exactly the way they'd point at a real cluster later.
+
 ## CI/CD
 
 Each service gets its own GitHub Actions job, triggered only when its folder, or a shared `platform-common` module it depends on, changes. Path filters keep a change to one service from rebuilding all 22. Integration tests run against real Kafka, Postgres, and Keycloak containers through Testcontainers instead of mocks, since the point of this project is seeing how these pieces behave together, not testing against a mock that hides the interesting failure modes.
@@ -266,11 +270,9 @@ A `CONTRIBUTING.md` explaining how the reactor build works, which services need 
 
 ## Open questions and next steps
 
-These are the decisions this brief deliberately leaves open, since they're exactly what the next round of system design needs to settle.
+These are the decisions this brief deliberately leaves open, since they're exactly what the next round of system design needs to settle. One that was open here, the orchestration layer, is now settled on Kubernetes; that decision is reflected in the tech stack and microservices sections above instead of repeated here.
 
-Runtime isolation for tenant workloads. Plain Docker containers, gVisor or Firecracker microVMs for stronger isolation, or handing this off to Kubernetes entirely.
-
-Orchestration layer. A hand rolled scheduler against raw Docker, or Kubernetes from day one, with `deploy-orchestrator-service` acting as a controller instead of building placement logic from scratch.
+Runtime isolation for tenant workloads. Orchestration is settled on Kubernetes, but the pod level isolation it gives by default, namespaces and cgroups sharing a kernel, still isn't a strong enough boundary for arbitrary tenant code. The remaining decision is which sandboxed `RuntimeClass` to run tenant pods under: gVisor, lighter weight and simpler to operate, or Kata Containers, which wraps a real microVM and costs more per pod to start.
 
 Log store. Loki, cheap and label based, against ClickHouse, more powerful queries and more operational weight to run.
 
@@ -280,4 +282,4 @@ Database strategy. One Postgres instance per service for true isolation, against
 
 Event schema format. Plain JSON to start, or Avro or Protobuf with a schema registry once the event catalog above needs real versioning.
 
-Network isolation between tenant workloads, and between tenants and the control plane. This is the hardest problem in the whole project, and it deserves its own design pass before any code gets written.
+Network isolation between tenant workloads, and between tenants and the control plane. Kubernetes gives a natural attachment point, `NetworkPolicy` rules scoped to each tenant's namespace, but the actual rule set, and whether `NetworkPolicy` alone is enough versus needing a service mesh with mTLS, is still the hardest problem in the whole project and deserves its own design pass before any code gets written.
