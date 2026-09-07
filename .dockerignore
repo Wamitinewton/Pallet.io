@@ -1,0 +1,13 @@
+**/target/
+**/build/
+.git/
+.idea/
+.github/
+docs/
+*.md
+!README.md
+deploy/
+**/*-credentials.json
+**/application-secrets.y*ml
+*.env
+.env

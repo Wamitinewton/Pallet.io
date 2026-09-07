@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The reactor is small enough today to build whole on every change. Once
+  # there are many services, split this into a paths-filter + matrix so a
+  # change to one service (or a platform-common module it depends on) only
+  # rebuilds what is affected — see CONTRIBUTING.md.
+  reactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build, unit + integration tests
+        run: ./mvnw -B clean verify
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: SpotBugs + OWASP Dependency-Check
+        run: ./mvnw -B verify -P security -DskipTests -Dnvd.api.key="${NVD_API_KEY}"
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Shared log appenders for Pallet services. Pull them in from a service's own
+  src/main/resources/logback-spring.xml:
+
+    <include resource="pallet-logback-base.xml"/>
+    <springProfile name="dev"><root level="INFO"><appender-ref ref="CONSOLE"/></root></springProfile>
+    <springProfile name="prod"><root level="INFO"><appender-ref ref="JSON"/></root></springProfile>
+
+  Micrometer Tracing populates traceId / spanId in the MDC. Services add orgId
+  (from OrgContext, once authenticated) and deploymentId where they have one.
+-->
+<included>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}][%X{orgId:-}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>orgId</includeMdcKeyName>
+            <includeMdcKeyName>deploymentId</includeMdcKeyName>
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerCause>20</maxDepthPerCause>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+</included>

@@ -69,11 +69,11 @@ flowchart LR
 
 ## Tech stack
 
-On the language and build side: Java 21, Spring Boot 3.x, and a Maven multi-module reactor tying all 22 services together under one parent POM. The parent POM is what keeps Spring Boot, Resilience4j, and Micrometer versions in sync across every service instead of drifting apart one dependency bump at a time.
+On the language and build side: Java 21, Spring Boot 4.1, and a Maven multi-module reactor tying all 24 services together under one parent POM. The parent POM is what keeps Spring Boot, Spring Cloud, Resilience4j, and Micrometer versions in sync across every service instead of drifting apart one dependency bump at a time. Spring Boot 4.1 pairs with Spring Cloud 2025.1.2 (Oakwood); earlier Spring Cloud releases don't run against it. Boot 4's modular starters mean several dependency names differ from the 3.x examples most of the internet is still written against, `spring-boot-starter-webmvc` rather than `-web`, `spring-boot-starter-security-oauth2-resource-server` rather than `-oauth2-resource-server`, `spring-boot-starter-aspectj` rather than `-aop`, and Jackson 3 moves databind types to `tools.jackson.*` while leaving annotations under `com.fasterxml.jackson.annotation`. `docs/adr/0005-java-21-spring-boot-4.md` has the full list.
 
-For networking and resilience: `spring-cloud-gateway` at the edge, `spring-kafka` for the event backbone, and Resilience4j for circuit breakers, retries, and timeouts. Resilience4j is the right pick here over Netflix's Hystrix, which stopped receiving updates a few years ago.
+For networking and resilience: `spring-cloud-gateway` at the edge, `spring-boot-starter-kafka` (Boot's managed wrapper over `spring-kafka`) for the event backbone, and Resilience4j for circuit breakers, retries, and timeouts. Resilience4j is the right pick here over Netflix's Hystrix, which stopped receiving updates a few years ago.
 
-For identity: `spring-boot-starter-oauth2-resource-server` and its client counterpart against Keycloak, plus the Keycloak Admin Client for provisioning tenants programmatically instead of by hand.
+For identity: `spring-boot-starter-security-oauth2-resource-server` and its client counterpart against Keycloak, plus the Keycloak Admin Client for provisioning tenants programmatically instead of by hand. The resource-server baseline (a secure-by-default filter chain, Keycloak realm-role mapping, and an `OrgContext` helper for the `org_id` claim check) lives in `platform-common-security` so every service gets it by depending on one module.
 
 For observability: Micrometer Tracing, the Spring Boot 3 replacement for Sleuth, exporting spans via OTLP to an OpenTelemetry Collector, which forwards them to Jaeger or Grafana Tempo. Metrics come from Micrometer plus `micrometer-registry-prometheus`, exposed through Actuator and visualized in Grafana.
 
@@ -81,9 +81,9 @@ For configuration and secrets: Spring Cloud Config Server early on, moving to Ku
 
 For service discovery: DNS based discovery throughout, Docker Compose's built in DNS by service name during local development, then Kubernetes DNS once the platform runs on a cluster. No Eureka or other registry service in between.
 
-For testing: Testcontainers wherever integration tests touch Kafka, Postgres, or Keycloak, since mocking those away would hide the exact failure modes this project is meant to explore.
+For testing: Testcontainers (2.x, whose module artifact ids now all carry a `testcontainers-` prefix) wherever integration tests touch Kafka, Postgres, ClickHouse, or Keycloak, since mocking those away would hide the exact failure modes this project is meant to explore. Unit tests are named `*Test` and run under Surefire; integration tests are `*IntegrationTest` and run under Failsafe at the `verify` phase.
 
-For infrastructure: Docker, Kubernetes, Helm, Terraform, and ArgoCD for the GitOps handoff described later in this document. Kubernetes doubles as the orchestration layer for tenant workloads themselves, not just the platform's own services, running each tenant app as a namespaced `Deployment`. `cert-manager` handles ACME and Let's Encrypt certificate issuance and renewal in-cluster, and Argo Rollouts drives blue/green and canary rollouts as a native controller instead of a hand rolled traffic shifter.
+For infrastructure: Docker, Kubernetes, Helm, Terraform, and ArgoCD for the GitOps handoff described later in this document. Kubernetes doubles as the orchestration layer for tenant workloads themselves, not just the platform's own services, running each tenant app as a namespaced `Deployment`. `cert-manager` handles ACME and Let's Encrypt certificate issuance and renewal in-cluster, and Argo Rollouts drives blue/green and canary rollouts as a native controller instead of a hand rolled traffic shifter. Tenant workloads can land on either of two registered clusters, an EKS cluster in AWS or a GKE cluster in GCP, with a tenant picking which cloud their app runs in at creation time; Pallet's own control-plane services run in a single place regardless of that choice.
 
 ## Microservices catalog
 
@@ -99,9 +99,9 @@ Twenty four services, grouped by what part of the system they own.
 
 `identity-service` wraps Keycloak. It issues and validates tokens for the dashboard and the API, and provisions a tenant's identity when an organization signs up.
 
-`org-team-service` owns organizations, teams, projects, and membership, and maps Keycloak roles (owner, admin, developer, viewer) to what a user can actually do inside a given org.
+`org-team-service` owns organizations, teams, projects, and membership, and maps Keycloak roles (owner, admin, developer, viewer) to what a user can actually do inside a given org. It also stores which cloud provider and region an app is deployed to, a choice made once at app creation, which flows into the deploy saga as an input `scheduler-service` resolves against the cluster registry.
 
-`audit-log-service` consumes an `audit.event.recorded` stream from every other service and keeps an immutable record of who did what. Useful for compliance, and just as useful for answering "who changed this deployment" during debugging.
+`audit-log-service` consumes an `audit.event.recorded` stream from every other service and keeps an immutable record of who did what, stored in ClickHouse rather than Postgres from the start, since the workload is append-only, write-heavy, and almost always queried over a time range. Useful for compliance, and just as useful for answering "who changed this deployment" during debugging.
 
 ### Source and build pipeline
 
@@ -115,13 +115,13 @@ Twenty four services, grouped by what part of the system they own.
 
 ### Deployment and networking
 
-`deploy-orchestrator-service` is the saga coordinator. It owns the state machine for a deployment (queued, building, pushing, provisioning, routing, health checking, live, failed, rolled back) and issues the compensating commands described in the architecture section above when a downstream step fails. Each saga step acts through the Kubernetes API, creating or patching a `Deployment`, `Service`, and `Ingress` for the tenant app; compensating actions are the same API calls in reverse, deleting or reverting whatever resource a failed step created. This is the piece that would graduate from a plain API client into a proper Kubernetes controller, with a `PalletApp` CRD and a reconciliation loop, if the operator pattern is worth demonstrating on its own later.
+`deploy-orchestrator-service` is the saga coordinator. It owns the state machine for a deployment (queued, building, pushing, provisioning, routing, health checking, live, failed, rolled back) and issues the compensating commands described in the architecture section above when a downstream step fails. Each saga step acts through the Kubernetes API of whichever cluster `scheduler-service` resolved for that deployment, AWS or GCP, creating or patching a `Deployment`, `Service`, and `Ingress` for the tenant app; compensating actions are the same API calls in reverse, deleting or reverting whatever resource a failed step created. Talking to more than one cluster means holding a Fabric8 client per registered cluster instead of a single hardcoded one, and treating a cloud provider's API, same as GitHub's or ACME's, as a call that goes through Resilience4j's retries and circuit breaker. This is the piece that would graduate from a plain API client into a proper Kubernetes controller, with a `PalletApp` CRD and a reconciliation loop, if the operator pattern is worth demonstrating on its own later.
 
-`scheduler-service` no longer places workloads itself, since Kubernetes' own scheduler handles bin packing and node placement. What's left is translating a tenant's resource plan into `resources.requests` and `limits` on the pod spec, and optionally into node selectors or taints so higher tiers land on dedicated node pools.
+`scheduler-service` no longer places workloads itself, since Kubernetes' own scheduler handles bin packing and node placement. What's left is translating a tenant's resource plan into `resources.requests` and `limits` on the pod spec, and optionally into node selectors or taints so higher tiers land on dedicated node pools. It also owns the cluster registry, cloud provider, region, API endpoint, and credential reference for each registered cluster, and resolves which cluster a given deployment targets from the tenant's chosen cloud provider or a plan tier default.
 
-`ingress-config-service` creates the Kubernetes `Ingress` (or Gateway API `HTTPRoute`) object for a new deployment, which an in-cluster ingress controller, Traefik or Contour, picks up to configure the virtual host and SNI based TLS termination. No config files get pushed by hand; the ingress controller reconciles off the Kubernetes API the same way any other controller does.
+`ingress-config-service` creates the Kubernetes `Ingress` (or Gateway API `HTTPRoute`) object for a new deployment, which an in-cluster ingress controller, Traefik or Contour, picks up to configure the virtual host and SNI based TLS termination. No config files get pushed by hand; the ingress controller reconciles off the Kubernetes API the same way any other controller does. The load balancer backing that ingress differs by cloud, an AWS NLB or ALB on the EKS cluster, a Cloud Load Balancer on the GKE cluster, but this service only ever talks to the `Ingress` object; the cloud specific provisioning is the ingress controller's problem, not this one's.
 
-`dns-service` automates DNS records, both for the platform's own wildcard subdomains and for any custom domain a tenant attaches, against a provider API. It triggers off the `Ingress` or `Service` for a deployment receiving an external address from the cluster's load balancer, rather than being told the address directly by the orchestrator.
+`dns-service` automates DNS records, both for the platform's own wildcard subdomains and for any custom domain a tenant attaches, against a provider API. It triggers off the `Ingress` or `Service` for a deployment receiving an external address from the cluster's load balancer, AWS or GCP, whichever cloud that deployment landed on, rather than being told the address directly by the orchestrator.
 
 `tls-service` delegates the actual ACME workflow to `cert-manager` running in-cluster, which issues a `Certificate` resource per domain and handles the retry and backoff logic that ACME's rate limits make necessary. This service's own job narrows to requesting a certificate for a custom domain a tenant attaches and watching that `Certificate`'s status, rather than driving ACME directly.
 
@@ -143,9 +143,9 @@ Twenty four services, grouped by what part of the system they own.
 
 `billing-service` integrates with Paystack for subscription checkout and webhook handling. Every webhook gets processed idempotently, since Paystack, like most payment providers, will retry a webhook delivery, and double charging or double provisioning on a retry is exactly the kind of bug this project exists to catch before it happens for real.
 
-`usage-metering-service` meters compute time, bandwidth, and log retention per org, and periodically emits `usage.recorded` events that `billing-service` turns into invoices.
+`usage-metering-service` meters compute time, bandwidth, and log retention per org, and periodically emits `usage.recorded` events that `billing-service` turns into invoices. Like `audit-log-service`, it stores its raw metering data in ClickHouse from the start, since per-org usage is high-cardinality time-series data that Postgres would only handle with heavy partitioning and rollup tables.
 
-`secrets-service` stores environment variables and secrets per app, backed by Vault, and injects them into containers at deploy time instead of baking them into images.
+`secrets-service` stores environment variables and secrets per app, backed by Vault, and injects them into containers at deploy time instead of baking them into images. It also stores the credentials for each registered cluster, an AWS IAM role for EKS or a GCP service account key for GKE, the same way it stores a tenant's own secrets, so `deploy-orchestrator-service` never holds cloud credentials directly.
 
 `notification-service` consumes events from across the platform (build failures, deploy state changes, billing events) and routes them to email, Slack, or a webhook the tenant configured.
 
@@ -197,19 +197,21 @@ Live logs work the way they do on Vercel or Render, and it's really just the log
 
 ## Repository and environment structure
 
-Everything lives in one repository, `github.com/<your-username>/pallet`, under the personal account rather than an organization, since this is a personal build in public project rather than a team effort.
+Everything lives in one repository, `github.com/Wamitinewton/Pallet.io`, under the personal account rather than an organization, since this is a personal build in public project rather than a team effort.
 
 ```
 pallet/
-├── pom.xml                            # parent POM, pins Spring Boot, Resilience4j,
-│                                       # and Micrometer versions for every service
+├── pom.xml                            # parent POM, pins Spring Boot, Spring Cloud,
+│                                       # Resilience4j, Micrometer, plugin versions
+├── mvnw / .mvn/                       # Maven wrapper (no local Maven needed)
+├── Makefile                          # make up / build / verify / obs / kind-up ...
 ├── platform-common/
-│   ├── platform-common-events/        # Kafka event contracts
-│   ├── platform-common-security/      # Keycloak / OAuth2 resource server config
-│   └── platform-common-observability/ # shared tracing and metrics config
+│   ├── platform-common-events/        # Kafka event contracts + the topic catalog
+│   ├── platform-common-security/      # OAuth2 resource server baseline + org_id check
+│   └── platform-common-observability/ # metrics / tracing / logging deps every service pulls in
 ├── services/
+│   ├── config-server/                 # built first; the only service scaffolded so far
 │   ├── api-gateway/
-│   ├── config-server/
 │   ├── identity-service/
 │   ├── org-team-service/
 │   ├── audit-log-service/
@@ -231,24 +233,27 @@ pallet/
 │   ├── usage-metering-service/
 │   ├── secrets-service/
 │   └── notification-service/
-├── docker-compose.yml
+├── config-repo/                      # config config-server serves (git-backed later)
+├── deploy/local/                     # prometheus, otel-collector, grafana, kind cluster
+├── infra/keycloak/                   # realm export: clients, roles, org_id mapper
+├── docker-compose.yml                # local infra, behind compose profiles
 ├── .github/workflows/
-└── docs/
+└── docs/adr/                         # architecture decision records
 ```
 
 `tracing-collector` doesn't appear in that tree since it runs as the standard OpenTelemetry Collector rather than custom code, configured through `docker-compose.yml` and later through Helm.
 
-Once ArgoCD or Flux enters the picture, `platform-infra` becomes a second, sibling repository on the same account: Terraform, Helm charts, and ArgoCD application manifests, kept apart from the app code so a deploy manifest change goes through a different review path than an app change does. A third repository, `platform-docs`, is worth considering later if the build log outgrows a folder of markdown files inside `pallet` itself.
+Once ArgoCD or Flux enters the picture, `platform-infra` becomes a second, sibling repository on the same account: Terraform, Helm charts, and ArgoCD application manifests, kept apart from the app code so a deploy manifest change goes through a different review path than an app change does. Its Terraform now covers both clouds a tenant can choose, an EKS module and a GKE module standing up the two workload clusters `scheduler-service` registers against, alongside whatever cluster runs the platform's own control-plane services. A third repository, `platform-docs`, is worth considering later if the build log outgrows a folder of markdown files inside `pallet` itself.
 
 ## Local development
 
-Running all 22 services at once eats memory fast; a JVM under docker-compose easily takes a few hundred megabytes just sitting idle. Two practical fixes: define docker-compose profiles so a working session only starts the services relevant to what's changing (the build pipeline group on its own, or `deploy-orchestrator-service` plus its direct dependencies), and treat Spring Boot 3's GraalVM native image support as a later optimization once the reactor build is stable. Native compiled services start in milliseconds instead of seconds and use a fraction of the memory, which matters for local development now and will matter again once Pallet is running actual tenant workloads.
+Running all 24 services at once eats memory fast; a JVM under docker-compose easily takes a few hundred megabytes just sitting idle. Two practical fixes: use docker-compose profiles so a working session only starts what it needs, and treat Spring Boot's GraalVM native image support as a later optimization once the reactor build is stable. The backing infrastructure is already split this way, `core` (postgres, redis, kafka, keycloak, clickhouse), `observability` (otel-collector, prometheus, grafana, jaeger, loki), `data` (minio, vault), and `ui`, wrapped by `make up` / `make obs` / `make data` / `make up-all`. The same discipline applies to the services themselves as they get grouped (the build pipeline on its own, or `deploy-orchestrator-service` plus its direct dependencies). Native compiled services start in milliseconds instead of seconds and use a fraction of the memory, which matters for local development now and will matter again once Pallet is running actual tenant workloads.
 
-Testing the tenant deploy path itself needs an actual Kubernetes API to talk to, not just docker-compose. A local `kind` or `k3d` cluster running alongside the compose stack covers this without needing a cloud cluster for every iteration; `deploy-orchestrator-service` and friends point at it exactly the way they'd point at a real cluster later.
+Testing the tenant deploy path itself needs an actual Kubernetes API to talk to, not just docker-compose. A local `kind` cluster running alongside the compose stack covers this without needing a cloud cluster for every iteration (`deploy/local/kind-cluster.yaml`, `make kind-up`); `deploy-orchestrator-service` and friends point at it exactly the way they'd point at a real cluster later.
 
 ## CI/CD
 
-Each service gets its own GitHub Actions job, triggered only when its folder, or a shared `platform-common` module it depends on, changes. Path filters keep a change to one service from rebuilding all 22. Integration tests run against real Kafka, Postgres, and Keycloak containers through Testcontainers instead of mocks, since the point of this project is seeing how these pieces behave together, not testing against a mock that hides the interesting failure modes.
+The end state: each service gets its own GitHub Actions job, triggered only when its folder, or a shared `platform-common` module it depends on, changes, so a path filter keeps a change to one service from rebuilding all 24. While the reactor is still small, CI builds and tests it whole on every PR (`.github/workflows/build.yml`), with a separate job for the security scans; the paths-filter-plus-matrix split happens once the build time makes it worth it. Integration tests run against real Kafka, Postgres, ClickHouse, and Keycloak containers through Testcontainers instead of mocks, since the point of this project is seeing how these pieces behave together, not testing against a mock that hides the interesting failure modes.
 
 Once `platform-infra` exists as its own repository, deployment follows GitOps: a merge to its main branch is what ArgoCD actually watches and applies, not a direct push from CI.
 
@@ -264,9 +269,9 @@ Once `platform-infra` exists as its own repository, deployment follows GitOps: a
 
 ## Open source and licensing
 
-Apache-2.0 is the recommended default. It gives explicit patent grant language, which matters more for infrastructure code than for most side projects, and it's still permissive enough that anyone following along can fork it and run their own copy without friction. MIT stays a reasonable fallback if the patent clause ever feels heavier than the project needs.
+Apache-2.0, now in place (`LICENSE`, `NOTICE`). It gives explicit patent grant language, which matters more for infrastructure code than for most side projects, and it's still permissive enough that anyone following along can fork it and run their own copy without friction. MIT stays a reasonable fallback if the patent clause ever feels heavier than the project needs.
 
-A `CONTRIBUTING.md` explaining how the reactor build works, which services need which local dependencies, and how the path filtered CI is set up will matter more here than in most solo projects, since the whole premise is other people following along and possibly sending pull requests once a particular service gets interesting enough to attract attention.
+`CONTRIBUTING.md` explains how the reactor build works, the Spring Boot 4 starter and Jackson 3 gotchas, which services need which local dependencies, and how CI is set up. This matters more here than in most solo projects, since the whole premise is other people following along and possibly sending pull requests once a particular service gets interesting enough to attract attention.
 
 ## Open questions and next steps
 
@@ -274,11 +279,13 @@ These are the decisions this brief deliberately leaves open, since they're exact
 
 Runtime isolation for tenant workloads. Orchestration is settled on Kubernetes, but the pod level isolation it gives by default, namespaces and cgroups sharing a kernel, still isn't a strong enough boundary for arbitrary tenant code. The remaining decision is which sandboxed `RuntimeClass` to run tenant pods under: gVisor, lighter weight and simpler to operate, or Kata Containers, which wraps a real microVM and costs more per pod to start.
 
-Log store. Loki, cheap and label based, against ClickHouse, more powerful queries and more operational weight to run.
+Cluster provisioning model. A static, Terraform-provisioned pair of clusters, one EKS, one GKE, is enough while there are only two clouds and a fixed set of clusters, but Cluster API (CAPI), with its AWS and GCP providers, is the Kubernetes native way to manage clusters as custom resources if the platform ever needs to provision clusters on demand rather than against a fixed pair.
+
+Log store. Loki, cheap and label based, against ClickHouse, more powerful queries and more operational weight to run. Since `audit-log-service` and `usage-metering-service` already put ClickHouse in the stack, the operational-weight argument against using it here too is weaker than it first looks.
 
 First DNS provider integration. Cloudflare's API is the friendlier one to start with.
 
-Database strategy. One Postgres instance per service for true isolation, against a shared cluster with a schema per service, simpler to run alone but weaker isolation.
+Database strategy. This concerns the Postgres-backed services only; `audit-log-service` and `usage-metering-service` are on ClickHouse from the start, given their append-only, time-series workloads. For the rest: one Postgres instance per service for true isolation, against a shared cluster with a schema per service, simpler to run alone but weaker isolation.
 
 Event schema format. Plain JSON to start, or Avro or Protobuf with a schema registry once the event catalog above needs real versioning.
 

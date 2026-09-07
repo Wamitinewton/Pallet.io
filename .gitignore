@@ -2,13 +2,34 @@
 .idea/
 *.iml
 .vscode/
+*.iws
+*.ipr
 
 # Java / Maven
 target/
+build/
 *.class
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# OWASP Dependency-Check local cache
+.owasp-dependency-check/
 
 # OS
 .DS_Store
 
 # Logs
 *.log
+
+# Secrets and local overrides — never commit these
+*-credentials.json
+application-secrets.yaml
+application-secrets.yml
+application-local.yaml
+application-local.yml
+*.env
+.env
+
+# Local Kubernetes / infra state
+deploy/local/*.kubeconfig

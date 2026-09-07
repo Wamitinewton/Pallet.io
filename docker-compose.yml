@@ -1,0 +1,253 @@
+# Local backing infrastructure for Pallet.
+#
+# Nothing here starts by default — every service is behind a profile so a
+# working session only runs what it needs (the brief's memory concern):
+#
+#   docker compose --profile core up -d           # postgres, redis, kafka, keycloak, clickhouse
+#   docker compose --profile observability up -d   # otel-collector, prometheus, grafana, jaeger, loki
+#   docker compose --profile data up -d            # minio, vault
+#   docker compose --profile ui up -d              # kafka-ui
+#
+# The Makefile wraps these (make up / make up-all / make obs / make down).
+
+name: pallet
+
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: pallet-postgres
+    profiles: ["core"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pallet
+      POSTGRES_PASSWORD: pallet
+      POSTGRES_DB: pallet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/local/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pallet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [pallet]
+
+  redis:
+    image: redis:7-alpine
+    container_name: pallet-redis
+    profiles: ["core"]
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [pallet]
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: pallet-kafka
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks: [pallet]
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: pallet-kafka-ui
+    profiles: ["ui"]
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8090:8080"
+    networks: [pallet]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    container_name: pallet-keycloak
+    profiles: ["core"]
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: pallet
+      KC_DB_PASSWORD: pallet
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [pallet]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
+    container_name: pallet-clickhouse
+    profiles: ["core"]
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: pallet
+      CLICKHOUSE_PASSWORD: pallet
+      CLICKHOUSE_DB: pallet
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [pallet]
+
+  minio:
+    image: minio/minio:latest
+    container_name: pallet-minio
+    profiles: ["data"]
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: pallet
+      MINIO_ROOT_PASSWORD: pallet-minio
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks: [pallet]
+
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: pallet-vault
+    profiles: ["data"]
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: pallet-root
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      - "8200:8200"
+    networks: [pallet]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: pallet-otel-collector
+    profiles: ["observability"]
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./deploy/local/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+    networks: [pallet]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: pallet-jaeger
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+    networks: [pallet]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pallet-prometheus
+    profiles: ["observability"]
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [pallet]
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: pallet-loki
+    profiles: ["observability"]
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    networks: [pallet]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: pallet-grafana
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./deploy/local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks: [pallet]
+
+networks:
+  pallet:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  kafka_data:
+  clickhouse_data:
+  minio_data:
+  grafana_data:

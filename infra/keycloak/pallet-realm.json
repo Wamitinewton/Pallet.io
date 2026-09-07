@@ -1,0 +1,103 @@
+{
+  "realm": "pallet",
+  "enabled": true,
+  "displayName": "Pallet",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "roles": {
+    "realm": [
+      { "name": "owner", "description": "Full control of an organization, including billing and deletion" },
+      { "name": "admin", "description": "Manage apps, deployments and team members; no billing" },
+      { "name": "developer", "description": "Trigger deploys and read logs; no member or billing management" },
+      { "name": "viewer", "description": "Read-only access to an organization" }
+    ]
+  },
+
+  "clientScopes": [
+    {
+      "name": "org",
+      "description": "Adds the org_id claim every Pallet service checks against the requested resource",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "org_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "org_id",
+            "claim.name": "org_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+
+  "defaultDefaultClientScopes": ["org"],
+
+  "clients": [
+    {
+      "clientId": "pallet-dashboard",
+      "name": "Pallet dashboard and API (public, PKCE)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:5173/*", "http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:5173", "http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "defaultClientScopes": ["org", "roles", "profile", "email"]
+    },
+    {
+      "clientId": "config-server",
+      "name": "config-server (service, client credentials)",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "secret": "config-server-dev-secret"
+    },
+    {
+      "clientId": "identity-service",
+      "name": "identity-service (service, client credentials)",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "secret": "identity-service-dev-secret"
+    },
+    {
+      "clientId": "deploy-orchestrator-service",
+      "name": "deploy-orchestrator-service (service, client credentials)",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "secret": "deploy-orchestrator-service-dev-secret"
+    }
+  ],
+
+  "users": [
+    {
+      "username": "dev-owner",
+      "enabled": true,
+      "email": "owner@pallet.local",
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Owner",
+      "attributes": { "org_id": ["org_local_dev"] },
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["owner"]
+    }
+  ]
+}

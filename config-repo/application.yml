@@ -1,0 +1,42 @@
+# Shared configuration served by config-server to every Pallet service.
+# A service fetches this (merged with its own <service-name>.yml) at startup.
+#
+# This directory is the starting point only. Once platform-infra exists it
+# moves to a git-backed source, and once Pallet runs on Kubernetes the shared
+# values move to ConfigMaps and the secrets to Vault / Kubernetes Secrets.
+# Never put a real secret in this file.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLE_RATE:1.0}
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTLP_METRICS_ENABLED:false}
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+      export:
+        enabled: ${OTLP_TRACING_ENABLED:false}
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/pallet}

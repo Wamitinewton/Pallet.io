@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.pallet</groupId>
+        <artifactId>pallet-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>platform-common</artifactId>
+    <packaging>pom</packaging>
+    <name>platform-common</name>
+    <description>Shared libraries every Pallet service depends on</description>
+
+    <modules>
+        <module>platform-common-events</module>
+        <module>platform-common-security</module>
+        <module>platform-common-observability</module>
+    </modules>
+
+</project>
