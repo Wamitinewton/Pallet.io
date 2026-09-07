@@ -46,7 +46,7 @@
              call (GitHub, ACME, DNS provider, Paystack, the cloud APIs) will
              depend on this once those services exist. Confirm the Spring Boot 4
              starter works before the first use. -->
-        <resilience4j.version>2.3.0</resilience4j.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
 
         <!-- Empty by default. Set locally via ~/.m2/settings.xml or in CI via
              -Dnvd.api.key=${{ secrets.NVD_API_KEY }}. Declared here only so the
