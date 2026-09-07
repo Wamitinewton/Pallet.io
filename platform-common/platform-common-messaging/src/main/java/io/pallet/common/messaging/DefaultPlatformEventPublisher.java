@@ -62,7 +62,7 @@ public class DefaultPlatformEventPublisher implements PlatformEventPublisher {
 
     private ExternalServiceException failed(String topic, PlatformEvent event, Exception cause) {
         count(topic, "failure");
-        log.warn("Event publish to {} failed for type={} orgId={}", topic, event.eventType(), event.orgId());
+        log.warn("Event publish to {} failed for type={} orgId={} eventId={}", topic, event.eventType(), event.orgId(), event.eventId(), cause);
         return new ExternalServiceException(
                 "Event publish failed",
                 "topic=" + topic + " type=" + event.eventType(),
