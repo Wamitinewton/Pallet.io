@@ -15,7 +15,7 @@
     <description>Shared metrics, tracing and structured logging wiring. Every service depends on this module.</description>
 
     <properties>
-        <logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
+        <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
     </properties>
 
     <dependencies>
