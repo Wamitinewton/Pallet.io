@@ -15,9 +15,12 @@
     <description>Shared libraries every Pallet service depends on</description>
 
     <modules>
+        <module>platform-common-api</module>
+        <module>platform-common-exception</module>
         <module>platform-common-events</module>
         <module>platform-common-security</module>
         <module>platform-common-observability</module>
+        <module>platform-common-messaging</module>
     </modules>
 
 </project>

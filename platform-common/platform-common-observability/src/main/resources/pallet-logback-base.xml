@@ -7,14 +7,15 @@
     <springProfile name="dev"><root level="INFO"><appender-ref ref="CONSOLE"/></root></springProfile>
     <springProfile name="prod"><root level="INFO"><appender-ref ref="JSON"/></root></springProfile>
 
-  Micrometer Tracing populates traceId / spanId in the MDC. Services add orgId
-  (from OrgContext, once authenticated) and deploymentId where they have one.
+  Micrometer Tracing populates traceId / spanId in the MDC; platform-common-observability
+  adds correlationId (the stable end-to-end handle). Services add orgId (from OrgContext,
+  once authenticated) and deploymentId where they have one.
 -->
 <included>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}][%X{orgId:-}] - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}][%X{correlationId:-}][%X{orgId:-}] - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -22,6 +23,7 @@
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <includeMdcKeyName>traceId</includeMdcKeyName>
             <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
             <includeMdcKeyName>orgId</includeMdcKeyName>
             <includeMdcKeyName>deploymentId</includeMdcKeyName>
             <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">

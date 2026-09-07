@@ -33,3 +33,4 @@ application-local.yml
 
 # Local Kubernetes / infra state
 deploy/local/*.kubeconfig
+docs/workflows

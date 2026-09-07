@@ -2,7 +2,7 @@
 
 A self built platform as a service, used as a learning vehicle for distributed systems patterns. Built in public, one service at a time.
 
-Status: design stage, no code written yet. This document is the starting point for the detailed system design that follows it.
+Status: initial setup done (Maven reactor, `platform-common/*`, `config-server`, local infra, CI). The event backbone is built next, before any feature work: a shared messaging module, a shared resilience module, and `notification-service` as the reference consumer. Nothing between services is a blocking call, and that holds from the first service onward rather than arriving as a later migration.
 
 ## Contents
 
@@ -24,7 +24,7 @@ Status: design stage, no code written yet. This document is the starting point f
 
 ## What this is
 
-Pallet is a smaller version of what Render, Fly.io, or Vercel do: a developer connects a Git repository, pushes code, and the platform builds it, deploys it, and hands back a live URL with TLS already configured. Underneath that pitch, it's a testbed for distributed systems patterns. The deployment pipeline runs on the saga pattern. Services talk to each other through an event backbone built on Kafka. Every call to something outside Pallet's control (GitHub, a DNS provider, Paystack, an ACME server) goes through retries, timeouts, and a circuit breaker. Keycloak handles identity across every tenant. Every request gets traced end to end. Prometheus and Grafana watch the whole thing, and Paystack handles real subscription billing.
+Pallet is a smaller version of what Render, Fly.io, or Vercel do: a developer connects a Git repository, pushes code, and the platform builds it, deploys it, and hands back a live URL with TLS already configured. Underneath that pitch, it's a testbed for distributed systems patterns. The deployment pipeline runs on the saga pattern. Services talk to each other through an event backbone built on Kafka, and no service makes a blocking call to another — the only synchronous edges in the whole system are inbound (a Git webhook, a dashboard request) and calls to third parties. Every call to something outside Pallet's control (GitHub, a DNS provider, Paystack, an ACME server, an SMTP host) goes through retries, timeouts, and a circuit breaker. Keycloak handles identity across every tenant. Every request and every event gets traced end to end. Prometheus and Grafana watch the whole thing, and Paystack handles real subscription billing. These patterns are load-bearing from the first service — `notification-service` and the two shared modules behind it (`platform-common-messaging`, `platform-common-resilience`) exist so the event wiring, dead-letter handling, circuit breaking, retry, tracing, and metrics are set once and reused, not reinvented per service.
 
 ## Why this project
 
@@ -35,9 +35,9 @@ Two things mattered when picking what to build: proving out these patterns in so
 | Concept | Where it lives | Technology |
 |---|---|---|
 | Saga pattern | `deploy-orchestrator-service` runs the deployment saga; `billing-service` runs a payment and provisioning saga | Hand rolled state machine over Kafka commands and events |
-| Event backbone | Every service that produces or reacts to a platform event | Apache Kafka, `spring-kafka` |
+| Event backbone | Every service that produces or reacts to a platform event; wiring shared via `platform-common-messaging` | Apache Kafka, `spring-kafka`, dead-letter topics |
 | Edge routing and config | `api-gateway`, `config-server` | Spring Cloud Gateway, Spring Cloud Config Server |
-| Retries, timeouts, circuit breakers | Calls to GitHub, the container registry, ACME, the DNS provider, Paystack | Resilience4j |
+| Retries, timeouts, circuit breakers | Every call off the backbone: SMTP, GitHub, the container registry, ACME, the DNS provider, Paystack; defaults shared via `platform-common-resilience` | Resilience4j |
 | Identity and multi-tenancy | `identity-service`, `org-team-service`, and every service that checks the org claim on a token | Keycloak, Spring Security OAuth2 |
 | Distributed tracing | Every service | Micrometer Tracing, OpenTelemetry, Jaeger or Grafana Tempo |
 | Payments | `billing-service` | Paystack |
@@ -47,14 +47,15 @@ Two things mattered when picking what to build: proving out these patterns in so
 
 ## Architecture overview
 
-A deployment moves through two phases. The first is synchronous: a push arrives, gets built, and hands off to the orchestrator. The second is asynchronous, driven by Kafka: the orchestrator configures DNS, the load balancer, and TLS, checks health, and only then marks the app live. If any step in the second phase fails, the orchestrator issues compensating commands instead of leaving the deployment half finished, deregistering a load balancer target, rolling back a DNS record, or tearing down a container that never passed its health check.
+A deployment is event-driven end to end. The only synchronous step is the inbound webhook: GitHub POSTs a push, `git-integration-service` acknowledges it and publishes `git.push.received`. From there every hop is a Kafka event — build is queued and run, an image is pushed, the orchestrator drives the saga (configure DNS, the load balancer, TLS, check health) and only then marks the app live. No service in that chain blocks waiting on another. If any saga step fails, the orchestrator issues compensating commands instead of leaving the deployment half finished, deregistering a load balancer target, rolling back a DNS record, or tearing down a container that never passed its health check.
 
 ```mermaid
 flowchart LR
-    A[Git push] --> B[Build service]
-    B --> C[Deploy orchestrator<br/>saga coordinator]
-    C -->|async via Kafka| D[Networking layer<br/>DNS + load balancer + TLS]
-    D --> E[Live app]
+    A[Git push webhook] -->|git.push.received| B[Build pipeline]
+    B -->|build.succeeded| C[Deploy orchestrator<br/>saga coordinator]
+    C -->|Kafka commands + events| D[Networking layer<br/>DNS + load balancer + TLS]
+    D -->|health.check events| C
+    C --> E[Live app]
 ```
 
 Logs work similarly, and it's the same event backbone doing the work. A log agent on each node tags every line with the tenant and app it belongs to, publishes it to Kafka, and a log service persists it and streams it live to the tenant's dashboard, but only after checking that the requester's token actually belongs to that tenant.
@@ -71,7 +72,7 @@ flowchart LR
 
 On the language and build side: Java 21, Spring Boot 4.1, and a Maven multi-module reactor tying all 24 services together under one parent POM. The parent POM is what keeps Spring Boot, Spring Cloud, Resilience4j, and Micrometer versions in sync across every service instead of drifting apart one dependency bump at a time. Spring Boot 4.1 pairs with Spring Cloud 2025.1.2 (Oakwood); earlier Spring Cloud releases don't run against it. Boot 4's modular starters mean several dependency names differ from the 3.x examples most of the internet is still written against, `spring-boot-starter-webmvc` rather than `-web`, `spring-boot-starter-security-oauth2-resource-server` rather than `-oauth2-resource-server`, `spring-boot-starter-aspectj` rather than `-aop`, and Jackson 3 moves databind types to `tools.jackson.*` while leaving annotations under `com.fasterxml.jackson.annotation`. `docs/adr/0005-java-21-spring-boot-4.md` has the full list.
 
-For networking and resilience: `spring-cloud-gateway` at the edge, `spring-boot-starter-kafka` (Boot's managed wrapper over `spring-kafka`) for the event backbone, and Resilience4j for circuit breakers, retries, and timeouts. Resilience4j is the right pick here over Netflix's Hystrix, which stopped receiving updates a few years ago.
+For networking and resilience: `spring-cloud-gateway` at the edge, `spring-boot-starter-kafka` (Boot's managed wrapper over `spring-kafka`) for the event backbone, and Resilience4j for circuit breakers, retries, and timeouts. Resilience4j is the right pick here over Netflix's Hystrix, which stopped receiving updates a few years ago. Neither is wired per service. `platform-common-messaging` owns the Kafka wiring — a JSON producer with the idempotent flag set, a consumer container factory with an `ErrorHandlingDeserializer`, exponential-backoff retry, a `DeadLetterPublishingRecoverer` that routes to `<topic>.DLT`, Micrometer observation on both sides, and a typed `PlatformEventPublisher` that resolves a topic from the event type and stamps the standard headers. `platform-common-resilience` owns the Resilience4j defaults (circuit breaker, retry, and time limiter configs, plus the Micrometer binding so breaker state and retry counts land in Prometheus). A service depends on those two modules and gets the whole setup; both exist before the first feature service so nothing is retrofitted.
 
 For identity: `spring-boot-starter-security-oauth2-resource-server` and its client counterpart against Keycloak, plus the Keycloak Admin Client for provisioning tenants programmatically instead of by hand. The resource-server baseline (a secure-by-default filter chain, Keycloak realm-role mapping, and an `OrgContext` helper for the `org_id` claim check) lives in `platform-common-security` so every service gets it by depending on one module.
 
@@ -147,14 +148,19 @@ Twenty four services, grouped by what part of the system they own.
 
 `secrets-service` stores environment variables and secrets per app, backed by Vault, and injects them into containers at deploy time instead of baking them into images. It also stores the credentials for each registered cluster, an AWS IAM role for EKS or a GCP service account key for GKE, the same way it stores a tenant's own secrets, so `deploy-orchestrator-service` never holds cloud credentials directly.
 
-`notification-service` consumes events from across the platform (build failures, deploy state changes, billing events) and routes them to email, Slack, or a webhook the tenant configured.
+`notification-service` is the first service built, and the reference implementation for every event consumer that follows it. It consumes one topic, `notification.requested` — a command-style event (single intended consumer, same modelling as the rollback trigger described under "Events and messaging") that any service publishes when it wants a tenant notified. The payload carries an org id, a `notificationType`, the recipient, a channel hint, and a map of template variables. `notification-service` owns a template registry keyed by `notificationType`: rendering a notification is looking up the template for that type, filling it from the variables, and delivering it. Adding a new kind of notification as the platform grows is therefore a local change where the event is produced (publish `notification.requested` with a new type and its variables) plus one template file here — no schema change, no new topic, no edit to another service's consumer.
+
+Email is the only channel to start (SMTP; Mailpit locally, a real provider later); Slack and tenant-configured webhooks come later behind the same registry. Every delivery attempt runs through a Resilience4j circuit breaker, retry, and time limiter from `platform-common-resilience`, so a slow or failing SMTP host degrades gracefully instead of stalling the consumer. A message that exhausts its retries, or that can't be deserialized, lands on `notification.requested.DLT` and is recorded as failed rather than lost. Consumption is idempotent by event id — a redelivered event sends one email, not two. Traces span the consume-render-send path, and counters for sent, failed, retried, and dead-lettered notifications plus a send-latency histogram and the breaker-state gauge are exported from day one. Persistent state is a single `notification` Postgres schema (per ADR-0007) holding a delivery log that doubles as the idempotency record.
 
 ## Events and messaging
 
-Topic names follow `domain.fact`, written in the past tense: something that already happened, not an instruction. A rollback trigger still gets modeled as an event with one intended consumer rather than a synchronous request, so the orchestrator never blocks waiting on an answer.
+Topic names follow `domain.fact`, written in the past tense: something that already happened, not an instruction. A few topics are command-style — one intended consumer, a request for something to happen (`deploy.rollback.triggered`, `notification.requested`) — but they use the same envelope and the same fire-and-forget delivery, so no producer blocks waiting on an answer.
+
+Every event on the backbone is a flat JSON record carrying the common envelope (`eventId`, `eventType`, `orgId`, `occurredAt`) plus its domain fields, defined once in `platform-common-events`. Messages are keyed by `orgId` so a tenant's events keep their order. Standard Kafka headers travel with each record: `event-id`, `event-type`, `occurred-at`, and the W3C `traceparent` for trace continuity across the hop. Each topic has a matching `<topic>.DLT` for messages that exhaust retries or fail to deserialize. Consumers are idempotent by `event-id`. All of this — producer, consumer container, retry, dead-lettering, header stamping, tracing — comes from `platform-common-messaging`; a service does not hand-roll a `KafkaTemplate` or a `@KafkaListener` config. JSON now, a schema registry (Avro or Protobuf) later, per `docs/adr/0006-event-schema-format.md`.
 
 | Topic | Producer | Key consumers | Payload highlights |
 |---|---|---|---|
+| `notification.requested` | any service | notification-service | org id, notificationType, recipient, channel, template variables, dedupe key |
 | `git.push.received` | git-integration-service | build-queue-service | repo, branch, commit sha, org id |
 | `build.started` | build-service | deploy-orchestrator-service, log-service, notification-service | build id, app id |
 | `build.succeeded` | build-service | deploy-orchestrator-service, registry-service | build id, image tag, digest |
@@ -206,11 +212,16 @@ pallet/
 ├── mvnw / .mvn/                       # Maven wrapper (no local Maven needed)
 ├── Makefile                          # make up / build / verify / obs / kind-up ...
 ├── platform-common/
-│   ├── platform-common-events/        # Kafka event contracts + the topic catalog
+│   ├── platform-common-events/        # event contracts (envelope + domain records) + topic catalog
+│   ├── platform-common-messaging/     # Kafka wiring: JSON producer/consumer, retry, DLT,
+│   │                                   # tracing, the typed PlatformEventPublisher
+│   ├── platform-common-resilience/    # Resilience4j defaults (circuit breaker / retry /
+│   │                                   # time limiter) + Micrometer binding
 │   ├── platform-common-security/      # OAuth2 resource server baseline + org_id check
 │   └── platform-common-observability/ # metrics / tracing / logging deps every service pulls in
 ├── services/
-│   ├── config-server/                 # built first; the only service scaffolded so far
+│   ├── config-server/                 # scaffolded (the reactor's spine)
+│   ├── notification-service/          # built first: the reference event consumer
 │   ├── api-gateway/
 │   ├── identity-service/
 │   ├── org-team-service/
@@ -247,7 +258,7 @@ Once ArgoCD or Flux enters the picture, `platform-infra` becomes a second, sibli
 
 ## Local development
 
-Running all 24 services at once eats memory fast; a JVM under docker-compose easily takes a few hundred megabytes just sitting idle. Two practical fixes: use docker-compose profiles so a working session only starts what it needs, and treat Spring Boot's GraalVM native image support as a later optimization once the reactor build is stable. The backing infrastructure is already split this way, `core` (postgres, redis, kafka, keycloak, clickhouse), `observability` (otel-collector, prometheus, grafana, jaeger, loki), `data` (minio, vault), and `ui`, wrapped by `make up` / `make obs` / `make data` / `make up-all`. The same discipline applies to the services themselves as they get grouped (the build pipeline on its own, or `deploy-orchestrator-service` plus its direct dependencies). Native compiled services start in milliseconds instead of seconds and use a fraction of the memory, which matters for local development now and will matter again once Pallet is running actual tenant workloads.
+Running all 24 services at once eats memory fast; a JVM under docker-compose easily takes a few hundred megabytes just sitting idle. Two practical fixes: use docker-compose profiles so a working session only starts what it needs, and treat Spring Boot's GraalVM native image support as a later optimization once the reactor build is stable. The backing infrastructure is already split this way, `core` (postgres, redis, kafka, keycloak, clickhouse, mailpit), `observability` (otel-collector, prometheus, grafana, jaeger, loki), `data` (minio, vault), and `ui`, wrapped by `make up` / `make obs` / `make data` / `make up-all`. Mailpit is in `core` from the start because `notification-service` is the first thing built and its whole loop ends at an SMTP host — Mailpit's UI at `:8025` is where a locally-triggered email actually shows up. The same discipline applies to the services themselves as they get grouped (the build pipeline on its own, or `deploy-orchestrator-service` plus its direct dependencies). Native compiled services start in milliseconds instead of seconds and use a fraction of the memory, which matters for local development now and will matter again once Pallet is running actual tenant workloads.
 
 Testing the tenant deploy path itself needs an actual Kubernetes API to talk to, not just docker-compose. A local `kind` cluster running alongside the compose stack covers this without needing a cloud cluster for every iteration (`deploy/local/kind-cluster.yaml`, `make kind-up`); `deploy-orchestrator-service` and friends point at it exactly the way they'd point at a real cluster later.
 
@@ -259,13 +270,16 @@ Once `platform-infra` exists as its own repository, deployment follows GitOps: a
 
 ## Build roadmap
 
-1. Identity and access. `config-server` stood up first as the reactor's spine, then Keycloak, `identity-service`, `org-team-service`, and `api-gateway` working end to end, with a working login before anything else exists.
-2. The build pipeline. `git-integration-service`, `build-queue-service`, `build-service`, and `registry-service`. Done when a git push produces a tagged image sitting in a registry.
-3. A naive deploy path. A first pass of `deploy-orchestrator-service`, without saga rollback yet, plus enough of the networking layer to get one app live at a real URL.
-4. The event backbone. Move the pipeline onto Kafka, add the saga's compensating actions, and wrap every external call in retries and a circuit breaker.
-5. Observability. `log-service`, `metrics-service`, tracing, and Grafana dashboards. This is the phase where the system becomes something worth screenshotting for a build in public post.
-6. Billing. `billing-service` and `usage-metering-service`, tied to Paystack.
-7. Hardening. Autoscaling, canary deploys, `secrets-service`, and whatever GraalVM native image or service mesh work is left on the table.
+The order changed once: the event backbone and its resilience and observability plumbing moved to the front, ahead of identity, so every feature service is built on top of it rather than being retrofitted onto it later.
+
+1. The event backbone. `platform-common-messaging` and `platform-common-resilience`, then `notification-service` with Mailpit and the email channel. Done when publishing a `notification.requested` event delivers an email visible in Mailpit, a forced SMTP outage trips the circuit breaker and lands the message on `notification.requested.DLT` instead of blocking the consumer, and the consume-render-send path shows up as a single trace in Jaeger with counters in Prometheus.
+2. Identity and access. Keycloak, `identity-service`, `api-gateway`, then `org-team-service`, working end to end with a real login. `identity-service` publishes `notification.requested` (org-owner welcome, and later e-mail verification) from the start — it is the first real producer on the backbone. `api-gateway` comes before `org-team-service`: it needs a token issuer to route to, and building it early fixes the edge auth and routing conventions before there are several services behind it.
+3. The build pipeline. `git-integration-service`, `build-queue-service`, `build-service`, and `registry-service`, communicating over the backbone from the first commit. Done when a git push produces a tagged image sitting in a registry, driven entirely by `git.push.received` → `build.*` events.
+4. A naive deploy path. A first pass of `deploy-orchestrator-service` plus enough of the networking layer to get one app live at a real URL — still no saga rollback, but already event-driven.
+5. The deploy saga. Add the orchestrator's compensating actions and the remaining external-call integrations (GitHub, the registry, ACME, the DNS provider), each wrapped in the retry and circuit breaker from `platform-common-resilience` that phase 1 already established.
+6. Observability in depth. `log-service`, `metrics-service`, and Grafana dashboards on top of the tracing and metrics baseline every service has carried since phase 1. This is the phase where the system becomes something worth screenshotting for a build in public post.
+7. Billing. `billing-service` and `usage-metering-service`, tied to Paystack.
+8. Hardening. Autoscaling, canary deploys, `secrets-service`, a decision on the transactional outbox, and whatever GraalVM native image or service mesh work is left on the table.
 
 ## Open source and licensing
 
@@ -288,5 +302,7 @@ First DNS provider integration. Cloudflare's API is the friendlier one to start 
 Database strategy. This concerns the Postgres-backed services only; `audit-log-service` and `usage-metering-service` are on ClickHouse from the start, given their append-only, time-series workloads. For the rest: one Postgres instance per service for true isolation, against a shared cluster with a schema per service, simpler to run alone but weaker isolation.
 
 Event schema format. Plain JSON to start, or Avro or Protobuf with a schema registry once the event catalog above needs real versioning.
+
+Reliable event publishing. Phase 1 publishes directly to Kafka with the idempotent-producer flag and Resilience4j around the send. That leaves a dual-write gap when a service must both commit a database change and publish an event for it (`identity-service` provisioning a user and announcing it, for one). The options are a transactional outbox drained by a poller, or the same table tailed by Debezium over the Postgres WAL. Deferred to phase 8 unless an earlier phase hits a concrete correctness problem that forces it sooner.
 
 Network isolation between tenant workloads, and between tenants and the control plane. Kubernetes gives a natural attachment point, `NetworkPolicy` rules scoped to each tenant's namespace, but the actual rule set, and whether `NetworkPolicy` alone is enough versus needing a service mesh with mTLS, is still the hardest problem in the whole project and deserves its own design pass before any code gets written.
