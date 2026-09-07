@@ -46,6 +46,8 @@ public class DefaultPlatformEventPublisher implements PlatformEventPublisher {
                 .add(EventHeaders.EVENT_TYPE, utf8(event.eventType()))
                 .add(EventHeaders.OCCURRED_AT, utf8(event.occurredAt().toString()))
                 .add(EventHeaders.ORG_ID, utf8(event.orgId()));
+        io.pallet.common.observability.CorrelationId.current()
+                .ifPresent(id -> record.headers().add(EventHeaders.CORRELATION_ID, utf8(id)));
 
         try {
             template.send(record).get(sendTimeout.toMillis(), TimeUnit.MILLISECONDS);
