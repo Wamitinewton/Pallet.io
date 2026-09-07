@@ -81,6 +81,16 @@
 
             <dependency>
                 <groupId>io.pallet</groupId>
+                <artifactId>platform-common-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pallet</groupId>
+                <artifactId>platform-common-exception</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pallet</groupId>
                 <artifactId>platform-common-events</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -92,6 +102,11 @@
             <dependency>
                 <groupId>io.pallet</groupId>
                 <artifactId>platform-common-observability</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pallet</groupId>
+                <artifactId>platform-common-messaging</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

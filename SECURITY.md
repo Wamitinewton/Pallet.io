@@ -23,7 +23,9 @@ at <https://nvd.nist.gov/developers/request-an-api-key>, then either:
 - add it to `~/.m2/settings.xml` as a property `nvd.api.key`, or
 - pass `-Dnvd.api.key=...` on the command line.
 
-In CI it comes from the `NVD_API_KEY` repository secret.
+In CI it comes from the `NVD_API_KEY` repository secret. If that secret is not
+set, the CI `security` job runs SpotBugs but skips OWASP Dependency-Check with a
+warning (Dependency-Check 13 cannot update the NVD without a key).
 
 ### Suppressions
 

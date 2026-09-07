@@ -118,10 +118,21 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: SpotBugs + OWASP Dependency-Check
-        run: ./mvnw -B verify -P security -DskipTests -Dnvd.api.key="${NVD_API_KEY}"
+      - name: SpotBugs + FindSecBugs
+        run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
+
+      - name: OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NVD_API_KEY:-}" ]; then
+            echo "::warning title=OWASP Dependency-Check skipped::NVD_API_KEY secret is not set."
+            echo "Dependency-Check 13 cannot update the NVD without a key. Add one at"
+            echo "Settings -> Secrets and variables -> Actions (get a key: https://nvd.nist.gov/developers/request-an-api-key)."
+            exit 0
+          fi
+          ./mvnw -B -P security -DskipTests -Dspotbugs.skip=true -Dnvd.api.key="$NVD_API_KEY" verify
 
   # Single stable status check to require in branch protection. Passes when the
   # build path that actually ran (reactor or service matrix) succeeded; a

@@ -51,7 +51,7 @@ services:
     networks: [pallet]
 
   kafka:
-    image: apache/kafka:3.9.0
+    image: apache/kafka:3.9.1
     container_name: pallet-kafka
     profiles: ["core"]
     restart: unless-stopped

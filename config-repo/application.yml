@@ -31,12 +31,31 @@ management:
 spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${spring.application.name}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: RECORD
+      observation-enabled: true
     producer:
       acks: all
       properties:
         enable.idempotence: true
+        max.in.flight.requests.per.connection: 5   # safe with idempotence=true
+    template:
+      observation-enabled: true
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/pallet}
+
+pallet:
+  messaging:
+    consumer-concurrency: 3
+    retry:
+      max-attempts: 4
+      initial-interval: 1s
+      multiplier: 2.0
+      max-interval: 30s

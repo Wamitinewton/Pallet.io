@@ -72,9 +72,12 @@ full reactor `verify` — the canonical green signal. A PR is classified by the
   `platform-common` module, `config-repo/`, or the workflow itself — falls back
   to a full reactor build, since a shared change can break any service.
 
-A separate `security` job runs the SpotBugs + OWASP scans over the whole reactor
-on every PR regardless. The `build` job is the single stable status check to
-require in branch protection; it passes when whichever build path ran succeeded.
+A separate `security` job runs on every PR regardless: SpotBugs + FindSecBugs
+always (a hard fail), then OWASP Dependency-Check — which is skipped with a
+warning unless the `NVD_API_KEY` secret is set, since Dependency-Check 13 cannot
+update the NVD without a key. The `build` job is the single stable status check
+to require in branch protection; it passes when whichever build path ran
+succeeded.
 
 Adding a service needs no CI change — the `scope` job discovers `services/*`
 from the diff.

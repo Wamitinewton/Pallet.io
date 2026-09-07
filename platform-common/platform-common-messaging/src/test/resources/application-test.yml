@@ -1,0 +1,28 @@
+spring:
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: RECORD
+      observation-enabled: true
+    template:
+      observation-enabled: true
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+pallet:
+  messaging:
+    create-topics: true
+    topic-replicas: 1
+    topic-partitions: 1
+    publish:
+      send-timeout: 5s
+    retry:
+      max-attempts: 3
+      initial-interval: 200ms
+      multiplier: 2.0
+      max-interval: 1s
