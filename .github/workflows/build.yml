@@ -14,11 +14,63 @@ permissions:
   contents: read
 
 jobs:
-  # The reactor is small enough today to build whole on every change. Once
-  # there are many services, split this into a paths-filter + matrix so a
-  # change to one service (or a platform-common module it depends on) only
-  # rebuilds what is affected — see CONTRIBUTING.md.
+  # Work out what a change touches. A push to main always runs a full reactor
+  # build — that is the canonical green signal. A PR builds only the affected
+  # services with `-pl <module> -am`, unless it touches something the whole
+  # reactor depends on (the parent POM, the Maven wrapper, a platform-common
+  # module, shared config, or this workflow), in which case it falls back to a
+  # full build.
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.classify.outputs.full }}
+      services: ${{ steps.classify.outputs.services }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "full=true"  >> "$GITHUB_OUTPUT"
+            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "push build -> full reactor"
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          echo "Changed files:"
+          printf '%s\n' "$changed"
+
+          # Any changed path that is not inside a single service module
+          # (services/<name>/...) forces a full build: every service inherits
+          # the parent POM and depends on platform-common, so a shared change
+          # can break anything.
+          shared="$(printf '%s\n' "$changed" | grep -Ev '^services/[^/]+/' || true)"
+          if [ -n "$shared" ]; then
+            echo "full=true"  >> "$GITHUB_OUTPUT"
+            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "shared change -> full reactor"
+            exit 0
+          fi
+
+          # Only service modules changed: collect the affected ones.
+          services="$(printf '%s\n' "$changed" \
+            | sed -nE 's#^(services/[^/]+)/.*#\1#p' \
+            | sort -u | jq -R . | jq -cs .)"
+          echo "full=false"          >> "$GITHUB_OUTPUT"
+          echo "services=$services"  >> "$GITHUB_OUTPUT"
+          echo "affected services: $services"
+
   reactor:
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +84,27 @@ jobs:
 
       - name: Build, unit + integration tests
         run: ./mvnw -B clean verify
+
+  service:
+    needs: scope
+    if: needs.scope.outputs.full == 'false' && needs.scope.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.scope.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build ${{ matrix.module }} + its dependencies
+        run: ./mvnw -B -pl ${{ matrix.module }} -am clean verify
 
   security:
     runs-on: ubuntu-latest
@@ -49,3 +122,25 @@ jobs:
         run: ./mvnw -B verify -P security -DskipTests -Dnvd.api.key="${NVD_API_KEY}"
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+  # Single stable status check to require in branch protection. Passes when the
+  # build path that actually ran (reactor or service matrix) succeeded; a
+  # skipped job is fine, it means the other path covered the change.
+  build:
+    needs: [scope, reactor, service, security]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "a required job did not pass"
+              exit 1
+            fi
+          done
+          echo "build ok"

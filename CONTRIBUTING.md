@@ -61,11 +61,23 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 
 ## CI
 
-`.github/workflows/build.yml` builds and tests the whole reactor on every PR to
-`main`, with a second job for the security scans. The reactor is small enough
-today that a full build per change is fine; once there are many services this
-splits into a paths-filter + matrix so a change to one service (or a
-`platform-common` module it depends on) only rebuilds what it affects.
+`.github/workflows/build.yml` is path-filtered. A push to `main` always runs a
+full reactor `verify` — the canonical green signal. A PR is classified by the
+`scope` job:
+
+- touches only files under one or more `services/<name>/` — a matrix job builds
+  each affected service with `./mvnw -pl services/<name> -am clean verify`, so
+  `platform-common` deps still compile but unrelated services are skipped;
+- touches anything shared — the parent POM, the Maven wrapper, a
+  `platform-common` module, `config-repo/`, or the workflow itself — falls back
+  to a full reactor build, since a shared change can break any service.
+
+A separate `security` job runs the SpotBugs + OWASP scans over the whole reactor
+on every PR regardless. The `build` job is the single stable status check to
+require in branch protection; it passes when whichever build path ran succeeded.
+
+Adding a service needs no CI change — the `scope` job discovers `services/*`
+from the diff.
 
 ## Pull requests
 
