@@ -19,7 +19,11 @@
          whitelist-validated ([A-Za-z0-9_-]{1,128}) before it reaches the response header or MDC. -->
     <Match>
         <Class name="io.pallet.common.observability.CorrelationIdFilter"/>
-        <Bug pattern="HRS_REQUEST_PARAMETER_TO_HTTP_HEADER,SERVLET_HEADER"/>
+        <Bug pattern="HRS_REQUEST_PARAMETER_TO_HTTP_HEADER"/>
+    </Match>
+    <Match>
+        <Class name="io.pallet.common.observability.CorrelationIdFilter"/>
+        <Bug pattern="SERVLET_HEADER"/>
     </Match>
     <Match>
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
