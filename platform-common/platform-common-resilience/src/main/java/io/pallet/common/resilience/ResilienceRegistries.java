@@ -66,6 +66,7 @@ public final class ResilienceRegistries {
                 .permittedNumberOfCallsInHalfOpenState(properties.permittedCallsInHalfOpenState())
                 .slowCallRateThreshold(properties.slowCallRateThreshold())
                 .slowCallDurationThreshold(properties.slowCallDurationThreshold())
+                .ignoreExceptions(AppException.class, IllegalArgumentException.class)
                 .build();
     }
 
