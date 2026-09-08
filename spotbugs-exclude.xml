@@ -28,4 +28,11 @@
     <Match>
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
     </Match>
+    <!-- ExternalCallExecutor.callUnchecked rethrows a caught RuntimeException unchanged to
+         preserve its exact type for Retry's ignoreExceptions(AppException...) check; only a
+         genuinely checked failure (a timeout) gets wrapped. -->
+    <Match>
+        <Class name="io.pallet.common.resilience.ExternalCallExecutor"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
 </FindBugsFilter>
