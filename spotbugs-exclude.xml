@@ -35,4 +35,10 @@
         <Class name="io.pallet.common.resilience.ExternalCallExecutor"/>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
+    <!-- palletSecurityFilterChain declares throws Exception only because HttpSecurity.build()
+         does; that signature is fixed by Spring Security, so it can't be narrowed. -->
+    <Match>
+        <Class name="io.pallet.common.security.PalletResourceServerAutoConfiguration"/>
+        <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+    </Match>
 </FindBugsFilter>
