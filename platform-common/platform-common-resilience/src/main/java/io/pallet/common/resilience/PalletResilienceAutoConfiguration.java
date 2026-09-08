@@ -18,10 +18,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * Builds the Resilience4j registries from {@link ResilienceProperties}, the shared
  * {@link ExternalCall} helper, and (when a {@link MeterRegistry} is present) binds all three

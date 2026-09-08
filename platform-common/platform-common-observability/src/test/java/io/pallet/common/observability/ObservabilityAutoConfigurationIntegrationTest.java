@@ -20,9 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
 @SpringBootTest(
-    classes = ObservabilityAutoConfigurationIntegrationTest.TestApp.class,
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "management.endpoints.web.exposure.include=prometheus")
+        classes = ObservabilityAutoConfigurationIntegrationTest.TestApp.class,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "management.endpoints.web.exposure.include=prometheus")
 class ObservabilityAutoConfigurationIntegrationTest {
 
     @Autowired
@@ -58,7 +58,7 @@ class ObservabilityAutoConfigurationIntegrationTest {
     @Test
     void methodMetricsCanBeDisabledByProperty() {
         runner().withPropertyValues("pallet.observability.method-metrics-enabled=false")
-            .run(ctx -> assertThat(ctx).doesNotHaveBean(MonitoringAspect.class));
+                .run(ctx -> assertThat(ctx).doesNotHaveBean(MonitoringAspect.class));
     }
 
     @Test
@@ -71,8 +71,8 @@ class ObservabilityAutoConfigurationIntegrationTest {
 
     private ApplicationContextRunner runner() {
         return new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(PalletObservabilityAutoConfiguration.class))
-            .withBean(SimpleMeterRegistry.class);
+                .withConfiguration(AutoConfigurations.of(PalletObservabilityAutoConfiguration.class))
+                .withBean(SimpleMeterRegistry.class);
     }
 
     @SpringBootConfiguration

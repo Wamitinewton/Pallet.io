@@ -69,7 +69,7 @@ class CorrelationIdFilterTest {
         };
 
         assertThatThrownBy(() -> filter(List.of()).doFilter(request, response, chain))
-            .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(RuntimeException.class);
         assertThat(MDC.get(CorrelationId.MDC_KEY)).isNull();
     }
 
@@ -97,7 +97,7 @@ class CorrelationIdFilterTest {
         return new MockFilterChain() {
             @Override
             public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse res)
-                throws IOException, ServletException {
+                    throws IOException, ServletException {
                 target.set(MDC.get(CorrelationId.MDC_KEY));
                 super.doFilter(req, res);
             }

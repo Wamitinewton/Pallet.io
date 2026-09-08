@@ -14,6 +14,6 @@ final class HandlerSupport {
     static ResponseEntity<ErrorResponse> render(
             HttpStatus status, String message, String errorCode, HttpServletRequest request) {
         return ResponseEntity.status(status)
-            .body(ErrorResponse.of(status, message, errorCode, request.getRequestURI()));
+                .body(ErrorResponse.of(status, message, errorCode, request.getRequestURI()));
     }
 }
