@@ -8,12 +8,16 @@ allow reasonable time for a fix before any disclosure.
 
 ## Dependency and code scanning
 
-Two checks run under the `security` Maven profile and in CI:
+Two checks run under the `security` Maven profile:
 
-| Tool | What it covers | Command |
-|---|---|---|
-| SpotBugs + FindSecBugs | SAST over compiled bytecode (injection, crypto misuse, hardcoded secrets) | `./mvnw -P security verify` |
-| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` |
+| Tool | What it covers | Command | Runs in CI |
+|---|---|---|---|
+| SpotBugs + FindSecBugs | SAST over compiled bytecode (injection, crypto misuse, hardcoded secrets) | `./mvnw -P security verify` | yes, on every PR |
+| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` | no — run it locally |
+
+OWASP Dependency-Check does not run in CI: it depends on a rate-limited
+external NVD API key, which makes it a poor fit for a check that has to pass
+on every PR. Run it locally instead, ideally before a dependency bump.
 
 ### NVD API key
 
@@ -22,10 +26,6 @@ at <https://nvd.nist.gov/developers/request-an-api-key>, then either:
 
 - add it to `~/.m2/settings.xml` as a property `nvd.api.key`, or
 - pass `-Dnvd.api.key=...` on the command line.
-
-In CI it comes from the `NVD_API_KEY` repository secret. If that secret is not
-set, the CI `security` job runs SpotBugs but skips OWASP Dependency-Check with a
-warning (Dependency-Check 13 cannot update the NVD without a key).
 
 ### Suppressions
 

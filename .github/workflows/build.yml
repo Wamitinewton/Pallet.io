@@ -16,15 +16,17 @@ permissions:
 jobs:
   # Work out what a change touches. A push to main always runs a full reactor
   # build — that is the canonical green signal. A PR builds only the affected
-  # services with `-pl <module> -am`, unless it touches something the whole
-  # reactor depends on (the parent POM, the Maven wrapper, a platform-common
-  # module, shared config, or this workflow), in which case it falls back to a
-  # full build.
+  # modules with `-pl <module> -am -amd` (also-make: the module's own
+  # dependencies, so it compiles; also-make-dependents: anything that depends
+  # on it, so a platform-common change is verified against every consumer),
+  # unless it touches something the whole reactor depends on (the parent POM,
+  # the Maven wrapper, the platform-common aggregator POM, shared config, or
+  # this workflow), in which case it falls back to a full build.
   scope:
     runs-on: ubuntu-latest
     outputs:
       full: ${{ steps.classify.outputs.full }}
-      services: ${{ steps.classify.outputs.services }}
+      modules: ${{ steps.classify.outputs.modules }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,7 +41,7 @@ jobs:
 
           if [ "$EVENT" != "pull_request" ]; then
             echo "full=true"  >> "$GITHUB_OUTPUT"
-            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "modules=[]" >> "$GITHUB_OUTPUT"
             echo "push build -> full reactor"
             exit 0
           fi
@@ -48,25 +50,26 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "$changed"
 
-          # Any changed path that is not inside a single service module
-          # (services/<name>/...) forces a full build: every service inherits
-          # the parent POM and depends on platform-common, so a shared change
-          # can break anything.
-          shared="$(printf '%s\n' "$changed" | grep -Ev '^services/[^/]+/' || true)"
+          # Any changed path that is not inside a single module (services/<name>/...
+          # or platform-common/<name>/...) forces a full build: the parent POM, the
+          # platform-common aggregator POM, shared config and the workflow itself
+          # apply to every module, so a change there can break anything.
+          shared="$(printf '%s\n' "$changed" | grep -Ev '^(services|platform-common)/[^/]+/' || true)"
           if [ -n "$shared" ]; then
             echo "full=true"  >> "$GITHUB_OUTPUT"
-            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "modules=[]" >> "$GITHUB_OUTPUT"
             echo "shared change -> full reactor"
             exit 0
           fi
 
-          # Only service modules changed: collect the affected ones.
-          services="$(printf '%s\n' "$changed" \
-            | sed -nE 's#^(services/[^/]+)/.*#\1#p' \
+          # Only specific modules changed: collect the affected ones, service or
+          # platform-common alike.
+          modules="$(printf '%s\n' "$changed" \
+            | sed -nE 's#^((services|platform-common)/[^/]+)/.*#\1#p' \
             | sort -u | jq -R . | jq -cs .)"
-          echo "full=false"          >> "$GITHUB_OUTPUT"
-          echo "services=$services"  >> "$GITHUB_OUTPUT"
-          echo "affected services: $services"
+          echo "full=false"        >> "$GITHUB_OUTPUT"
+          echo "modules=$modules"  >> "$GITHUB_OUTPUT"
+          echo "affected modules: $modules"
 
   reactor:
     needs: scope
@@ -85,14 +88,14 @@ jobs:
       - name: Build, unit + integration tests
         run: ./mvnw -B clean verify
 
-  service:
+  module:
     needs: scope
-    if: needs.scope.outputs.full == 'false' && needs.scope.outputs.services != '[]'
+    if: needs.scope.outputs.full == 'false' && needs.scope.outputs.modules != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        module: ${{ fromJSON(needs.scope.outputs.services) }}
+        module: ${{ fromJSON(needs.scope.outputs.modules) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -103,8 +106,8 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Build ${{ matrix.module }} + its dependencies
-        run: ./mvnw -B -pl ${{ matrix.module }} -am clean verify
+      - name: Build ${{ matrix.module }}, its dependencies and its dependents
+        run: ./mvnw -B -pl ${{ matrix.module }} -am -amd clean verify
 
   security:
     runs-on: ubuntu-latest
@@ -121,24 +124,11 @@ jobs:
       - name: SpotBugs + FindSecBugs
         run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
-      - name: OWASP Dependency-Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${NVD_API_KEY:-}" ]; then
-            echo "::warning title=OWASP Dependency-Check skipped::NVD_API_KEY secret is not set."
-            echo "Dependency-Check 13 cannot update the NVD without a key. Add one at"
-            echo "Settings -> Secrets and variables -> Actions (get a key: https://nvd.nist.gov/developers/request-an-api-key)."
-            exit 0
-          fi
-          ./mvnw -B -P security -DskipTests -Dspotbugs.skip=true -Dnvd.api.key="$NVD_API_KEY" verify
-
   # Single stable status check to require in branch protection. Passes when the
-  # build path that actually ran (reactor or service matrix) succeeded; a
+  # build path that actually ran (reactor or module matrix) succeeded; a
   # skipped job is fine, it means the other path covered the change.
   build:
-    needs: [scope, reactor, service, security]
+    needs: [scope, reactor, module, security]
     if: always()
     runs-on: ubuntu-latest
     steps:
