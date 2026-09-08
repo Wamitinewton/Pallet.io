@@ -21,6 +21,7 @@
         <module>platform-common-security</module>
         <module>platform-common-observability</module>
         <module>platform-common-messaging</module>
+        <module>platform-common-resilience</module>
     </modules>
 
 </project>

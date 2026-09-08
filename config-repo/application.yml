@@ -59,3 +59,9 @@ pallet:
       initial-interval: 1s
       multiplier: 2.0
       max-interval: 30s
+  resilience:
+    defaults:
+      circuit-breaker: { failure-rate-threshold: 50, sliding-window-size: 10, minimum-number-of-calls: 5, wait-duration-in-open-state: 30s }
+      retry: { max-attempts: 3, wait-duration: 500ms, exponential-backoff-multiplier: 2.0, max-wait-duration: 10s }
+      time-limiter: { timeout: 6s }
+    policies: {}   # services add named policies (smtp, keycloak-admin, ...) in their own config
