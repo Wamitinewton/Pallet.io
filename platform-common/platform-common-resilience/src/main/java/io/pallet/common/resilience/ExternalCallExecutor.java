@@ -1,16 +1,15 @@
 package io.pallet.common.resilience;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.pallet.common.error.AppException;
 import io.pallet.common.error.ExternalServiceException;
+
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class ExternalCallExecutor implements ExternalCall {
 
@@ -22,6 +21,20 @@ public class ExternalCallExecutor implements ExternalCall {
     public ExternalCallExecutor(ResilienceRegistries registries, ExecutorService timeLimiterExecutor) {
         this.registries = registries;
         this.timeLimiterExecutor = timeLimiterExecutor;
+    }
+
+    private static <T> T callUnchecked(Callable<T> callable) {
+        try {
+            return callable.call();
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CheckedCallFailure(e);
+        }
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        return failure instanceof CheckedCallFailure && failure.getCause() != null ? failure.getCause() : failure;
     }
 
     @Override
@@ -51,27 +64,15 @@ public class ExternalCallExecutor implements ExternalCall {
         TimeLimiter timeLimiter = registries.timeLimiter(policy);
 
         Callable<T> timeLimited = TimeLimiter.decorateFutureSupplier(
-                timeLimiter, () -> timeLimiterExecutor.submit(supplier::get));
+            timeLimiter, () -> timeLimiterExecutor.submit(supplier::get));
         Supplier<T> retried = Retry.decorateSupplier(retry, () -> callUnchecked(timeLimited));
         return CircuitBreaker.decorateSupplier(circuitBreaker, retried);
     }
 
-    private static <T> T callUnchecked(Callable<T> callable) {
-        try {
-            return callable.call();
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new CheckedCallFailure(e);
-        }
-    }
-
-    private static Throwable unwrap(Throwable failure) {
-        return failure instanceof CheckedCallFailure && failure.getCause() != null ? failure.getCause() : failure;
-    }
-
-    /** Carries a checked failure (e.g. a timeout) from the time-limited {@link Callable} through
-     *  the {@link Supplier}-based retry/breaker chain, which can't declare checked exceptions. */
+    /**
+     * Carries a checked failure (e.g. a timeout) from the time-limited {@link Callable} through
+     * the {@link Supplier}-based retry/breaker chain, which can't declare checked exceptions.
+     */
     private static final class CheckedCallFailure extends RuntimeException {
         CheckedCallFailure(Throwable cause) {
             super(cause);

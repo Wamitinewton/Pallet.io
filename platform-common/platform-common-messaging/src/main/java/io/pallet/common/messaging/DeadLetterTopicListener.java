@@ -28,17 +28,6 @@ public class DeadLetterTopicListener {
         this.meterRegistry = meterRegistry;
     }
 
-    @KafkaListener(topicPattern = ".*\\.DLT", groupId = "pallet-dlt-monitor")
-    public void onDeadLetter(ConsumerRecord<String, JsonNode> record,
-                             @Header(name = KafkaHeaders.EXCEPTION_MESSAGE, required = false) String failure) {
-        JsonNode envelope = record.value();
-        log.error("Dead-letter {}-{}@{} eventType={} eventId={} correlationId={} cause={}",
-                record.topic(), record.partition(), record.offset(),
-                field(envelope, "eventType"), field(envelope, "eventId"),
-                header(record, EventHeaders.CORRELATION_ID), failure);
-        meterRegistry.counter("messaging.dead_letter", "topic", record.topic()).increment();
-    }
-
     private static String field(JsonNode envelope, String name) {
         return envelope != null && envelope.hasNonNull(name) ? envelope.get(name).asString() : null;
     }
@@ -46,5 +35,16 @@ public class DeadLetterTopicListener {
     private static String header(ConsumerRecord<?, ?> record, String key) {
         org.apache.kafka.common.header.Header header = record.headers().lastHeader(key);
         return header != null ? new String(header.value(), StandardCharsets.UTF_8) : null;
+    }
+
+    @KafkaListener(topicPattern = ".*\\.DLT", groupId = "pallet-dlt-monitor")
+    public void onDeadLetter(ConsumerRecord<String, JsonNode> record,
+                             @Header(name = KafkaHeaders.EXCEPTION_MESSAGE, required = false) String failure) {
+        JsonNode envelope = record.value();
+        log.error("Dead-letter {}-{}@{} eventType={} eventId={} correlationId={} cause={}",
+            record.topic(), record.partition(), record.offset(),
+            field(envelope, "eventType"), field(envelope, "eventId"),
+            header(record, EventHeaders.CORRELATION_ID), failure);
+        meterRegistry.counter("messaging.dead_letter", "topic", record.topic()).increment();
     }
 }

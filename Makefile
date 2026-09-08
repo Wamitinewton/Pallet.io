@@ -24,8 +24,8 @@ security: ## Run SpotBugs (FindSecBugs) + OWASP Dependency-Check
 	$(MVN) -B verify -P security
 
 .PHONY: format-check
-format-check: ## Fail on any formatting / import-order drift (wire up Spotless before enforcing)
-	@echo "TODO: add Spotless to the parent POM, then run: $(MVN) spotless:check"
+format-check: ## Check .editorconfig conformance (whitespace/EOL/charset) across the repo
+	pre-commit run --all-files
 
 ## ── Local infrastructure ────────────────────────────────────────────────
 

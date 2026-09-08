@@ -58,6 +58,19 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 - Code style: no comments that restate the code; keep them for a genuine hidden
   constraint. Prefer editing an existing class over a new abstraction for a
   one-off.
+- Whitespace/EOL/charset style is defined once in `.editorconfig` and enforced
+  by [`editorconfig-checker`](https://github.com/editorconfig-checker/editorconfig-checker)
+  via a `pre-commit` hook. Indent *style* (tabs vs. spaces) is enforced, but
+  indent *size* is not — nested Markdown lists and XML/Java continuation-line
+  alignment don't fit a strict "multiple of N spaces" rule, so `IndentSize` is
+  disabled in `.editorconfig-checker.json`. Set up once per clone:
+  ```bash
+  pip install pre-commit   # or: brew install pre-commit / pipx install pre-commit
+  pre-commit install
+  ```
+  `make format-check` runs the same check on demand (`pre-commit run
+  --all-files`). It also runs in CI (`style` job) regardless of whether the
+  local hook is installed.
 
 ## CI
 

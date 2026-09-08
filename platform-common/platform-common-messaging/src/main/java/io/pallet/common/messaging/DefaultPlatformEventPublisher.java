@@ -33,6 +33,10 @@ public class DefaultPlatformEventPublisher implements PlatformEventPublisher {
         this.sendTimeout = properties.publish().sendTimeout();
     }
 
+    private static byte[] utf8(String value) {
+        return value.getBytes(StandardCharsets.UTF_8);
+    }
+
     @Override
     public void publish(PlatformEvent event) {
         publish(EventType.topicFor(event), event);
@@ -42,12 +46,12 @@ public class DefaultPlatformEventPublisher implements PlatformEventPublisher {
     public void publish(String topic, PlatformEvent event) {
         ProducerRecord<String, Object> record = new ProducerRecord<>(topic, event.orgId(), event);
         record.headers()
-                .add(EventHeaders.EVENT_ID, utf8(event.eventId().toString()))
-                .add(EventHeaders.EVENT_TYPE, utf8(event.eventType()))
-                .add(EventHeaders.OCCURRED_AT, utf8(event.occurredAt().toString()))
-                .add(EventHeaders.ORG_ID, utf8(event.orgId()));
+            .add(EventHeaders.EVENT_ID, utf8(event.eventId().toString()))
+            .add(EventHeaders.EVENT_TYPE, utf8(event.eventType()))
+            .add(EventHeaders.OCCURRED_AT, utf8(event.occurredAt().toString()))
+            .add(EventHeaders.ORG_ID, utf8(event.orgId()));
         io.pallet.common.observability.CorrelationId.current()
-                .ifPresent(id -> record.headers().add(EventHeaders.CORRELATION_ID, utf8(id)));
+            .ifPresent(id -> record.headers().add(EventHeaders.CORRELATION_ID, utf8(id)));
 
         try {
             template.send(record).get(sendTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -64,16 +68,12 @@ public class DefaultPlatformEventPublisher implements PlatformEventPublisher {
         count(topic, "failure");
         log.warn("Event publish to {} failed for type={} orgId={} eventId={}", topic, event.eventType(), event.orgId(), event.eventId(), cause);
         return new ExternalServiceException(
-                "Event publish failed",
-                "topic=" + topic + " type=" + event.eventType(),
-                cause);
+            "Event publish failed",
+            "topic=" + topic + " type=" + event.eventType(),
+            cause);
     }
 
     private void count(String topic, String outcome) {
         meterRegistry.counter("messaging.published", "topic", topic, "outcome", outcome).increment();
-    }
-
-    private static byte[] utf8(String value) {
-        return value.getBytes(StandardCharsets.UTF_8);
     }
 }

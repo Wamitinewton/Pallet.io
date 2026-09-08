@@ -24,8 +24,8 @@ class ConfigServerApplicationTest {
     @Test
     void servesConfigForAKnownApplication() throws Exception {
         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/config-server/default")).build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/config-server/default")).build(),
+            HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"name\":\"config-server\"");

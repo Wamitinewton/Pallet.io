@@ -1,22 +1,15 @@
 package io.pallet.common.resilience;
 
-import java.time.Duration;
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.time.Duration;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ResiliencePropertiesTest {
-
-    @Test
-    void defaultValuesBindFromAnEmptySource() {
-        new ApplicationContextRunner()
-                .withUserConfiguration(EnableResilienceProperties.class)
-                .run(context -> assertDefaults(context.getBean(ResilienceProperties.class)));
-    }
 
     private static void assertDefaults(ResilienceProperties properties) {
         ResilienceProperties.CircuitBreaker circuitBreaker = properties.defaults().circuitBreaker();
@@ -41,12 +34,26 @@ class ResiliencePropertiesTest {
         assertThat(properties.policies()).isEmpty();
     }
 
+    private static ResilienceProperties.Policy defaultPolicy() {
+        return new ResilienceProperties.Policy(
+            new ResilienceProperties.CircuitBreaker(50, 10, 5, Duration.ofSeconds(30), 3, 50, Duration.ofSeconds(5)),
+            new ResilienceProperties.Retry(3, Duration.ofMillis(500), 2.0, Duration.ofSeconds(10)),
+            new ResilienceProperties.TimeLimiter(Duration.ofSeconds(6), true));
+    }
+
+    @Test
+    void defaultValuesBindFromAnEmptySource() {
+        new ApplicationContextRunner()
+            .withUserConfiguration(EnableResilienceProperties.class)
+            .run(context -> assertDefaults(context.getBean(ResilienceProperties.class)));
+    }
+
     @Test
     void resolveReturnsTheNamedPolicyWhenConfigured() {
         ResilienceProperties.Policy smtpPolicy = new ResilienceProperties.Policy(
-                new ResilienceProperties.CircuitBreaker(30, 20, 10, Duration.ofSeconds(15), 2, 40, Duration.ofSeconds(2)),
-                new ResilienceProperties.Retry(5, Duration.ofMillis(200), 1.5, Duration.ofSeconds(5)),
-                new ResilienceProperties.TimeLimiter(Duration.ofSeconds(3), false));
+            new ResilienceProperties.CircuitBreaker(30, 20, 10, Duration.ofSeconds(15), 2, 40, Duration.ofSeconds(2)),
+            new ResilienceProperties.Retry(5, Duration.ofMillis(200), 1.5, Duration.ofSeconds(5)),
+            new ResilienceProperties.TimeLimiter(Duration.ofSeconds(3), false));
         ResilienceProperties.Policy defaultPolicy = defaultPolicy();
         ResilienceProperties properties = new ResilienceProperties(defaultPolicy, Map.of("smtp", smtpPolicy));
 
@@ -59,13 +66,6 @@ class ResiliencePropertiesTest {
         ResilienceProperties properties = new ResilienceProperties(defaultPolicy, Map.of());
 
         assertThat(properties.resolve("unknown")).isSameAs(defaultPolicy);
-    }
-
-    private static ResilienceProperties.Policy defaultPolicy() {
-        return new ResilienceProperties.Policy(
-                new ResilienceProperties.CircuitBreaker(50, 10, 5, Duration.ofSeconds(30), 3, 50, Duration.ofSeconds(5)),
-                new ResilienceProperties.Retry(3, Duration.ofMillis(500), 2.0, Duration.ofSeconds(10)),
-                new ResilienceProperties.TimeLimiter(Duration.ofSeconds(6), true));
     }
 
     @EnableConfigurationProperties(ResilienceProperties.class)

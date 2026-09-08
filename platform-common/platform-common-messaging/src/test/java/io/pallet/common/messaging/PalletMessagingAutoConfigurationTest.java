@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.KafkaAdmin;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -15,13 +15,13 @@ import static org.mockito.Mockito.mock;
 class PalletMessagingAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(
-                    KafkaAutoConfiguration.class, PalletMessagingAutoConfiguration.class))
-            .withBean(SimpleMeterRegistry.class)
-            .withBean(KafkaAdmin.class, () -> mock(KafkaAdmin.class))
-            .withPropertyValues(
-                    "spring.kafka.bootstrap-servers=localhost:9092",
-                    "spring.kafka.listener.auto-startup=false");
+        .withConfiguration(AutoConfigurations.of(
+            KafkaAutoConfiguration.class, PalletMessagingAutoConfiguration.class))
+        .withBean(SimpleMeterRegistry.class)
+        .withBean(KafkaAdmin.class, () -> mock(KafkaAdmin.class))
+        .withPropertyValues(
+            "spring.kafka.bootstrap-servers=localhost:9092",
+            "spring.kafka.listener.auto-startup=false");
 
     @Test
     void wiresTheProducerTheSharedFactoryTheMonitorAndTheInMemoryGuardByDefault() {
@@ -30,24 +30,24 @@ class PalletMessagingAutoConfigurationTest {
             assertThat(context).hasSingleBean(DeadLetterTopicListener.class);
             assertThat(context).hasBean("kafkaListenerContainerFactory");
             assertThat(context.getBean("kafkaListenerContainerFactory"))
-                    .isInstanceOf(ConcurrentKafkaListenerContainerFactory.class);
+                .isInstanceOf(ConcurrentKafkaListenerContainerFactory.class);
             assertThat(context.getBean(EventIdempotencyGuard.class))
-                    .isInstanceOf(InMemoryEventIdempotencyGuard.class);
+                .isInstanceOf(InMemoryEventIdempotencyGuard.class);
         });
     }
 
     @Test
     void theRedisGuardIsChosenWhenAStringRedisTemplateExists() {
         runner.withBean(StringRedisTemplate.class, () -> mock(StringRedisTemplate.class))
-                .run(context -> assertThat(context.getBean(EventIdempotencyGuard.class))
-                        .isInstanceOf(RedisEventIdempotencyGuard.class));
+            .run(context -> assertThat(context.getBean(EventIdempotencyGuard.class))
+                .isInstanceOf(RedisEventIdempotencyGuard.class));
     }
 
     @Test
     void aServiceSuppliedGuardOverridesTheDefaults() {
         EventIdempotencyGuard custom = mock(EventIdempotencyGuard.class);
         runner.withBean("deliveryLogGuard", EventIdempotencyGuard.class, () -> custom)
-                .run(context -> assertThat(context.getBean(EventIdempotencyGuard.class)).isSameAs(custom));
+            .run(context -> assertThat(context.getBean(EventIdempotencyGuard.class)).isSameAs(custom));
     }
 
     @Test
@@ -61,12 +61,12 @@ class PalletMessagingAutoConfigurationTest {
     @Test
     void topicCreationCanBeTurnedOff() {
         runner.withPropertyValues("pallet.messaging.create-topics=false")
-                .run(context -> assertThat(context).doesNotHaveBean(KafkaAdmin.NewTopics.class));
+            .run(context -> assertThat(context).doesNotHaveBean(KafkaAdmin.NewTopics.class));
     }
 
     @Test
     void theMonitorCanBeTurnedOff() {
         runner.withPropertyValues("pallet.messaging.dlt-monitor.enabled=false")
-                .run(context -> assertThat(context).doesNotHaveBean(DeadLetterTopicListener.class));
+            .run(context -> assertThat(context).doesNotHaveBean(DeadLetterTopicListener.class));
     }
 }

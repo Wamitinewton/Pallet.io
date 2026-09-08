@@ -18,7 +18,9 @@ public final class CorrelationId {
     private CorrelationId() {
     }
 
-    /** The correlation id on the calling thread's MDC, if one has been installed. */
+    /**
+     * The correlation id on the calling thread's MDC, if one has been installed.
+     */
     public static Optional<String> current() {
         return Optional.ofNullable(MDC.get(MDC_KEY));
     }

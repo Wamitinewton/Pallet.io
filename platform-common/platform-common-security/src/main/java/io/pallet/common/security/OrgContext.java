@@ -16,7 +16,9 @@ import java.util.Optional;
  */
 public final class OrgContext {
 
-    /** Claim name carrying the caller's organization id. */
+    /**
+     * Claim name carrying the caller's organization id.
+     */
     public static final String ORG_CLAIM = "org_id";
 
     private OrgContext() {
@@ -29,7 +31,7 @@ public final class OrgContext {
      */
     public static String requireOrgId() {
         return currentOrgId().orElseThrow(() ->
-                new IllegalStateException("No " + ORG_CLAIM + " claim on the current token"));
+            new IllegalStateException("No " + ORG_CLAIM + " claim on the current token"));
     }
 
     public static Optional<String> currentOrgId() {

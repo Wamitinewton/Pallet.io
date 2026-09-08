@@ -37,30 +37,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(classes = DeadLetterRoutingIntegrationTest.TestApp.class,
-        properties = {
-                "spring.autoconfigure.exclude="
-                        + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration",
-                // The catch-all monitor would re-dead-letter the poison pill it can't parse; not wanted here.
-                "pallet.messaging.dlt-monitor.enabled=false"
-        })
+    properties = {
+        "spring.autoconfigure.exclude="
+            + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration",
+        // The catch-all monitor would re-dead-letter the poison pill it can't parse; not wanted here.
+        "pallet.messaging.dlt-monitor.enabled=false"
+    })
 @ActiveProfiles("test")
 @Testcontainers
 class DeadLetterRoutingIntegrationTest {
 
     @Container
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))
-            .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false");
+        .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false");
+    @Autowired
+    private PlatformEventPublisher publisher;
+    @Autowired
+    private Listeners listeners;
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
-
-    @Autowired
-    private PlatformEventPublisher publisher;
-
-    @Autowired
-    private Listeners listeners;
 
     @Test
     void aRecordThatKeepsFailingIsRetriedPerPolicyThenDeadLettered() {
@@ -74,8 +72,8 @@ class DeadLetterRoutingIntegrationTest {
     @Test
     void aNonDeserializableRecordIsDeadLetteredWithoutRetry() throws Exception {
         try (KafkaProducer<String, String> raw = new KafkaProducer<>(
-                Map.of(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()),
-                new StringSerializer(), new StringSerializer())) {
+            Map.of(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()),
+            new StringSerializer(), new StringSerializer())) {
             raw.send(new ProducerRecord<>(Topics.HEALTH_CHECK_FAILED, "k", "definitely-not-json{")).get();
         }
 
@@ -86,10 +84,10 @@ class DeadLetterRoutingIntegrationTest {
 
     private ConsumerRecord<String, String> awaitOne(String topic) {
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers(),
-                ConsumerConfig.GROUP_ID_CONFIG, "assert-" + UUID.randomUUID(),
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"),
-                new StringDeserializer(), new StringDeserializer())) {
+            ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers(),
+            ConsumerConfig.GROUP_ID_CONFIG, "assert-" + UUID.randomUUID(),
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"),
+            new StringDeserializer(), new StringDeserializer())) {
             consumer.subscribe(List.of(topic));
             var found = new java.util.concurrent.atomic.AtomicReference<ConsumerRecord<String, String>>();
             await().atMost(Duration.ofSeconds(30)).until(() -> {

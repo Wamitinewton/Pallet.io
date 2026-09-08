@@ -14,6 +14,26 @@ class TopicsTest {
 
     private static final Pattern TOPIC_NAME = Pattern.compile("^[a-z]+(\\.[a-z-]+)+$");
 
+    /**
+     * Every public String constant on Topics except the DLT suffix, so a new topic that skips all() fails here.
+     */
+    private static Set<String> declaredTopicConstants() {
+        return java.util.Arrays.stream(Topics.class.getDeclaredFields())
+            .filter(f -> Modifier.isPublic(f.getModifiers()) && Modifier.isStatic(f.getModifiers()))
+            .filter(f -> f.getType() == String.class)
+            .filter(f -> !f.getName().equals("DLT_SUFFIX"))
+            .map(TopicsTest::value)
+            .collect(Collectors.toSet());
+    }
+
+    private static String value(Field f) {
+        try {
+            return (String) f.get(null);
+        } catch (IllegalAccessException e) {
+            throw new AssertionError(e);
+        }
+    }
+
     @Test
     void deadLetterAppendsTheSuffix() {
         assertThat(Topics.deadLetter("build.started")).isEqualTo("build.started.DLT");
@@ -30,26 +50,8 @@ class TopicsTest {
             assertThat(name).doesNotContainAnyWhitespaces();
             assertThat(name).isLowerCase();
             assertThat(TOPIC_NAME.matcher(name).matches())
-                    .as("%s matches %s", name, TOPIC_NAME.pattern())
-                    .isTrue();
+                .as("%s matches %s", name, TOPIC_NAME.pattern())
+                .isTrue();
         });
-    }
-
-    /** Every public String constant on Topics except the DLT suffix, so a new topic that skips all() fails here. */
-    private static Set<String> declaredTopicConstants() {
-        return java.util.Arrays.stream(Topics.class.getDeclaredFields())
-                .filter(f -> Modifier.isPublic(f.getModifiers()) && Modifier.isStatic(f.getModifiers()))
-                .filter(f -> f.getType() == String.class)
-                .filter(f -> !f.getName().equals("DLT_SUFFIX"))
-                .map(TopicsTest::value)
-                .collect(Collectors.toSet());
-    }
-
-    private static String value(Field f) {
-        try {
-            return (String) f.get(null);
-        } catch (IllegalAccessException e) {
-            throw new AssertionError(e);
-        }
     }
 }

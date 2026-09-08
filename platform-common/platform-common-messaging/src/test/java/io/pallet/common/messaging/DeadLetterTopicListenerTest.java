@@ -15,26 +15,26 @@ class DeadLetterTopicListenerTest {
     private final DeadLetterTopicListener listener = new DeadLetterTopicListener(meterRegistry);
     private final JsonMapper json = JsonMapper.builder().build();
 
+    private static ConsumerRecord<String, JsonNode> record(String topic, JsonNode value) {
+        return new ConsumerRecord<>(topic, 0, 0L, "org_1", value);
+    }
+
     @Test
     void countsEveryDeadLetterByItsTopic() {
         listener.onDeadLetter(record("build.failed.DLT",
-                json.readTree("{\"eventType\":\"build.failed\",\"eventId\":\"e-1\"}")), "boom");
+            json.readTree("{\"eventType\":\"build.failed\",\"eventId\":\"e-1\"}")), "boom");
         listener.onDeadLetter(record("build.failed.DLT",
-                json.readTree("{\"eventType\":\"build.failed\",\"eventId\":\"e-2\"}")), "boom");
+            json.readTree("{\"eventType\":\"build.failed\",\"eventId\":\"e-2\"}")), "boom");
 
         assertThat(meterRegistry.get("messaging.dead_letter").tag("topic", "build.failed.DLT").counter().count())
-                .isEqualTo(2.0);
+            .isEqualTo(2.0);
     }
 
     @Test
     void toleratesANonDeserializableEnvelope() {
         assertThatCode(() -> listener.onDeadLetter(record("notification.requested.DLT", null), "parse failure"))
-                .doesNotThrowAnyException();
+            .doesNotThrowAnyException();
         assertThat(meterRegistry.get("messaging.dead_letter")
-                .tag("topic", "notification.requested.DLT").counter().count()).isEqualTo(1.0);
-    }
-
-    private static ConsumerRecord<String, JsonNode> record(String topic, JsonNode value) {
-        return new ConsumerRecord<>(topic, 0, 0L, "org_1", value);
+            .tag("topic", "notification.requested.DLT").counter().count()).isEqualTo(1.0);
     }
 }

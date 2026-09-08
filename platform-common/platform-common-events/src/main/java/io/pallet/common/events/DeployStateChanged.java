@@ -12,20 +12,20 @@ import java.util.UUID;
  * and {@code occurredAt} so callers only supply the domain fields.
  */
 public record DeployStateChanged(
-        UUID eventId,
-        String eventType,
-        String orgId,
-        Instant occurredAt,
-        String deploymentId,
-        String fromState,
-        String toState
+    UUID eventId,
+    String eventType,
+    String orgId,
+    Instant occurredAt,
+    String deploymentId,
+    String fromState,
+    String toState
 ) implements PlatformEvent {
 
     public static final String TYPE = Topics.DEPLOY_STATE_CHANGED;
 
     public static DeployStateChanged of(
-            String orgId, String deploymentId, String fromState, String toState) {
+        String orgId, String deploymentId, String fromState, String toState) {
         return new DeployStateChanged(
-                UUID.randomUUID(), TYPE, orgId, Instant.now(), deploymentId, fromState, toState);
+            UUID.randomUUID(), TYPE, orgId, Instant.now(), deploymentId, fromState, toState);
     }
 }

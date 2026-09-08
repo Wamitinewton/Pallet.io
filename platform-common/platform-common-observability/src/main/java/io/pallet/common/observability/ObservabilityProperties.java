@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("pallet.observability")
 public record ObservabilityProperties(
-        @DefaultValue("true") boolean methodMetricsEnabled,
-        @DefaultValue("true") boolean correlationFilterEnabled,
-        @DefaultValue(CorrelationId.HEADER) String correlationHeader) {
+    @DefaultValue("true") boolean methodMetricsEnabled,
+    @DefaultValue("true") boolean correlationFilterEnabled,
+    @DefaultValue(CorrelationId.HEADER) String correlationHeader) {
 }

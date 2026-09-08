@@ -11,8 +11,8 @@ class NotificationRequestedTest {
     @Test
     void factoryStampsEnvelopeAndCarriesDomainFields() {
         NotificationRequested event = NotificationRequested.of(
-                "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL",
-                "welcome:usr_1", Map.of("name", "Ada"));
+            "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL",
+            "welcome:usr_1", Map.of("name", "Ada"));
 
         assertThat(event.eventId()).isNotNull();
         assertThat(event.eventType()).isEqualTo(NotificationRequested.TYPE);
@@ -29,7 +29,7 @@ class NotificationRequestedTest {
     @Test
     void dedupeKeyMayBeNull() {
         NotificationRequested event = NotificationRequested.of(
-                "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", null, Map.of());
+            "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", null, Map.of());
 
         assertThat(event.dedupeKey()).isNull();
     }
@@ -37,7 +37,7 @@ class NotificationRequestedTest {
     @Test
     void nullVariablesBecomeAnEmptyMap() {
         NotificationRequested event = NotificationRequested.of(
-                "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", null, null);
+            "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", null, null);
 
         assertThat(event.variables()).isNotNull().isEmpty();
     }

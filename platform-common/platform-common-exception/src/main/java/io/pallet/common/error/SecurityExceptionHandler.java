@@ -27,13 +27,13 @@ public class SecurityExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("[ACCESS_DENIED] {} {}", request.getMethod(), request.getRequestURI());
         return HandlerSupport.render(HttpStatus.FORBIDDEN, "You do not have permission to perform this action.",
-                "ACCESS_DENIED", request);
+            "ACCESS_DENIED", request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
         log.warn("[AUTHENTICATION_REQUIRED] {} {}", request.getMethod(), request.getRequestURI());
         return HandlerSupport.render(HttpStatus.UNAUTHORIZED, "Authentication is required to access this resource.",
-                "AUTHENTICATION_REQUIRED", request);
+            "AUTHENTICATION_REQUIRED", request);
     }
 }

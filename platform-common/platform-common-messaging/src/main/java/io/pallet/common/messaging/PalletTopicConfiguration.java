@@ -25,10 +25,10 @@ class PalletTopicConfiguration {
         int partitions = properties.topicPartitions();
         short replicas = properties.topicReplicas();
         NewTopic[] topics = Topics.all().stream()
-                .flatMap(name -> Stream.of(
-                        new NewTopic(name, partitions, replicas),
-                        new NewTopic(Topics.deadLetter(name), partitions, replicas)))
-                .toArray(NewTopic[]::new);
+            .flatMap(name -> Stream.of(
+                new NewTopic(name, partitions, replicas),
+                new NewTopic(Topics.deadLetter(name), partitions, replicas)))
+            .toArray(NewTopic[]::new);
         return new KafkaAdmin.NewTopics(topics);
     }
 }

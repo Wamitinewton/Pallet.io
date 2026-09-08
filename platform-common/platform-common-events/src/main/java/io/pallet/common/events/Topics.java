@@ -14,16 +14,13 @@ import java.util.Set;
  */
 public final class Topics {
 
-    private Topics() {
-    }
-
-    /** Suffix of the dead-letter topic paired with every catalog topic. */
+    /**
+     * Suffix of the dead-letter topic paired with every catalog topic.
+     */
     public static final String DLT_SUFFIX = ".DLT";
-
     // Command-style: one intended consumer, same envelope and delivery as a fact.
     public static final String NOTIFICATION_REQUESTED = "notification.requested";
     public static final String DEPLOY_ROLLBACK_TRIGGERED = "deploy.rollback.triggered";
-
     // Facts.
     public static final String GIT_PUSH_RECEIVED = "git.push.received";
     public static final String BUILD_STARTED = "build.started";
@@ -37,29 +34,35 @@ public final class Topics {
     public static final String USAGE_RECORDED = "usage.recorded";
     public static final String BILLING_PAYMENT_RECEIVED = "billing.payment.received";
     public static final String AUDIT_EVENT_RECORDED = "audit.event.recorded";
-
     private static final Set<String> ALL = Set.of(
-            NOTIFICATION_REQUESTED,
-            DEPLOY_ROLLBACK_TRIGGERED,
-            GIT_PUSH_RECEIVED,
-            BUILD_STARTED,
-            BUILD_SUCCEEDED,
-            BUILD_FAILED,
-            DEPLOY_STEP_COMPLETED,
-            DEPLOY_STATE_CHANGED,
-            DNS_RECORD_UPDATED,
-            TLS_CERT_ISSUED,
-            HEALTH_CHECK_FAILED,
-            USAGE_RECORDED,
-            BILLING_PAYMENT_RECEIVED,
-            AUDIT_EVENT_RECORDED);
+        NOTIFICATION_REQUESTED,
+        DEPLOY_ROLLBACK_TRIGGERED,
+        GIT_PUSH_RECEIVED,
+        BUILD_STARTED,
+        BUILD_SUCCEEDED,
+        BUILD_FAILED,
+        DEPLOY_STEP_COMPLETED,
+        DEPLOY_STATE_CHANGED,
+        DNS_RECORD_UPDATED,
+        TLS_CERT_ISSUED,
+        HEALTH_CHECK_FAILED,
+        USAGE_RECORDED,
+        BILLING_PAYMENT_RECEIVED,
+        AUDIT_EVENT_RECORDED);
 
-    /** The dead-letter topic a message lands on after retries are exhausted or it fails to deserialize. */
+    private Topics() {
+    }
+
+    /**
+     * The dead-letter topic a message lands on after retries are exhausted or it fails to deserialize.
+     */
     public static String deadLetter(String topic) {
         return topic + DLT_SUFFIX;
     }
 
-    /** Every topic this catalog knows — feeds topic auto-creation (each entry plus its {@link #deadLetter}). */
+    /**
+     * Every topic this catalog knows — feeds topic auto-creation (each entry plus its {@link #deadLetter}).
+     */
     public static Set<String> all() {
         return ALL;
     }

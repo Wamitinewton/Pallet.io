@@ -2,7 +2,9 @@ package io.pallet.common.error;
 
 import org.springframework.http.HttpStatus;
 
-/** Authenticated but not allowed — e.g. the wrong {@code org_id} for the resource. */
+/**
+ * Authenticated but not allowed — e.g. the wrong {@code org_id} for the resource.
+ */
 public class ForbiddenException extends AppException {
 
     public ForbiddenException(String clientMessage) {

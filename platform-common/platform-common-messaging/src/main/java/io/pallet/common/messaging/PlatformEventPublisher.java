@@ -22,6 +22,8 @@ public interface PlatformEventPublisher {
      */
     void publish(PlatformEvent event);
 
-    /** Escape hatch: publish to an explicit topic (e.g. a service-local topic not in {@link Topics}). */
+    /**
+     * Escape hatch: publish to an explicit topic (e.g. a service-local topic not in {@link Topics}).
+     */
     void publish(String topic, PlatformEvent event);
 }
