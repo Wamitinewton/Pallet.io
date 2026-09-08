@@ -8,19 +8,12 @@ import java.util.UUID;
  * lands on a connected repository; {@code build-queue-service} consumes it.
  */
 public record GitPushReceived(
-    UUID eventId,
-    String eventType,
-    String orgId,
-    Instant occurredAt,
-    String repo,
-    String branch,
-    String commitSha
-) implements PlatformEvent {
+        UUID eventId, String eventType, String orgId, Instant occurredAt, String repo, String branch, String commitSha)
+        implements PlatformEvent {
 
     public static final String TYPE = Topics.GIT_PUSH_RECEIVED;
 
     public static GitPushReceived of(String orgId, String repo, String branch, String commitSha) {
-        return new GitPushReceived(
-            UUID.randomUUID(), TYPE, orgId, Instant.now(), repo, branch, commitSha);
+        return new GitPushReceived(UUID.randomUUID(), TYPE, orgId, Instant.now(), repo, branch, commitSha);
     }
 }

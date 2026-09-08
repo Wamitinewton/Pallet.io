@@ -1,6 +1,11 @@
 package io.pallet.common.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.pallet.common.error.ErrorResponse.ValidationError;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -12,12 +17,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
@@ -33,8 +32,8 @@ class GlobalExceptionHandlerTest {
     @Test
     void appExceptionCarriesMetaAndValidationErrorsToBody() {
         AppException ex = new ConflictException("cannot do that")
-            .withValidationErrors(List.of("reason one", "reason two"))
-            .withMeta(Map.of("retryAfter", 5L));
+                .withValidationErrors(List.of("reason one", "reason two"))
+                .withMeta(Map.of("retryAfter", 5L));
 
         ResponseEntity<ErrorResponse> response = handler.handleAppException(ex, request());
 
@@ -46,16 +45,16 @@ class GlobalExceptionHandlerTest {
         assertThat(body.statusCode()).isEqualTo(409);
         assertThat(body.path()).isEqualTo("/widgets/42");
         assertThat(body.timestamp()).isNotNull();
-        assertThat(body.validationErrors()).containsExactly(
-            new ValidationError(null, "reason one"), new ValidationError(null, "reason two"));
+        assertThat(body.validationErrors())
+                .containsExactly(new ValidationError(null, "reason one"), new ValidationError(null, "reason two"));
         assertThat(body.meta()).containsEntry("retryAfter", 5L);
     }
 
     @Test
     void serverErrorAppExceptionLogsAtError(CapturedOutput output) {
         handler.handleAppException(
-            new ExternalServiceException("upstream down", "connect timeout", new RuntimeException("boom")),
-            request());
+                new ExternalServiceException("upstream down", "connect timeout", new RuntimeException("boom")),
+                request());
 
         assertThat(output).contains("EXTERNAL_SERVICE_ERROR");
     }
@@ -63,7 +62,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void unexpectedExceptionFallbackDoesNotLeakThrownMessage() {
         ResponseEntity<ErrorResponse> response =
-            handler.handleUnexpected(new IllegalStateException("secret internal detail"), request());
+                handler.handleUnexpected(new IllegalStateException("secret internal detail"), request());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         ErrorResponse body = response.getBody();
@@ -92,7 +91,6 @@ class GlobalExceptionHandlerTest {
 
     @SuppressWarnings("unused")
     private static final class Target {
-        void handle(String value) {
-        }
+        void handle(String value) {}
     }
 }

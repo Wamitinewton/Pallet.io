@@ -26,54 +26,60 @@ public final class ResilienceRegistries {
 
     public ResilienceRegistries(ResilienceProperties properties) {
         this.properties = properties;
-        this.circuitBreakerRegistry = CircuitBreakerRegistry.of(toCircuitBreakerConfig(properties.defaults().circuitBreaker()));
-        this.retryRegistry = RetryRegistry.of(toRetryConfig(properties.defaults().retry()));
-        this.timeLimiterRegistry = TimeLimiterRegistry.of(toTimeLimiterConfig(properties.defaults().timeLimiter()));
+        this.circuitBreakerRegistry = CircuitBreakerRegistry.of(
+                toCircuitBreakerConfig(properties.defaults().circuitBreaker()));
+        this.retryRegistry =
+                RetryRegistry.of(toRetryConfig(properties.defaults().retry()));
+        this.timeLimiterRegistry =
+                TimeLimiterRegistry.of(toTimeLimiterConfig(properties.defaults().timeLimiter()));
     }
 
     private static CircuitBreakerConfig toCircuitBreakerConfig(ResilienceProperties.CircuitBreaker properties) {
         return CircuitBreakerConfig.custom()
-            .failureRateThreshold(properties.failureRateThreshold())
-            .slidingWindowSize(properties.slidingWindowSize())
-            .minimumNumberOfCalls(properties.minimumNumberOfCalls())
-            .waitDurationInOpenState(properties.waitDurationInOpenState())
-            .permittedNumberOfCallsInHalfOpenState(properties.permittedCallsInHalfOpenState())
-            .slowCallRateThreshold(properties.slowCallRateThreshold())
-            .slowCallDurationThreshold(properties.slowCallDurationThreshold())
-            .ignoreExceptions(AppException.class, IllegalArgumentException.class)
-            .build();
+                .failureRateThreshold(properties.failureRateThreshold())
+                .slidingWindowSize(properties.slidingWindowSize())
+                .minimumNumberOfCalls(properties.minimumNumberOfCalls())
+                .waitDurationInOpenState(properties.waitDurationInOpenState())
+                .permittedNumberOfCallsInHalfOpenState(properties.permittedCallsInHalfOpenState())
+                .slowCallRateThreshold(properties.slowCallRateThreshold())
+                .slowCallDurationThreshold(properties.slowCallDurationThreshold())
+                .ignoreExceptions(AppException.class, IllegalArgumentException.class)
+                .build();
     }
 
     // AppException/IllegalArgumentException are deterministic client-side failures: retrying them
     // wastes an attempt and a breaker slot on something a fresh attempt can never fix.
     private static RetryConfig toRetryConfig(ResilienceProperties.Retry properties) {
         return RetryConfig.custom()
-            .maxAttempts(properties.maxAttempts())
-            .intervalFunction(IntervalFunction.ofExponentialBackoff(
-                properties.waitDuration(), properties.exponentialBackoffMultiplier(), properties.maxWaitDuration()))
-            .ignoreExceptions(AppException.class, IllegalArgumentException.class)
-            .build();
+                .maxAttempts(properties.maxAttempts())
+                .intervalFunction(IntervalFunction.ofExponentialBackoff(
+                        properties.waitDuration(),
+                        properties.exponentialBackoffMultiplier(),
+                        properties.maxWaitDuration()))
+                .ignoreExceptions(AppException.class, IllegalArgumentException.class)
+                .build();
     }
 
     private static TimeLimiterConfig toTimeLimiterConfig(ResilienceProperties.TimeLimiter properties) {
         return TimeLimiterConfig.custom()
-            .timeoutDuration(properties.timeout())
-            .cancelRunningFuture(properties.cancelRunningFuture())
-            .build();
+                .timeoutDuration(properties.timeout())
+                .cancelRunningFuture(properties.cancelRunningFuture())
+                .build();
     }
 
     public CircuitBreaker circuitBreaker(String policy) {
-        return circuitBreakerRegistry.circuitBreaker(policy,
-            () -> toCircuitBreakerConfig(properties.resolve(policy).circuitBreaker()));
+        return circuitBreakerRegistry.circuitBreaker(
+                policy, () -> toCircuitBreakerConfig(properties.resolve(policy).circuitBreaker()));
     }
 
     public Retry retry(String policy) {
-        return retryRegistry.retry(policy, () -> toRetryConfig(properties.resolve(policy).retry()));
+        return retryRegistry.retry(
+                policy, () -> toRetryConfig(properties.resolve(policy).retry()));
     }
 
     public TimeLimiter timeLimiter(String policy) {
-        return timeLimiterRegistry.timeLimiter(policy,
-            () -> toTimeLimiterConfig(properties.resolve(policy).timeLimiter()));
+        return timeLimiterRegistry.timeLimiter(
+                policy, () -> toTimeLimiterConfig(properties.resolve(policy).timeLimiter()));
     }
 
     public CircuitBreakerRegistry circuitBreakerRegistry() {

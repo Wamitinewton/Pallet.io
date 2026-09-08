@@ -1,6 +1,11 @@
 package io.pallet.common.observability;
 
 import io.pallet.common.events.EventHeaders;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -9,12 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.kafka.listener.RecordInterceptor;
 import tools.jackson.databind.JsonNode;
-
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Consumer-side counterpart of {@link CorrelationIdFilter}: pulls the correlation id off the
@@ -35,8 +34,8 @@ public class CorrelationConsumerInterceptor implements RecordInterceptor<Object,
     }
 
     @Override
-    public ConsumerRecord<Object, Object> intercept(ConsumerRecord<Object, Object> record,
-                                                    Consumer<Object, Object> consumer) {
+    public ConsumerRecord<Object, Object> intercept(
+            ConsumerRecord<Object, Object> record, Consumer<Object, Object> consumer) {
         MDC.put(CorrelationId.MDC_KEY, resolveCorrelationId(record));
         traceId(record).ifPresent(id -> MDC.put(TRACE_ID_MDC_KEY, id));
         contributed.set(contributors.apply());
@@ -60,8 +59,12 @@ public class CorrelationConsumerInterceptor implements RecordInterceptor<Object,
             return value.get("correlationId").asString();
         }
         String generated = UUID.randomUUID().toString();
-        log.warn("Record on {}-{}@{} carried no correlation id — generated {}",
-            record.topic(), record.partition(), record.offset(), generated);
+        log.warn(
+                "Record on {}-{}@{} carried no correlation id — generated {}",
+                record.topic(),
+                record.partition(),
+                record.offset(),
+                generated);
         return generated;
     }
 

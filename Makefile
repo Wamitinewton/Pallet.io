@@ -24,8 +24,12 @@ security: ## Run SpotBugs (FindSecBugs) + OWASP Dependency-Check
 	$(MVN) -B verify -P security
 
 .PHONY: format-check
-format-check: ## Check .editorconfig conformance (whitespace/EOL/charset) across the repo
+format-check: ## Check .editorconfig conformance + Java formatting (Spotless/Palantir)
 	pre-commit run --all-files
+
+.PHONY: format
+format: ## Auto-fix Java formatting (Spotless/Palantir)
+	$(MVN) -q spotless:apply
 
 ## ── Local infrastructure ────────────────────────────────────────────────
 

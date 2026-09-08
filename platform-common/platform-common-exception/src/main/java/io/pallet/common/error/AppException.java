@@ -1,9 +1,8 @@
 package io.pallet.common.error;
 
-import org.springframework.http.HttpStatus;
-
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 
 /**
  * Base type for every expected application error. Services model their own domain
@@ -28,8 +27,8 @@ public abstract class AppException extends RuntimeException {
         this(status, errorCode, clientMessage, technicalMessage, null);
     }
 
-    protected AppException(HttpStatus status, String errorCode, String clientMessage,
-                           String technicalMessage, Throwable cause) {
+    protected AppException(
+            HttpStatus status, String errorCode, String clientMessage, String technicalMessage, Throwable cause) {
         super(technicalMessage, cause);
         this.status = status;
         this.errorCode = errorCode;

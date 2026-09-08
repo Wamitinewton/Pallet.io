@@ -1,12 +1,11 @@
 package io.pallet.common.events;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class EventSerializationTest {
 
@@ -17,35 +16,47 @@ class EventSerializationTest {
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_4f8a21", "BUILDING", "ROUTING");
 
         JsonNode tree = json.readTree(json.writeValueAsString(event));
-        assertThat(tree.propertyNames()).containsExactlyInAnyOrder(
-            "eventId", "eventType", "orgId", "occurredAt", "deploymentId", "fromState", "toState");
+        assertThat(tree.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "eventId", "eventType", "orgId", "occurredAt", "deploymentId", "fromState", "toState");
 
-        assertThat(json.readValue(json.writeValueAsString(event), DeployStateChanged.class)).isEqualTo(event);
+        assertThat(json.readValue(json.writeValueAsString(event), DeployStateChanged.class))
+                .isEqualTo(event);
     }
 
     @Test
     void notificationRequestedIsFlatAndRoundTrips() {
         NotificationRequested event = NotificationRequested.of(
-            "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", "welcome:usr_1",
-            Map.of("name", "Ada"));
+                "org_9k2j7f", "ORG_OWNER_WELCOME", "owner@acme.test", "EMAIL", "welcome:usr_1", Map.of("name", "Ada"));
 
         JsonNode tree = json.readTree(json.writeValueAsString(event));
-        assertThat(tree.propertyNames()).containsExactlyInAnyOrder(
-            "eventId", "eventType", "orgId", "occurredAt",
-            "notificationType", "recipient", "channel", "dedupeKey", "variables");
+        assertThat(tree.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "eventId",
+                        "eventType",
+                        "orgId",
+                        "occurredAt",
+                        "notificationType",
+                        "recipient",
+                        "channel",
+                        "dedupeKey",
+                        "variables");
 
-        assertThat(json.readValue(json.writeValueAsString(event), NotificationRequested.class)).isEqualTo(event);
+        assertThat(json.readValue(json.writeValueAsString(event), NotificationRequested.class))
+                .isEqualTo(event);
     }
 
     @Test
     void occurredAtRoundTripsAsIso8601Utc() {
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_4f8a21", "BUILDING", "ROUTING");
 
-        String occurredAt = json.readTree(json.writeValueAsString(event)).get("occurredAt").asString();
+        String occurredAt =
+                json.readTree(json.writeValueAsString(event)).get("occurredAt").asString();
 
         assertThat(occurredAt).endsWith("Z");
-        assertThat(json.readValue(json.writeValueAsString(event), DeployStateChanged.class).occurredAt())
-            .isEqualTo(event.occurredAt());
+        assertThat(json.readValue(json.writeValueAsString(event), DeployStateChanged.class)
+                        .occurredAt())
+                .isEqualTo(event.occurredAt());
     }
 
     @Test

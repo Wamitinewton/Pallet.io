@@ -1,8 +1,7 @@
 package io.pallet.common.error;
 
-import org.springframework.http.HttpStatus;
-
 import java.util.List;
+import org.springframework.http.HttpStatus;
 
 /**
  * Multi-reason business validation failure; the reasons travel on {@code validationErrors}.

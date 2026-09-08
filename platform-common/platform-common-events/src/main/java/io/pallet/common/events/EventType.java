@@ -7,8 +7,7 @@ package io.pallet.common.events;
  */
 public final class EventType {
 
-    private EventType() {
-    }
+    private EventType() {}
 
     public static String topicFor(PlatformEvent event) {
         return event.eventType();

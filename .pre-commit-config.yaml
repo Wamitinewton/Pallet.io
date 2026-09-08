@@ -3,3 +3,13 @@ repos:
     rev: 3.11.1
     hooks:
       - id: editorconfig-checker
+
+  - repo: local
+    hooks:
+      - id: spotless-check
+        name: Spotless (Palantir Java Format)
+        description: Java formatting/import-order — mvn spotless:apply to fix
+        entry: ./mvnw -q spotless:check
+        language: system
+        files: \.java$
+        pass_filenames: false

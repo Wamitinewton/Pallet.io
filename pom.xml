@@ -47,6 +47,12 @@
              Resilience4j Spring Boot starter, whose Boot 4 compatibility is unconfirmed. -->
         <resilience4j.version>2.4.0</resilience4j.version>
 
+        <!-- Java formatting, enforced on every `verify` (spotless:check binds to the
+             verify phase by default). Palantir's formatter, not Google's, because it
+             matches .editorconfig's indent_size=4 for Java. -->
+        <spotless.version>3.10.2</spotless.version>
+        <palantir-java-format.version>2.97.0</palantir-java-format.version>
+
         <!-- Empty by default. Set locally via ~/.m2/settings.xml or in CI via
              -Dnvd.api.key=${{ secrets.NVD_API_KEY }}. Declared here only so the
              IDE does not flag it as unresolved. -->
@@ -153,6 +159,28 @@
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <palantirJavaFormat>
+                            <version>${palantir-java-format.version}</version>
+                        </palantirJavaFormat>
+                        <removeUnusedImports/>
+                        <importOrder/>
+                        <formatAnnotations/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>

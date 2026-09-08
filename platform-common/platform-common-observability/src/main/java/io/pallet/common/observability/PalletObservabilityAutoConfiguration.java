@@ -1,6 +1,7 @@
 package io.pallet.common.observability;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -12,15 +13,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.listener.RecordInterceptor;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.util.List;
-
 /**
  * Engages each piece by classpath presence — the aspect for any service, the correlation filter
  * for a servlet web service, the consumer interceptor for a Kafka consumer — and lets a service
  * override any bean or switch a piece off by property.
  */
-@AutoConfiguration(afterName =
-    "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration")
+@AutoConfiguration(
+        afterName = "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration")
 @EnableConfigurationProperties(ObservabilityProperties.class)
 public class PalletObservabilityAutoConfiguration {
 
@@ -47,8 +46,8 @@ public class PalletObservabilityAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        CorrelationIdFilter palletCorrelationIdFilter(ObservabilityProperties properties,
-                                                      List<MdcContributor> contributors) {
+        CorrelationIdFilter palletCorrelationIdFilter(
+                ObservabilityProperties properties, List<MdcContributor> contributors) {
             return new CorrelationIdFilter(properties.correlationHeader(), contributors);
         }
 

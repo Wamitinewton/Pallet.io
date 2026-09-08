@@ -2,6 +2,7 @@ package io.pallet.common.messaging;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.events.EventHeaders;
+import java.nio.charset.StandardCharsets;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +10,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import tools.jackson.databind.JsonNode;
-
-import java.nio.charset.StandardCharsets;
 
 /**
  * Consumes every {@code *.DLT} topic, logs the envelope and the failure that put
@@ -29,7 +28,9 @@ public class DeadLetterTopicListener {
     }
 
     private static String field(JsonNode envelope, String name) {
-        return envelope != null && envelope.hasNonNull(name) ? envelope.get(name).asString() : null;
+        return envelope != null && envelope.hasNonNull(name)
+                ? envelope.get(name).asString()
+                : null;
     }
 
     private static String header(ConsumerRecord<?, ?> record, String key) {
@@ -38,13 +39,19 @@ public class DeadLetterTopicListener {
     }
 
     @KafkaListener(topicPattern = ".*\\.DLT", groupId = "pallet-dlt-monitor")
-    public void onDeadLetter(ConsumerRecord<String, JsonNode> record,
-                             @Header(name = KafkaHeaders.EXCEPTION_MESSAGE, required = false) String failure) {
+    public void onDeadLetter(
+            ConsumerRecord<String, JsonNode> record,
+            @Header(name = KafkaHeaders.EXCEPTION_MESSAGE, required = false) String failure) {
         JsonNode envelope = record.value();
-        log.error("Dead-letter {}-{}@{} eventType={} eventId={} correlationId={} cause={}",
-            record.topic(), record.partition(), record.offset(),
-            field(envelope, "eventType"), field(envelope, "eventId"),
-            header(record, EventHeaders.CORRELATION_ID), failure);
+        log.error(
+                "Dead-letter {}-{}@{} eventType={} eventId={} correlationId={} cause={}",
+                record.topic(),
+                record.partition(),
+                record.offset(),
+                field(envelope, "eventType"),
+                field(envelope, "eventId"),
+                header(record, EventHeaders.CORRELATION_ID),
+                failure);
         meterRegistry.counter("messaging.dead_letter", "topic", record.topic()).increment();
     }
 }
