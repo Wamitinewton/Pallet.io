@@ -107,7 +107,7 @@ jobs:
           cache: maven
 
       - name: Build ${{ matrix.module }}, its dependencies and its dependents
-        run: ./mvnw -B -pl ${{ matrix.module }} -am -amd clean verify
+        run: ./mvnw -B -pl "${{ matrix.module }}" -am -amd clean verify
 
   security:
     runs-on: ubuntu-latest
