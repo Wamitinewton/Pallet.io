@@ -1,10 +1,3 @@
-# Shared configuration served by config-server to every Pallet service.
-# A service fetches this (merged with its own <service-name>.yml) at startup.
-#
-# This directory is the starting point only. Once platform-infra exists it
-# moves to a git-backed source, and once Pallet runs on Kubernetes the shared
-# values move to ConfigMaps and the secrets to Vault / Kubernetes Secrets.
-# Never put a real secret in this file.
 
 management:
   endpoints:
