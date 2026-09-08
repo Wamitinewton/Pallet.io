@@ -31,40 +31,23 @@
     </modules>
 
     <properties>
-        <!-- Language level. The brief targets Java 21 (current LTS); the build
-             machine ships JDK 25, which compiles a 21 release fine. Bump both
-             lines together if the language target ever moves. -->
+
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- Spring Boot 4.1.0 needs Spring Cloud 2025.1.2 (Oakwood) or newer;
-             2025.1.1 and earlier do not run against Boot 4.1. -->
+
         <spring-cloud.version>2025.1.3</spring-cloud.version>
 
-        <!-- Backs platform-common-resilience's registries (circuit breaker, retry, time
-             limiter) and its Micrometer binding. Programmatic registries only — not the
-             Resilience4j Spring Boot starter, whose Boot 4 compatibility is unconfirmed. -->
         <resilience4j.version>2.4.0</resilience4j.version>
 
-        <!-- Java formatting, enforced on every `verify` (spotless:check binds to the
-             verify phase by default). Palantir's formatter, not Google's, because it
-             matches .editorconfig's indent_size=4 for Java. -->
+
         <spotless.version>3.10.2</spotless.version>
         <palantir-java-format.version>2.97.0</palantir-java-format.version>
 
-        <!-- Empty by default. Set locally via ~/.m2/settings.xml or in CI via
-             -Dnvd.api.key=${{ secrets.NVD_API_KEY }}. Declared here only so the
-             IDE does not flag it as unresolved. -->
         <nvd.api.key></nvd.api.key>
 
-        <!-- ── Security patch overrides ────────────────────────────────────
-             Override Spring Boot BOM-managed versions here to pick up security
-             patches released after the BOM was published. Each entry gets a
-             CVE reference and is rechecked on every Spring Boot bump, since the
-             BOM often catches up and the override can then be dropped. Empty
-             for now; see SECURITY.md.
-             ────────────────────────────────────────────────────────────── -->
+
     </properties>
 
     <dependencyManagement>
