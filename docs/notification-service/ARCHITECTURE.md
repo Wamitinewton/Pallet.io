@@ -16,6 +16,8 @@ changes architecture gets an ADR in the same PR."
 - [Data model](#data-model)
 - [Inbound contract: `notification.requested`](#inbound-contract-notificationrequested)
 - [Channel abstraction and the template registry](#channel-abstraction-and-the-template-registry)
+- [Broadcast notifications and future org-team-service integration](#broadcast-notifications-and-future-org-team-service-integration)
+- [Rate limiting per organization](#rate-limiting-per-organization)
 - [Processing pipeline](#processing-pipeline)
 - [Read API: in-app notifications](#read-api-in-app-notifications)
 - [Distributed systems mechanisms](#distributed-systems-mechanisms)
@@ -109,16 +111,23 @@ that is this service's problem to solve (or expose via metrics/audit), not their
   are exported from the first commit, not bolted on later.
 - The service degrades gracefully under a slow or dead SMTP host: the consumer keeps making
   progress on other channels/messages instead of stalling.
+- **Broadcast (org-wide) is a first-class audience from day one**, not retrofitted when
+  `org-team-service` ships. The data model, fan-out logic, and a membership read-model seam are
+  built now; the only thing missing until Phase 1d/2 is a real producer of membership events to
+  populate that seam. See [Broadcast notifications](#broadcast-notifications-and-future-org-team-service-integration).
+- **A noisy org cannot degrade delivery for other tenants.** Per-org volume is bounded without
+  ever blocking a Kafka partition's poll loop — see [Rate limiting](#rate-limiting-per-organization).
+- **Every notification is retained in full** — no TTL, no purge job, no silent data loss on old
+  history. Retention is a deliberate product decision here, not an oversight; see
+  [Data model](#data-model).
 
 **Non-goals (this foundation)**
 
-- Real-time push (WebSocket/SSE) for in-app notifications — the read API is pull-based; see
-  [Open questions](#open-questions--deferred).
+- Real-time push (WebSocket/SSE) for in-app notifications — decided, but deliberately deferred:
+  the read API is pull-based for now, and the data model is shaped so a push layer bolts on later
+  without a migration. See [Open questions](#open-questions--deferred).
 - Per-user notification preferences / opt-out / digesting — the template registry decides
   channels for now, not a per-recipient setting.
-- Org-wide broadcast (one event → every member of an org notified) — v1 is one delivery per
-  explicit recipient. A broadcast either fans out at the producer (loop and publish N events) or
-  waits for `org-team-service` to exist so this service can resolve membership itself.
 - A schema registry or Avro/Protobuf — ADR-0006 keeps the wire format plain JSON.
 
 ## Domain model
@@ -143,6 +152,7 @@ classDiagram
         String notificationType
         UUID sourceEventId
         String dedupeKey
+        Audience audience
         String renderedTitle
         String renderedBody
         Map~String,Object~ variables
@@ -163,6 +173,12 @@ classDiagram
         Instant updatedAt
     }
 
+    class Audience {
+        <<enumeration>>
+        SINGLE
+        ORG
+    }
+
     class Channel {
         <<enumeration>>
         EMAIL
@@ -172,15 +188,25 @@ classDiagram
     class DeliveryStatus {
         <<enumeration>>
         PENDING
+        THROTTLED
         SENT
         FAILED
         DEAD_LETTERED
     }
 
     Notification "1" --> "*" NotificationDelivery : fans out to
+    Notification --> Audience
     NotificationDelivery --> Channel
     NotificationDelivery --> DeliveryStatus
 ```
+
+`audience` is stamped once on the `Notification` from the inbound event and never changes — it
+records *what was asked for* (one person, or the whole org), independent of how many
+`NotificationDelivery` rows that produced. `SINGLE` always produces one delivery per selected
+channel; `ORG` produces one delivery per *(resolved member, selected channel)* pair — see
+[Broadcast notifications](#broadcast-notifications-and-future-org-team-service-integration).
+`THROTTLED` is a transient status introduced by per-org rate limiting — see
+[Rate limiting](#rate-limiting-per-organization).
 
 ## Data model
 
@@ -196,6 +222,7 @@ erDiagram
         varchar notification_type
         uuid source_event_id UK "idempotency key"
         varchar dedupe_key
+        varchar audience "SINGLE | ORG"
         varchar rendered_title
         text rendered_body
         jsonb variables
@@ -214,7 +241,19 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    ORG_MEMBERS {
+        varchar org_id PK
+        varchar user_id PK
+        varchar email
+        varchar status "ACTIVE | REMOVED"
+        timestamptz updated_at
+    }
 ```
+
+`ORG_MEMBERS` has no foreign key to `NOTIFICATIONS` — it's an independent local read-model, not
+part of the notification/delivery aggregate. See
+[Broadcast notifications](#broadcast-notifications-and-future-org-team-service-integration) for
+what populates it and why it lives in this schema at all.
 
 Indexes that matter from day one (Flyway, not an afterthought migration):
 
@@ -222,17 +261,35 @@ Indexes that matter from day one (Flyway, not an afterthought migration):
   a redelivery hits a constraint violation, which the guard treats as "already handled."
 - `notifications(org_id, dedupe_key)` unique **partial** index (`WHERE dedupe_key IS NOT NULL`) —
   collapses logically-duplicate requests from two different producers.
-- `notification_deliveries(notification_id, channel)` **unique** — one delivery row per channel
-  per notification; fan-out is `INSERT ... ON CONFLICT DO NOTHING`, so a retried fan-out step
-  never double-sends a channel that already succeeded.
+- `notification_deliveries(notification_id, channel, recipient)` **unique** — one delivery row per
+  *(notification, channel, recipient)* triple. `recipient` is part of the key, not just
+  `(notification_id, channel)`, because a broadcast fans one notification out to many recipients
+  on the same channel; fan-out is `INSERT ... ON CONFLICT DO NOTHING`, so a retried fan-out step
+  (or a partially-completed broadcast resumed after a crash) never double-delivers a
+  member/channel pair that already succeeded.
 - `notification_deliveries(recipient, channel, created_at DESC) WHERE channel = 'IN_APP'` — the
   index the read API's list query actually runs against.
 - `notification_deliveries(recipient, channel) WHERE channel = 'IN_APP' AND read_at IS NULL` —
   backs the unread-count endpoint without a full table scan per request.
+- `notification_deliveries(status, created_at) WHERE status = 'THROTTLED'` — the index the
+  delivery-retry scheduler sweeps (see [Rate limiting](#rate-limiting-per-organization)).
+- `org_members(org_id, status)` — the membership-resolution query for an `ORG` broadcast.
 
 `recipient` is channel-appropriate: an email address for `EMAIL`, a user id (the token's `sub`)
 for `IN_APP`. Storing it on the delivery row, not the notification row, is what lets one
-notification address different identifiers per channel.
+notification address different identifiers per channel, and what lets a broadcast address a
+different recipient per row while sharing one rendered `Notification`.
+
+**Retention.** Nothing here deletes a row. `notifications` and `notification_deliveries` are
+retained in full — no TTL, no archival job, no purge. Unread state is a column
+(`read_at IS NULL`), never a reason to remove a row. This is a product decision, not a gap: a
+tenant's notification history is part of their record. The only operational consequence worth
+planning for as volume grows is query performance, not storage correctness — if
+`notification_deliveries` becomes very large, the standard mitigation is time-range table
+partitioning (e.g. by `created_at`, monthly), which is a Postgres/DBA-level change that needs no
+application code change given the access patterns above are already scoped by `created_at`
+ranges and indexed accordingly. Not needed on day one; noted here so it isn't rediscovered as a
+surprise later.
 
 ## Inbound contract: `notification.requested`
 
@@ -251,12 +308,33 @@ public record NotificationRequested(
   that `notificationType` decide — most notification types will declare both `EMAIL` and
   `IN_APP` there rather than every producer having to know the full channel list. This is additive
   interpretation of an existing nullable field, not a contract break.
-- `recipient` is required and must already be the right shape for whichever channel(s) actually
-  get used — the producer picking an email address for a notification type that also fans out to
-  `IN_APP` is a template-authoring bug the registry should catch at startup (see below), not a
-  runtime failure to design around.
+- `recipient` is required for a `SINGLE`-audience notification and must already be the right shape
+  for whichever channel(s) actually get used — the producer picking an email address for a
+  notification type that also fans out to `IN_APP` is a template-authoring bug the registry should
+  catch at startup (see below), not a runtime failure to design around.
 - `variables` stays the loose `Map<String, Object>` per ADR-0006; unknown keys are ignored by the
   renderer the same way unknown JSON fields are ignored by the deserializer.
+
+**Proposed additive field: `audience`.** Broadcast needs one more field on the event, not yet in
+`platform-common-events`:
+
+```java
+public record NotificationRequested(
+        UUID eventId, String eventType, String orgId, Instant occurredAt,
+        String notificationType, String recipient, String channel,
+        String dedupeKey, Map<String, Object> variables,
+        String audience   // NEW — "SINGLE" (default when absent/null) | "ORG"
+) implements PlatformEvent { ... }
+```
+
+- Absent or `null` → `SINGLE`, meaning every producer that exists today keeps working with zero
+  changes — this is why it's additive under ADR-0006, not a breaking contract change.
+- `audience = "ORG"` means "every current member of `orgId`," resolved at delivery time (not at
+  publish time) against the local membership projection described next — `recipient` is ignored
+  when `audience` is `ORG`.
+- This field needs an actual code change to `NotificationRequested` in `platform-common-events`
+  before broadcast can be produced; it's specified here so the contract and the consumer-side
+  design land together rather than the consumer guessing at a shape that doesn't exist yet.
 
 ## Channel abstraction and the template registry
 
@@ -285,7 +363,155 @@ public record NotificationTemplate(
 `notificationType` from the event catalog has no matching template. Failing loud at boot beats
 failing quiet on a redelivered message a producer already sent.
 
+## Broadcast notifications and future org-team-service integration
+
+`org-team-service` (Phase 1d/2) will own organizations, teams, and membership (`PROJECT.md`).
+This service doesn't wait for that to exist to get broadcast right — the audience concept, the
+fan-out logic, and a local membership seam are built now, so the day `org-team-service` starts
+publishing membership events, broadcast starts actually reaching people with **no change to this
+service's code**.
+
+### Why a local read-model, not a synchronous lookup
+
+The tempting shortcut — call `org-team-service` synchronously to list an org's members when a
+broadcast arrives — breaks the platform's one hard rule: *no service makes a blocking call to
+another* (`PROJECT.md`, "Architecture overview"). It would also make every broadcast's latency and
+availability depend on a second service being up. Instead, `notification-service` keeps its own
+small, eventually-consistent projection of "who's in this org," fed by consuming membership
+events, and resolves broadcasts against that local copy — the same CQRS-style read-model pattern
+`audit-log-service` and `log-service` already apply to their own inputs.
+
+```mermaid
+flowchart LR
+    subgraph OTS["org-team-service (future, Phase 1d/2)"]
+        M[Membership changes]
+    end
+    subgraph Backbone["Event backbone"]
+        T3[["org.member.added"]]
+        T4[["org.member.removed"]]
+    end
+    subgraph NS["notification-service"]
+        L2[OrgMembershipEventListener]
+        P[(org_members<br/>local projection)]
+        AR[AudienceResolver]
+    end
+
+    M -- publish --> T3
+    M -- publish --> T4
+    T3 --> L2
+    T4 --> L2
+    L2 -- upsert / mark removed --> P
+    AR -- read --> P
+```
+
+### The seam, concretely
+
+```java
+public enum Audience { SINGLE, ORG }
+
+public record Recipient(String userId, String email) {}
+
+public interface AudienceResolver {
+    List<Recipient> resolve(String orgId, Audience audience, String singleRecipient);
+}
+```
+
+- `SingleAudienceResolver` (default, active today): `ORG` isn't reachable yet because nothing
+  publishes `audience = ORG` until the event contract change above ships, but the interface
+  already has both cases so wiring a producer doesn't require touching this service again.
+- `LocalProjectionAudienceResolver`: `SINGLE` returns the one recipient as-is;
+  `ORG` queries `org_members WHERE org_id = ? AND status = 'ACTIVE'` and returns one `Recipient`
+  per row. Swapping this in for the default is a Spring `@ConditionalOnMissingBean` override —
+  the same extension pattern every `platform-common` module already uses.
+- `org_members(org_id, user_id, email, status, updated_at)` is populated by
+  `OrgMembershipEventListener`, a `@KafkaListener` on two topics this document expects
+  `platform-common-events`/`org-team-service` to add later: `org.member.added` and
+  `org.member.removed` (payload: `orgId`, `userId`, `email`). Until `org-team-service` exists and
+  publishes them, the listener has nothing to consume and the table stays empty — an `ORG`
+  broadcast today resolves to zero recipients rather than failing, which is the correct, honest
+  behavior for "the feature is wired but the upstream data source doesn't exist yet" (see
+  [Failure modes](#failure-modes)).
+
+### Fan-out with an audience
+
+The processing pipeline's fan-out step changes from "one recipient × selected channels" to
+"resolved recipients × selected channels":
+
+```mermaid
+sequenceDiagram
+    participant L as NotificationRequestedListener
+    participant AR as AudienceResolver
+    participant Repo as NotificationRepository
+    participant CR as ChannelRouter
+    participant DDB as Postgres
+
+    L->>AR: resolve(orgId, audience, recipient)
+    AR-->>L: [Recipient, Recipient, ...]  (1 for SINGLE, N for ORG)
+    L->>Repo: insert Notification (audience, rendered content) — once, regardless of N
+    loop each resolved recipient
+        loop each selected channel
+            L->>CR: fanOut(notification, channel, recipient)
+            CR->>DDB: INSERT delivery(notification_id, channel, recipient) ON CONFLICT DO NOTHING
+        end
+    end
+```
+
+One `Notification` row regardless of audience size — rendering happens once; only the delivery
+fan-out multiplies. A broadcast to a 200-person org is 200 delivery rows sharing one rendered
+notification, not 200 copies of the rendered text. Because the fan-out is idempotent per
+`(notification_id, channel, recipient)`, a crash mid-broadcast resumes cleanly on redelivery: rows
+already inserted are skipped, not duplicated.
+
+## Rate limiting per organization
+
+A single noisy or misbehaving producer (a bug that publishes the same event type in a loop, or a
+legitimately large broadcast) must not degrade delivery for other tenants sharing the same Kafka
+partition, and must not let one org flood its own in-app inbox or exhaust the shared SMTP relay's
+quota.
+
+**The constraint that shapes the design**: `notification.requested` is keyed by `orgId`, but a
+partition holds *many* orgs' keys (partition count is far smaller than the tenant count). If
+rate-limiting blocked the consumer thread when an org is over quota, it would stall every other
+org's messages waiting behind it on that partition — a classic head-of-line-blocking bug hiding
+inside what looks like a reasonable safety feature. So the limiter must **never block the poll
+loop**; it can only make a fast accept/reject decision per delivery attempt.
+
+```mermaid
+flowchart LR
+    L[NotificationRequestedListener] --> CR[ChannelRouter]
+    CR --> RL{OrgRateLimiter<br/>non-blocking permission check}
+    RL -- permitted --> Send[EmailChannel / InAppChannel]
+    RL -- rejected --> Th[(mark delivery THROTTLED)]
+    Th -.picked up later.-> Sched[DeliveryRetryScheduler<br/>@Scheduled sweep]
+    Sched --> RL
+```
+
+- `OrgRateLimiter` is a Resilience4j `RateLimiter` registry keyed by `orgId` (one limiter instance
+  per org, created on first use, config default e.g. N deliveries/minute via
+  `pallet.notification.rate-limit.*` — no hardcoded threshold, per the shared modules' own rule
+  against hardcoding tunables). It's consulted with a **zero-wait permission check**
+  (`RateLimiter.acquirePermission()`, not `executeRunnable` with a wait timeout) — reject
+  immediately, never wait.
+- On rejection, the delivery row is written as `THROTTLED` rather than attempted — the event has
+  already been fully consumed and acknowledged; this is a delivery-pacing decision, not a
+  consumption failure, so it must never trigger Kafka redelivery or a DLT entry.
+- `DeliveryRetryScheduler`, a `@Scheduled` task independent of the Kafka consumer, periodically
+  sweeps `THROTTLED` rows (the partial index from [Data model](#data-model)) and re-attempts them
+  through the same `ChannelRouter` → `OrgRateLimiter` path. This decouples *ingestion speed*
+  (bounded only by Kafka consumer throughput) from *delivery pacing* (bounded by each org's
+  quota) — the two were conflated in a naive "rate-limit the listener" design and shouldn't be.
+- The same `OrgRateLimiter` registry can gate the read API too (a per-org or per-user request
+  cap on `GET /api/v1/notifications`) using Resilience4j's standard Spring MVC integration —
+  worth adding once real traffic shows it's needed; the registry already exists either way.
+
 ## Processing pipeline
+
+The diagram below is the default, `SINGLE`-audience path — one recipient, no throttling. For an
+`ORG` broadcast, the fan-out step expands per
+[Broadcast notifications](#broadcast-notifications-and-future-org-team-service-integration); for a
+throttled delivery, the send step ends in `THROTTLED` instead of `SENT`/`FAILED` per
+[Rate limiting](#rate-limiting-per-organization). Both are drawn separately above rather than
+folded into one crowded diagram.
 
 ```mermaid
 sequenceDiagram
@@ -382,6 +608,8 @@ sequenceDiagram
 | Backpressure / horizontal scale | Stateless consumer, scales by adding instances up to the partition count of `notification.requested` | Consumer group, `platform-common-messaging` |
 | Fast, bounded retry per external call | Retry + circuit breaker + time limiter around each SMTP send | `ExternalCall` (`platform-common-resilience`) wrapping `EmailChannel` |
 | Slow-consumer isolation | A tripped email circuit breaker fails fast instead of blocking the poll loop; in-app deliveries for the same batch are unaffected since they don't share the breaker | Per-channel `ExternalCall` instances, not one shared breaker |
+| Per-tenant fairness / noisy-neighbor protection | Non-blocking, per-org rate limiter on the send path; rejections become `THROTTLED` deliveries drained by a separate scheduled sweep, never a blocked partition | `OrgRateLimiter` (Resilience4j `RateLimiter` registry) + `DeliveryRetryScheduler` — see [Rate limiting](#rate-limiting-per-organization) |
+| Eventually-consistent local read-model for cross-service data | Membership needed for broadcast is consumed from events into a local table instead of queried synchronously | `org_members` projection + `OrgMembershipEventListener` — see [Broadcast notifications](#broadcast-notifications-and-future-org-team-service-integration) |
 | Redelivery + poison-message handling | Exponential backoff redelivery, then `DeadLetterPublishingRecoverer` → `notification.requested.DLT` | `platform-common-messaging` |
 | Tracing | One trace spans consume → render → fan-out → send, and separately, one span per inbound read-API call | `platform-common-observability` (`@Monitored`, correlation interceptor) |
 | Metrics | Counters: `notifications.sent`, `.failed`, `.retried`, `.dead_lettered`, `.read`; histogram: send latency by channel; gauge: breaker state | Micrometer via `platform-common-observability` + `-resilience` |
@@ -399,6 +627,8 @@ delivery only reaches `DEAD_LETTERED` after both are exhausted.
 stateDiagram-v2
     [*] --> PENDING: delivery row created
     PENDING --> SENT: channel send succeeds
+    PENDING --> THROTTLED: org rate limiter rejects (non-blocking check)
+    THROTTLED --> PENDING: DeliveryRetryScheduler re-attempts on its next sweep
     PENDING --> FAILED: Resilience4j retry budget exhausted OR breaker open OR non-retryable error
     FAILED --> PENDING: whole event redelivered by Kafka (new consumer attempt)
     FAILED --> DEAD_LETTERED: Kafka-level retries also exhausted → event lands on .DLT
@@ -407,6 +637,11 @@ stateDiagram-v2
     READ --> [*]
     DEAD_LETTERED --> [*]: recorded as failed, visible in metrics/audit, not silently lost
 ```
+
+`THROTTLED` is never a Kafka-retry trigger — it's resolved entirely by
+`DeliveryRetryScheduler`, independent of consumer redelivery. It only ever transitions back to
+`PENDING`, never straight to `DEAD_LETTERED` — a throttled delivery is retried until it sends or
+until it fails for a real (non-quota) reason, not abandoned for being rate-limited.
 
 ## Failure modes
 
@@ -419,6 +654,9 @@ stateDiagram-v2
 | Redelivered event after a successful first pass | `EventIdempotencyGuard` short-circuits before any channel runs — zero duplicate emails, zero duplicate in-app rows |
 | Reader marks an already-read notification as read again | No-op, 200 — `read_at` is monotonic |
 | Recipient claim on the token doesn't match the delivery's `recipient` | 404, not 403 — don't confirm to a caller that a notification exists for someone else |
+| `ORG` broadcast arrives before `org-team-service` exists or before it has published that org's members | `AudienceResolver` returns zero recipients; the `Notification` row is still created (content isn't lost) but produces no deliveries — visible as a `notifications.broadcast_empty` counter, not a silent drop, so it's diagnosable rather than mysterious |
+| An org sustains volume above its rate limit for a long time | Deliveries accumulate as `THROTTLED` and keep getting retried by the sweep; this is a capacity/backlog signal (alert on `THROTTLED` count and oldest-`THROTTLED`-age, not just on failures) rather than a state this design silently resolves — see [Open questions](#open-questions--deferred) |
+| Broadcast crashes mid-fan-out (pod killed after 80 of 200 deliveries inserted) | Safe to redeliver or restart: the `(notification_id, channel, recipient)` unique constraint makes re-running the fan-out for the same notification a no-op for the 80 already inserted and completes the remaining 120 |
 
 ## Component view
 
@@ -430,7 +668,12 @@ flowchart TB
         G["EventIdempotencyGuard impl<br/>(notifications.source_event_id)"]
         Reg[NotificationTemplateRegistry]
         Rend[TemplateRenderer]
+        AR[AudienceResolver]
+        MRepo[OrgMembershipRepository]
+        ML["OrgMembershipEventListener<br/>(@KafkaListener, future topics)"]
         Router[ChannelRouter]
+        RL[OrgRateLimiter]
+        Sched["DeliveryRetryScheduler<br/>(@Scheduled)"]
         EC2[EmailChannel]
         IC[InAppChannel]
         Repo1[NotificationRepository]
@@ -441,10 +684,15 @@ flowchart TB
 
     L --> G
     L --> Reg --> Rend
+    L --> AR --> MRepo
+    ML --> MRepo
     L --> Repo1
     L --> Router
-    Router --> EC2 --> Repo2
-    Router --> IC --> Repo2
+    Router --> RL
+    RL --> EC2 --> Repo2
+    RL --> IC --> Repo2
+    Sched --> RL
+    Sched --> Repo2
     Ctrl --> QSvc --> Repo1
     QSvc --> Repo2
 ```
@@ -501,7 +749,11 @@ services/notification-service/
     ├── consumer/        NotificationRequestedListener
     ├── idempotency/      NotificationEventIdempotencyGuard
     ├── template/         NotificationTemplate, NotificationTemplateRegistry, TemplateRenderer
+    ├── audience/          Audience, Recipient, AudienceResolver, SingleAudienceResolver,
+    │                     LocalProjectionAudienceResolver, OrgMember (entity),
+    │                     OrgMembershipRepository, OrgMembershipEventListener
     ├── channel/          NotificationChannel, EmailChannel, InAppChannel, ChannelRouter
+    ├── ratelimit/         OrgRateLimiter, DeliveryRetryScheduler
     ├── domain/           Notification, NotificationDelivery, Channel, DeliveryStatus (JPA entities)
     ├── repository/       NotificationRepository, NotificationDeliveryRepository
     ├── api/               NotificationController, NotificationQueryService, NotificationDto
@@ -538,19 +790,24 @@ Adding **notification preferences** (a user muting a type or channel): a lookup 
 
 ## Open questions / deferred
 
-- **Real-time push for in-app.** The read API is pull/poll-based in this foundation. A live
-  unread-count badge either polls `GET .../unread-count` on an interval or, later, gets a
-  WebSocket/SSE push — the same pattern `PROJECT.md`'s log-service tail already establishes
-  (JWT-checked live stream scoped to the caller). Not built now; the data model doesn't block it.
-- **Org-wide broadcast.** Deferred until there's a membership source to resolve against
-  (`org-team-service`); v1 requires one explicit recipient per delivery.
-- **Notification retention / archival.** No TTL or archival job in this foundation — `read_at`
-  distinguishes read from unread, nothing deletes old rows yet. Worth revisiting alongside
-  `usage-metering-service`'s per-org retention-as-a-plan-attribute pattern if in-app volume grows.
-- **Rate limiting per org.** Not in this foundation; a noisy producer can currently flood one
-  tenant's in-app inbox. A `Bucket4j`/Resilience4j `RateLimiter` in front of the read API, or a
-  per-org cap in the consumer, is a natural Phase-1-hardening addition once real usage shows
-  whether it's needed.
+- **Real-time push for in-app.** Decided direction: not now. The read API is pull/poll-based in
+  this foundation — a live unread-count badge polls `GET .../unread-count` on an interval. A
+  WebSocket/SSE push comes later, following the same pattern `PROJECT.md`'s log-service tail
+  already establishes (a JWT-checked live stream scoped to the caller). Nothing in the data model
+  blocks adding it: a push layer would sit beside `NotificationQueryService`, publishing the same
+  `NotificationDto` rows it already produces, triggered off the same writes `InAppChannel` and
+  `DeliveryRetryScheduler` already make — no reshaping of `notifications` /
+  `notification_deliveries` needed when that phase starts.
+- **Sustained per-org throttling.** The rate-limiting design (above) handles a burst cleanly, but
+  doesn't yet define a cap on how long a delivery may sit `THROTTLED`, or what happens if an org's
+  sustained volume permanently exceeds its quota (unbounded backlog vs. an eventual drop with an
+  audit trail vs. an alert that pages a human to raise the org's limit). Needs a decision once
+  real traffic patterns exist to size the default limits against — premature to fix a number now.
+- **Broadcast audience beyond "every active member."** `ORG` today means every row in
+  `org_members` with `status = 'ACTIVE'`. Whether a broadcast should ever be scoped further (only
+  a given role, e.g. owners/admins) is an `org-team-service`-shaped question — the
+  `AudienceResolver` interface can grow a third case then; not needed for the seam to be useful
+  now.
 
 ## Relationship to existing planning docs
 
@@ -564,7 +821,17 @@ table now also carries the fan-out and read-state that in-app needs. The event c
 rather than a required field, which was already legal (it's a plain nullable `String`).
 
 Before Sprint 1 of `docs/workflows/notification-service/` starts, this expansion in scope (a
-second channel, two new REST endpoints groups, `platform-common-security` as a new dependency for
-this service) should get a short ADR, per `CONTRIBUTING.md`'s rule that an architecture-changing
-decision ships an ADR in the same PR — this file is the design; the ADR is the one-page record of
-*why* in-app joined the foundation instead of arriving as a later phase.
+second channel, two new REST endpoint groups, `platform-common-security` as a new dependency for
+this service, an `audience` field on `NotificationRequested`, and a local `org_members`
+projection fed by topics `org-team-service` doesn't publish yet) should get a short ADR, per
+`CONTRIBUTING.md`'s rule that an architecture-changing decision ships an ADR in the same PR — this
+file is the design; the ADR is the one-page record of *why* in-app and broadcast joined the
+foundation instead of arriving as later phases. Two follow-ups this design creates for other
+docs, worth listing in that ADR rather than losing track of:
+
+- `platform-common-events`: add `audience` to `NotificationRequested`, and reserve
+  `org.member.added` / `org.member.removed` in `Topics` once `org-team-service`'s own workflow
+  defines their exact payload — this document assumes their shape, it doesn't own it.
+- `docs/workflows/ROADMAP.md` Phase 1c's checkpoint table should grow a line for the
+  audience/rate-limit/membership-projection work when `docs/workflows/notification-service/` is
+  written sprint-by-sprint, so the roadmap doesn't silently fall behind this design.
