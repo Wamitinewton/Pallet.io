@@ -30,9 +30,8 @@ import org.springframework.context.annotation.Bean;
 @EnableConfigurationProperties(ResilienceProperties.class)
 public class PalletResilienceAutoConfiguration {
 
-    // Small and fixed: this pool only hosts the blocking call while its time limiter watches it,
-    // not the call's real work, so a handful of threads comfortably covers concurrent callers.
-    private static final int SCHEDULER_POOL_SIZE = 8;
+    // Small and fixed by default: this pool executes the guarded supplier while the time limiter enforces the timeout.
+    // Services with high concurrency / long-running blocking calls should override the palletResilienceScheduler bean with a suitably sized executor.
 
     private static final AtomicInteger THREAD_COUNT = new AtomicInteger();
 
