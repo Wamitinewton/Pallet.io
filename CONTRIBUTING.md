@@ -65,22 +65,23 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 full reactor `verify` — the canonical green signal. A PR is classified by the
 `scope` job:
 
-- touches only files under one or more `services/<name>/` — a matrix job builds
-  each affected service with `./mvnw -pl services/<name> -am clean verify`, so
-  `platform-common` deps still compile but unrelated services are skipped;
-- touches anything shared — the parent POM, the Maven wrapper, a
-  `platform-common` module, `config-repo/`, or the workflow itself — falls back
-  to a full reactor build, since a shared change can break any service.
+- touches only files under one or more `services/<name>/` or
+  `platform-common/<name>/` — a matrix job builds each affected module with
+  `./mvnw -pl <module> -am -amd clean verify` (also-make its dependencies so it
+  compiles, also-make-dependents so a `platform-common` change is verified
+  against every service that consumes it), while unrelated modules are skipped;
+- touches anything shared — the parent POM, the Maven wrapper, the
+  `platform-common` aggregator POM, `config-repo/`, or the workflow itself —
+  falls back to a full reactor build, since a shared change can break anything.
 
-A separate `security` job runs on every PR regardless: SpotBugs + FindSecBugs
-always (a hard fail), then OWASP Dependency-Check — which is skipped with a
-warning unless the `NVD_API_KEY` secret is set, since Dependency-Check 13 cannot
-update the NVD without a key. The `build` job is the single stable status check
-to require in branch protection; it passes when whichever build path ran
-succeeded.
+A separate `security` job runs on every PR regardless: SpotBugs + FindSecBugs,
+a hard fail. OWASP Dependency-Check does not run in CI (see
+[SECURITY.md](SECURITY.md)) — run it locally before a dependency bump. The
+`build` job is the single stable status check to require in branch protection;
+it passes when whichever build path ran succeeded.
 
-Adding a service needs no CI change — the `scope` job discovers `services/*`
-from the diff.
+Adding a service or a `platform-common` module needs no CI change — the
+`scope` job discovers both from the diff.
 
 ## Pull requests
 
