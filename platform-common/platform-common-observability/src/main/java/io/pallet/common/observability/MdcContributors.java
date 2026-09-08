@@ -6,7 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Applies and unwinds a set of {@link MdcContributor} beans over a request or record scope. */
+/**
+ * Applies and unwinds a set of {@link MdcContributor} beans over a request or record scope.
+ */
 final class MdcContributors {
 
     private final List<MdcContributor> contributors;
@@ -15,7 +17,9 @@ final class MdcContributors {
         this.contributors = contributors;
     }
 
-    /** @return the keys this call installed, for the caller to remove once the scope ends. */
+    /**
+     * @return the keys this call installed, for the caller to remove once the scope ends.
+     */
     List<String> apply() {
         List<String> installed = new ArrayList<>();
         for (MdcContributor contributor : contributors) {

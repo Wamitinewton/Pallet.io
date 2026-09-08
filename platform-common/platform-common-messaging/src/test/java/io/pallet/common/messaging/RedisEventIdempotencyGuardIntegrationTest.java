@@ -28,19 +28,17 @@ class RedisEventIdempotencyGuardIntegrationTest {
 
     @Container
     static final GenericContainer<?> REDIS =
-            new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+        new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    @Autowired
+    private EventIdempotencyGuard guard;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     }
-
-    @Autowired
-    private EventIdempotencyGuard guard;
-
-    @Autowired
-    private StringRedisTemplate redisTemplate;
 
     @Test
     void firstCallerWinsReleaseReopensAndExpiryFrees() throws InterruptedException {

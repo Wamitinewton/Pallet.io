@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
  */
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
-    /** An inbound id outside this shape is dropped: it reaches a response header and the logs. */
+    /**
+     * An inbound id outside this shape is dropped: it reaches a response header and the logs.
+     */
     private static final Pattern SAFE = Pattern.compile("[A-Za-z0-9_-]{1,128}");
 
     private final String header;
@@ -35,11 +37,11 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
+        throws ServletException, IOException {
         String inbound = request.getHeader(header);
         String correlationId = inbound != null && SAFE.matcher(inbound).matches()
-                ? inbound
-                : UUID.randomUUID().toString();
+            ? inbound
+            : UUID.randomUUID().toString();
         response.setHeader(header, correlationId);
 
         MDC.put(CorrelationId.MDC_KEY, correlationId);

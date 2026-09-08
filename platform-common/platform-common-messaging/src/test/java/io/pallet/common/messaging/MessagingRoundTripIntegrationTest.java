@@ -36,26 +36,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(classes = MessagingRoundTripIntegrationTest.TestApp.class,
-        properties = "spring.autoconfigure.exclude="
-                + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration")
+    properties = "spring.autoconfigure.exclude="
+        + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration")
 @ActiveProfiles("test")
 @Testcontainers
 class MessagingRoundTripIntegrationTest {
 
     @Container
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))
-            .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false"); // topics must come from our NewTopics beans
+        .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false"); // topics must come from our NewTopics beans
+    @Autowired
+    private PlatformEventPublisher publisher;
+    @Autowired
+    private Listeners listeners;
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
 
-    @Autowired
-    private PlatformEventPublisher publisher;
-
-    @Autowired
-    private Listeners listeners;
+    private static String header(ConsumerRecord<String, JsonNode> record, String key) {
+        Header header = record.headers().lastHeader(key);
+        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
 
     @Test
     void theEnvelopeKeyAndHeadersSurviveTheRoundTrip() throws Exception {
@@ -81,17 +84,12 @@ class MessagingRoundTripIntegrationTest {
         UUID eventId = UUID.randomUUID();
         for (int i = 0; i < 5; i++) {
             publisher.publish(new NotificationRequested(eventId, NotificationRequested.TYPE, "org_dup",
-                    Instant.now(), "TEST", "a@b.c", "EMAIL", null, Map.of("copy", i)));
+                Instant.now(), "TEST", "a@b.c", "EMAIL", null, Map.of("copy", i)));
         }
 
         await().atMost(Duration.ofSeconds(20))
-                .untilAsserted(() -> assertThat(listeners.notificationReceived).hasValueGreaterThanOrEqualTo(5));
+            .untilAsserted(() -> assertThat(listeners.notificationReceived).hasValueGreaterThanOrEqualTo(5));
         assertThat(listeners.notificationHandled).hasValue(1);
-    }
-
-    private static String header(ConsumerRecord<String, JsonNode> record, String key) {
-        Header header = record.headers().lastHeader(key);
-        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
     }
 
     @SpringBootConfiguration

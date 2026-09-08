@@ -2,7 +2,9 @@ package io.pallet.common.error;
 
 import org.springframework.http.HttpStatus;
 
-/** Client-input fault not caught by bean validation. */
+/**
+ * Client-input fault not caught by bean validation.
+ */
 public class BadRequestException extends AppException {
 
     public BadRequestException(String clientMessage) {

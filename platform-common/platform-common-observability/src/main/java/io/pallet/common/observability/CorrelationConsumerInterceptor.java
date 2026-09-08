@@ -61,11 +61,13 @@ public class CorrelationConsumerInterceptor implements RecordInterceptor<Object,
         }
         String generated = UUID.randomUUID().toString();
         log.warn("Record on {}-{}@{} carried no correlation id — generated {}",
-                record.topic(), record.partition(), record.offset(), generated);
+            record.topic(), record.partition(), record.offset(), generated);
         return generated;
     }
 
-    /** W3C traceparent is {@code version-traceId-spanId-flags}; the middle field is the trace id. */
+    /**
+     * W3C traceparent is {@code version-traceId-spanId-flags}; the middle field is the trace id.
+     */
     private Optional<String> traceId(ConsumerRecord<Object, Object> record) {
         String traceparent = header(record, EventHeaders.TRACEPARENT);
         if (traceparent == null) {

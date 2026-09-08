@@ -1,9 +1,9 @@
 package io.pallet.common.error;
 
+import org.springframework.http.HttpStatus;
+
 import java.util.List;
 import java.util.Map;
-
-import org.springframework.http.HttpStatus;
 
 /**
  * Base type for every expected application error. Services model their own domain
@@ -36,7 +36,9 @@ public abstract class AppException extends RuntimeException {
         this.clientMessage = clientMessage;
     }
 
-    /** Attach structured context, surfaced as {@code ErrorResponse.meta}. Set-once. */
+    /**
+     * Attach structured context, surfaced as {@code ErrorResponse.meta}. Set-once.
+     */
     public AppException withMeta(Map<String, Object> meta) {
         if (this.meta == null && meta != null) {
             this.meta = Map.copyOf(meta);
@@ -44,7 +46,9 @@ public abstract class AppException extends RuntimeException {
         return this;
     }
 
-    /** Attach failure reasons, surfaced as {@code ErrorResponse.validationErrors}. Set-once. */
+    /**
+     * Attach failure reasons, surfaced as {@code ErrorResponse.validationErrors}. Set-once.
+     */
     public AppException withValidationErrors(List<String> validationErrors) {
         if (this.validationErrors == null && validationErrors != null) {
             this.validationErrors = List.copyOf(validationErrors);

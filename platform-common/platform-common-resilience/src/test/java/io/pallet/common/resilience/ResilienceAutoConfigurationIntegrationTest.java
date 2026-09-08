@@ -1,9 +1,5 @@
 package io.pallet.common.resilience;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
@@ -22,16 +18,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(
-        classes = ResilienceAutoConfigurationIntegrationTest.TestApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "management.endpoints.web.exposure.include=prometheus",
-                "pallet.resilience.policies.smtp.retry.max-attempts=1"
-        })
+    classes = ResilienceAutoConfigurationIntegrationTest.TestApp.class,
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "management.endpoints.web.exposure.include=prometheus",
+        "pallet.resilience.policies.smtp.retry.max-attempts=1"
+    })
 class ResilienceAutoConfigurationIntegrationTest {
 
     @Autowired
@@ -82,9 +82,9 @@ class ResilienceAutoConfigurationIntegrationTest {
     @Test
     void aServiceSuppliedExternalCallOverridesTheAutoConfiguredOne() {
         new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(PalletResilienceAutoConfiguration.class))
-                .withUserConfiguration(StubExternalCallConfiguration.class)
-                .run(ctx -> assertThat(ctx.getBean(ExternalCall.class)).isInstanceOf(StubExternalCall.class));
+            .withConfiguration(AutoConfigurations.of(PalletResilienceAutoConfiguration.class))
+            .withUserConfiguration(StubExternalCallConfiguration.class)
+            .run(ctx -> assertThat(ctx.getBean(ExternalCall.class)).isInstanceOf(StubExternalCall.class));
     }
 
     @SpringBootConfiguration

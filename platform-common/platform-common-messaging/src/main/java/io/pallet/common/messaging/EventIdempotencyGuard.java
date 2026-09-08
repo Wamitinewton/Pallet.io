@@ -10,9 +10,13 @@ import java.time.Duration;
  */
 public interface EventIdempotencyGuard {
 
-    /** Exactly one caller racing on {@code eventId} within {@code retention} gets {@code true}; the rest get {@code false}. */
+    /**
+     * Exactly one caller racing on {@code eventId} within {@code retention} gets {@code true}; the rest get {@code false}.
+     */
     boolean markProcessed(String eventId, Duration retention);
 
-    /** Undo a reservation after processing failed, so a redelivery is reprocessed rather than dropped. */
+    /**
+     * Undo a reservation after processing failed, so a redelivery is reprocessed rather than dropped.
+     */
     void release(String eventId);
 }

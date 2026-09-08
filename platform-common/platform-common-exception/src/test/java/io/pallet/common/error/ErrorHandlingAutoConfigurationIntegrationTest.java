@@ -2,22 +2,16 @@ package io.pallet.common.error;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,35 +41,35 @@ class ErrorHandlingAutoConfigurationIntegrationTest {
     @Test
     void appExceptionRendersErrorResponseShape() throws Exception {
         mvc.perform(get("/things/99"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"))
-                .andExpect(jsonPath("$.statusCode").value(404))
-                .andExpect(jsonPath("$.path").value("/things/99"))
-                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error").value("NOT_FOUND"))
+            .andExpect(jsonPath("$.statusCode").value(404))
+            .andExpect(jsonPath("$.path").value("/things/99"))
+            .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
     void unexpectedExceptionFallsBackWithoutLeaking() throws Exception {
         mvc.perform(get("/boom"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.error").value("INTERNAL_ERROR"))
-                .andExpect(jsonPath("$.message").value("An unexpected error occurred. Please try again later."));
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.error").value("INTERNAL_ERROR"))
+            .andExpect(jsonPath("$.message").value("An unexpected error occurred. Please try again later."));
     }
 
     @Test
     void beanValidationFailureMapsToValidationError() throws Exception {
         mvc.perform(post("/things").contentType("application/json").content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors[0].field").value("name"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.validationErrors[0].field").value("name"));
     }
 
     @Test
     void unknownRouteMapsToRouteNotFound() throws Exception {
         mvc.perform(get("/no/such/path"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("ROUTE_NOT_FOUND"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error").value("ROUTE_NOT_FOUND"));
     }
 
     @SpringBootConfiguration
@@ -101,6 +95,7 @@ class ErrorHandlingAutoConfigurationIntegrationTest {
             }
         }
 
-        record Payload(@NotBlank String name) {}
+        record Payload(@NotBlank String name) {
+        }
     }
 }

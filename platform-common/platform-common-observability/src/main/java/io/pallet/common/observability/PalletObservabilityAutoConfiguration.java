@@ -1,14 +1,10 @@
 package io.pallet.common.observability;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import org.aspectj.lang.annotation.Aspect;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.aspectj.lang.annotation.Aspect;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +20,7 @@ import java.util.List;
  * override any bean or switch a piece off by property.
  */
 @AutoConfiguration(afterName =
-        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration")
+    "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration")
 @EnableConfigurationProperties(ObservabilityProperties.class)
 public class PalletObservabilityAutoConfiguration {
 
@@ -43,8 +39,10 @@ public class PalletObservabilityAutoConfiguration {
     @ConditionalOnProperty(prefix = "pallet.observability", name = "correlation-filter-enabled", matchIfMissing = true)
     static class CorrelationFilterConfiguration {
 
-        /** {@code SecurityProperties.DEFAULT_FILTER_ORDER + 10}: just after Spring Security's
-         *  chain, so an {@link MdcContributor} sourced from the authenticated principal has one. */
+        /**
+         * {@code SecurityProperties.DEFAULT_FILTER_ORDER + 10}: just after Spring Security's
+         * chain, so an {@link MdcContributor} sourced from the authenticated principal has one.
+         */
         private static final int FILTER_ORDER = -90;
 
         @Bean

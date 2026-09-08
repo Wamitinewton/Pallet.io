@@ -30,6 +30,25 @@ class DefaultPlatformEventPublisherTest {
 
     private DefaultPlatformEventPublisher publisher;
 
+    private static MessagingProperties properties(Duration sendTimeout) {
+        return new MessagingProperties(
+            3,
+            new MessagingProperties.Retry(4, Duration.ofSeconds(1), 2.0, Duration.ofSeconds(30)),
+            new MessagingProperties.Publish(sendTimeout),
+            true, (short) 1, 3,
+            new MessagingProperties.DltMonitor(true));
+    }
+
+    private static String header(ProducerRecord<String, Object> record, String key) {
+        var header = record.headers().lastHeader(key);
+        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CompletableFuture<SendResult<String, Object>> ackedFuture() {
+        return CompletableFuture.completedFuture(mock(SendResult.class));
+    }
+
     @BeforeEach
     void setUp() {
         publisher = new DefaultPlatformEventPublisher(template, meterRegistry, properties(Duration.ofMillis(200)));
@@ -69,14 +88,14 @@ class DefaultPlatformEventPublisherTest {
     @Test
     void aFailedSendSurfacesAsExternalServiceExceptionWithTopicAndType() {
         when(template.send(any(ProducerRecord.class)))
-                .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker down")));
+            .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker down")));
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_3", "A", "B");
 
         assertThatThrownBy(() -> publisher.publish(event))
-                .isInstanceOf(ExternalServiceException.class)
-                .hasMessageContaining("topic=deploy.state.changed")
-                .hasMessageContaining("type=deploy.state.changed")
-                .hasRootCauseInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ExternalServiceException.class)
+            .hasMessageContaining("topic=deploy.state.changed")
+            .hasMessageContaining("type=deploy.state.changed")
+            .hasRootCauseInstanceOf(IllegalStateException.class);
         assertThat(published("failure")).isEqualTo(1.0);
     }
 
@@ -87,18 +106,9 @@ class DefaultPlatformEventPublisherTest {
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_4", "A", "B");
 
         assertThatThrownBy(() -> publisher.publish(event))
-                .isInstanceOf(ExternalServiceException.class)
-                .hasMessageContaining("topic=deploy.state.changed");
+            .isInstanceOf(ExternalServiceException.class)
+            .hasMessageContaining("topic=deploy.state.changed");
         assertThat(published("failure")).isEqualTo(1.0);
-    }
-
-    private static MessagingProperties properties(Duration sendTimeout) {
-        return new MessagingProperties(
-                3,
-                new MessagingProperties.Retry(4, Duration.ofSeconds(1), 2.0, Duration.ofSeconds(30)),
-                new MessagingProperties.Publish(sendTimeout),
-                true, (short) 1, 3,
-                new MessagingProperties.DltMonitor(true));
     }
 
     @SuppressWarnings("unchecked")
@@ -111,15 +121,5 @@ class DefaultPlatformEventPublisherTest {
     private double published(String outcome) {
         RequiredSearch search = meterRegistry.get("messaging.published").tags("outcome", outcome);
         return search.counter().count();
-    }
-
-    private static String header(ProducerRecord<String, Object> record, String key) {
-        var header = record.headers().lastHeader(key);
-        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static CompletableFuture<SendResult<String, Object>> ackedFuture() {
-        return CompletableFuture.completedFuture(mock(SendResult.class));
     }
 }

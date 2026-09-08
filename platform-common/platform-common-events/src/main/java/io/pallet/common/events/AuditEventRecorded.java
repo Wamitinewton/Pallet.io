@@ -11,14 +11,14 @@ import java.util.UUID;
  * from the start. {@code context} carries action-specific detail (ADR-0006).
  */
 public record AuditEventRecorded(
-        UUID eventId,
-        String eventType,
-        String orgId,
-        Instant occurredAt,
-        String actor,
-        String action,
-        String resource,
-        Map<String, Object> context
+    UUID eventId,
+    String eventType,
+    String orgId,
+    Instant occurredAt,
+    String actor,
+    String action,
+    String resource,
+    Map<String, Object> context
 ) implements PlatformEvent {
 
     public static final String TYPE = Topics.AUDIT_EVENT_RECORDED;
@@ -28,8 +28,8 @@ public record AuditEventRecorded(
     }
 
     public static AuditEventRecorded of(
-            String orgId, String actor, String action, String resource, Map<String, Object> context) {
+        String orgId, String actor, String action, String resource, Map<String, Object> context) {
         return new AuditEventRecorded(
-                UUID.randomUUID(), TYPE, orgId, Instant.now(), actor, action, resource, context);
+            UUID.randomUUID(), TYPE, orgId, Instant.now(), actor, action, resource, context);
     }
 }

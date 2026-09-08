@@ -23,25 +23,9 @@ import java.util.Map;
 @Configuration(proxyBeanMethods = false)
 class PalletKafkaProducerConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean(ProducerFactory.class)
-    ProducerFactory<String, Object> palletKafkaProducerFactory(KafkaProperties kafkaProperties,
-                                                               ObjectProvider<JsonMapper> jsonMapper) {
-        DefaultKafkaProducerFactory<String, Object> factory =
-                new DefaultKafkaProducerFactory<>(idempotentProducerConfig(kafkaProperties));
-        factory.setValueSerializer(jsonValueSerializer(jsonMapper));
-        return factory;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(KafkaTemplate.class)
-    KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> palletKafkaProducerFactory) {
-        KafkaTemplate<String, Object> template = new KafkaTemplate<>(palletKafkaProducerFactory);
-        template.setObservationEnabled(true);
-        return template;
-    }
-
-    /** Producer config with the platform's durability flags forced on, whatever a service configured. */
+    /**
+     * Producer config with the platform's durability flags forced on, whatever a service configured.
+     */
     static Map<String, Object> idempotentProducerConfig(KafkaProperties kafkaProperties) {
         Map<String, Object> config = kafkaProperties.buildProducerProperties();
         config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
@@ -52,8 +36,26 @@ class PalletKafkaProducerConfiguration {
 
     static JacksonJsonSerializer<Object> jsonValueSerializer(ObjectProvider<JsonMapper> jsonMapper) {
         JacksonJsonSerializer<Object> serializer =
-                new JacksonJsonSerializer<>(jsonMapper.getIfAvailable(() -> JsonMapper.builder().build()));
+            new JacksonJsonSerializer<>(jsonMapper.getIfAvailable(() -> JsonMapper.builder().build()));
         serializer.setAddTypeInfo(false);
         return serializer;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(ProducerFactory.class)
+    ProducerFactory<String, Object> palletKafkaProducerFactory(KafkaProperties kafkaProperties,
+                                                               ObjectProvider<JsonMapper> jsonMapper) {
+        DefaultKafkaProducerFactory<String, Object> factory =
+            new DefaultKafkaProducerFactory<>(idempotentProducerConfig(kafkaProperties));
+        factory.setValueSerializer(jsonValueSerializer(jsonMapper));
+        return factory;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(KafkaTemplate.class)
+    KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> palletKafkaProducerFactory) {
+        KafkaTemplate<String, Object> template = new KafkaTemplate<>(palletKafkaProducerFactory);
+        template.setObservationEnabled(true);
+        return template;
     }
 }

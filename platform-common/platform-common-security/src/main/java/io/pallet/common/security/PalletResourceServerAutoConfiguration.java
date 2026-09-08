@@ -33,20 +33,28 @@ import java.util.Map;
 public class PalletResourceServerAutoConfiguration {
 
     private static final String[] PUBLIC_PATHS = {
-            "/actuator/health/**", "/actuator/info", "/actuator/prometheus"
+        "/actuator/health/**", "/actuator/info", "/actuator/prometheus"
     };
+
+    private static Collection<?> realmRoles(Jwt jwt) {
+        if (jwt.getClaim("realm_access") instanceof Map<?, ?> realmAccess
+            && realmAccess.get("roles") instanceof Collection<?> roles) {
+            return roles;
+        }
+        return java.util.List.of();
+    }
 
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
     SecurityFilterChain palletSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_PATHS).permitAll()
-                        .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                        jwt.jwtAuthenticationConverter(keycloakRoleConverter())));
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(PUBLIC_PATHS).permitAll()
+                .anyRequest().authenticated())
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
+                jwt.jwtAuthenticationConverter(keycloakRoleConverter())));
         return http.build();
     }
 
@@ -64,13 +72,5 @@ public class PalletResourceServerAutoConfiguration {
             return authorities;
         });
         return converter;
-    }
-
-    private static Collection<?> realmRoles(Jwt jwt) {
-        if (jwt.getClaim("realm_access") instanceof Map<?, ?> realmAccess
-                && realmAccess.get("roles") instanceof Collection<?> roles) {
-            return roles;
-        }
-        return java.util.List.of();
     }
 }

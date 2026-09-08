@@ -19,22 +19,26 @@ public interface ExternalCall {
      * @param policy   a name from {@code pallet.resilience.policies}; an unconfigured name falls
      *                 back to {@code pallet.resilience.defaults}
      * @param supplier the external call
-     * @throws io.pallet.common.error.AppException      unwrapped, as thrown by {@code supplier} —
-     *                                                   never retried and never wrapped
+     * @throws io.pallet.common.error.AppException             unwrapped, as thrown by {@code supplier} —
+     *                                                         never retried and never wrapped
      * @throws io.pallet.common.error.ExternalServiceException when the breaker is open, the call
-     *                                                          times out, or every retry is
-     *                                                          exhausted — the cause is the last
-     *                                                          underlying failure
+     *                                                         times out, or every retry is
+     *                                                         exhausted — the cause is the last
+     *                                                         underlying failure
      */
     <T> T call(String policy, Supplier<T> supplier);
 
-    /** Same as {@link #call(String, Supplier)}, but {@code fallback} runs instead of throwing
-     *  {@link io.pallet.common.error.ExternalServiceException} when the guarded call ultimately
-     *  fails. An {@link io.pallet.common.error.AppException} from {@code supplier} still propagates
-     *  unwrapped, bypassing the fallback. */
+    /**
+     * Same as {@link #call(String, Supplier)}, but {@code fallback} runs instead of throwing
+     * {@link io.pallet.common.error.ExternalServiceException} when the guarded call ultimately
+     * fails. An {@link io.pallet.common.error.AppException} from {@code supplier} still propagates
+     * unwrapped, bypassing the fallback.
+     */
     <T> T call(String policy, Supplier<T> supplier, Function<Throwable, T> fallback);
 
-    /** Void convenience over {@link #call(String, Supplier)}. */
+    /**
+     * Void convenience over {@link #call(String, Supplier)}.
+     */
     default void run(String policy, Runnable action) {
         call(policy, () -> {
             action.run();

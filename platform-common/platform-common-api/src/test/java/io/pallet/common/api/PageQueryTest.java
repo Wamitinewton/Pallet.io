@@ -22,7 +22,7 @@ class PageQueryTest {
     @Test
     void sizeIsClampedToMax() {
         assertThat(new PageQuery(0, 100_000, null).toPageable(DEFAULT_SORT).getPageSize())
-                .isEqualTo(PageQuery.MAX_SIZE);
+            .isEqualTo(PageQuery.MAX_SIZE);
     }
 
     @Test
@@ -33,7 +33,7 @@ class PageQueryTest {
     @Test
     void zeroSizeBecomesDefault() {
         assertThat(new PageQuery(0, 0, null).toPageable(DEFAULT_SORT).getPageSize())
-                .isEqualTo(PageQuery.DEFAULT_SIZE);
+            .isEqualTo(PageQuery.DEFAULT_SIZE);
     }
 
     @Test
@@ -63,12 +63,12 @@ class PageQueryTest {
     void malformedSortFallsBackToDefault() {
         assertThat(new PageQuery(0, 20, "").toPageable(DEFAULT_SORT).getSort()).isEqualTo(DEFAULT_SORT);
         assertThat(new PageQuery(0, 20, "garbage,sideways").toPageable(DEFAULT_SORT).getSort())
-                .isEqualTo(DEFAULT_SORT);
+            .isEqualTo(DEFAULT_SORT);
     }
 
     @Test
     void missingDefaultSortFailsFast() {
         assertThatThrownBy(() -> new PageQuery(0, 20, null).toPageable(null))
-                .isInstanceOf(NullPointerException.class);
+            .isInstanceOf(NullPointerException.class);
     }
 }

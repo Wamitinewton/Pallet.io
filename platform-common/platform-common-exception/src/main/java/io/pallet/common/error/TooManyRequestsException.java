@@ -1,11 +1,13 @@
 package io.pallet.common.error;
 
+import org.springframework.http.HttpStatus;
+
 import java.time.Duration;
 import java.util.Map;
 
-import org.springframework.http.HttpStatus;
-
-/** Rate-limit or lockout; an optional {@code retryAfter} (seconds) is carried on {@code meta}. */
+/**
+ * Rate-limit or lockout; an optional {@code retryAfter} (seconds) is carried on {@code meta}.
+ */
 public class TooManyRequestsException extends AppException {
 
     public TooManyRequestsException(String clientMessage) {

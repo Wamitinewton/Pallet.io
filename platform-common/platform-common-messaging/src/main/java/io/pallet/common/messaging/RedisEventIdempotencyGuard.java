@@ -19,6 +19,10 @@ public class RedisEventIdempotencyGuard implements EventIdempotencyGuard {
         this.redisTemplate = redisTemplate;
     }
 
+    private static String key(String eventId) {
+        return KEY_PREFIX + eventId;
+    }
+
     @Override
     public boolean markProcessed(String eventId, Duration retention) {
         Boolean reserved = redisTemplate.opsForValue().setIfAbsent(key(eventId), "1", retention);
@@ -28,9 +32,5 @@ public class RedisEventIdempotencyGuard implements EventIdempotencyGuard {
     @Override
     public void release(String eventId) {
         redisTemplate.delete(key(eventId));
-    }
-
-    private static String key(String eventId) {
-        return KEY_PREFIX + eventId;
     }
 }

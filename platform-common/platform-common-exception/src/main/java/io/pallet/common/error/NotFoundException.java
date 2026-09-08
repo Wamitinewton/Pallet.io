@@ -10,7 +10,7 @@ public class NotFoundException extends AppException {
 
     public NotFoundException(String resource, Object identifier) {
         super(HttpStatus.NOT_FOUND, "NOT_FOUND",
-                "%s not found".formatted(resource),
-                "%s not found: %s".formatted(resource, identifier));
+            "%s not found".formatted(resource),
+            "%s not found: %s".formatted(resource, identifier));
     }
 }

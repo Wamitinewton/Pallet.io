@@ -25,9 +25,9 @@ class MonitoringAspectTest {
         sample.ok();
 
         var timer = registry.get(MonitoringAspect.DEFAULT_METRIC)
-                .tag("class", "Sample").tag("method", "ok")
-                .tag("outcome", "success").tag("exception", "none")
-                .timer();
+            .tag("class", "Sample").tag("method", "ok")
+            .tag("outcome", "success").tag("exception", "none")
+            .timer();
         assertThat(timer.count()).isEqualTo(1);
     }
 
@@ -36,8 +36,8 @@ class MonitoringAspectTest {
         assertThatThrownBy(sample::boom).isInstanceOf(IllegalStateException.class);
 
         var timer = registry.get(MonitoringAspect.DEFAULT_METRIC)
-                .tag("outcome", "failure").tag("exception", "IllegalStateException")
-                .timer();
+            .tag("outcome", "failure").tag("exception", "IllegalStateException")
+            .timer();
         assertThat(timer.count()).isEqualTo(1);
     }
 

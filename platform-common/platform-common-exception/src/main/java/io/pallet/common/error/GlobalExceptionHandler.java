@@ -1,10 +1,8 @@
 package io.pallet.common.error;
 
-import java.util.List;
-
+import io.pallet.common.error.ErrorResponse.ValidationError;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -26,7 +24,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import io.pallet.common.error.ErrorResponse.ValidationError;
+import java.util.List;
 
 /**
  * Renders every {@link AppException} and the common Spring MVC exceptions in the
@@ -48,16 +46,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAppException(AppException ex, HttpServletRequest request) {
         if (ex.getStatus().is5xxServerError()) {
             log.error("[{}] {} {} — {}", ex.getErrorCode(), request.getMethod(), request.getRequestURI(),
-                    ex.getMessage(), ex);
+                ex.getMessage(), ex);
         } else {
             log.warn("[{}] {} {} — {}", ex.getErrorCode(), request.getMethod(), request.getRequestURI(), ex.getMessage());
         }
         ErrorResponse body = ErrorResponse.of(ex.getStatus(), ex.getClientMessage(), ex.getErrorCode(),
-                request.getRequestURI());
+            request.getRequestURI());
         if (ex.getValidationErrors() != null) {
             body = body.withValidationErrors(ex.getValidationErrors().stream()
-                    .map(reason -> new ValidationError(null, reason))
-                    .toList());
+                .map(reason -> new ValidationError(null, reason))
+                .toList());
         }
         if (ex.getMeta() != null) {
             body = body.withMeta(ex.getMeta());
@@ -67,15 +65,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException ex, HttpServletRequest request) {
+        MethodArgumentNotValidException ex, HttpServletRequest request) {
         List<ValidationError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> new ValidationError(e.getField(), e.getDefaultMessage()))
-                .toList();
+            .map(e -> new ValidationError(e.getField(), e.getDefaultMessage()))
+            .toList();
         log.warn("[VALIDATION_ERROR] {} {} — {} field error(s)", request.getMethod(), request.getRequestURI(),
-                fieldErrors.size());
+            fieldErrors.size());
         return ResponseEntity.badRequest().body(
-                ErrorResponse.of(HttpStatus.BAD_REQUEST, "Validation failed.", "VALIDATION_ERROR", request.getRequestURI())
-                        .withValidationErrors(fieldErrors));
+            ErrorResponse.of(HttpStatus.BAD_REQUEST, "Validation failed.", "VALIDATION_ERROR", request.getRequestURI())
+                .withValidationErrors(fieldErrors));
     }
 
     @ExceptionHandler({HandlerMethodValidationException.class, ConstraintViolationException.class})
@@ -87,71 +85,71 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST,
-                "Required request header '" + ex.getHeaderName() + "' is missing.", "MISSING_REQUEST_HEADER", request);
+            "Required request header '" + ex.getHeaderName() + "' is missing.", "MISSING_REQUEST_HEADER", request);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(
-            MissingServletRequestParameterException ex, HttpServletRequest request) {
+        MissingServletRequestParameterException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST,
-                "Required request parameter '" + ex.getParameterName() + "' is missing.", "MISSING_REQUEST_PARAMETER",
-                request);
+            "Required request parameter '" + ex.getParameterName() + "' is missing.", "MISSING_REQUEST_PARAMETER",
+            request);
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponse> handleMissingPart(
-            MissingServletRequestPartException ex, HttpServletRequest request) {
+        MissingServletRequestPartException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST,
-                "Required request part '" + ex.getRequestPartName() + "' is missing.", "MISSING_REQUEST_PART", request);
+            "Required request part '" + ex.getRequestPartName() + "' is missing.", "MISSING_REQUEST_PART", request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(
-            HttpMessageNotReadableException ex, HttpServletRequest request) {
+        HttpMessageNotReadableException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST, "Request body is missing or malformed.",
-                "MALFORMED_REQUEST_BODY", request);
+            "MALFORMED_REQUEST_BODY", request);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(
-            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST,
-                "Parameter '" + ex.getName() + "' has the wrong type.", "INVALID_PARAMETER_TYPE", request);
+            "Parameter '" + ex.getName() + "' has the wrong type.", "INVALID_PARAMETER_TYPE", request);
     }
 
     @ExceptionHandler(PropertyReferenceException.class)
     public ResponseEntity<ErrorResponse> handlePropertyReference(
-            PropertyReferenceException ex, HttpServletRequest request) {
+        PropertyReferenceException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.BAD_REQUEST,
-                "Unknown sort or filter property: '" + ex.getPropertyName() + "'.", "INVALID_QUERY_PROPERTY", request);
+            "Unknown sort or filter property: '" + ex.getPropertyName() + "'.", "INVALID_QUERY_PROPERTY", request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotSupported(
-            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not allowed for this resource.",
-                "METHOD_NOT_ALLOWED", request);
+            "METHOD_NOT_ALLOWED", request);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(
-            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+        HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type.",
-                "UNSUPPORTED_MEDIA_TYPE", request);
+            "UNSUPPORTED_MEDIA_TYPE", request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResourceFound(
-            NoResourceFoundException ex, HttpServletRequest request) {
+        NoResourceFoundException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.NOT_FOUND, "The requested resource does not exist.", "ROUTE_NOT_FOUND",
-                request);
+            request);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(
-            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        MaxUploadSizeExceededException ex, HttpServletRequest request) {
         return HandlerSupport.render(HttpStatus.PAYLOAD_TOO_LARGE, "The uploaded file is too large.", "PAYLOAD_TOO_LARGE",
-                request);
+            request);
     }
 
     @ExceptionHandler(Exception.class)

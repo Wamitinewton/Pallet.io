@@ -17,11 +17,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.listener.CommonErrorHandler;
-import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
-import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.listener.RecordInterceptor;
+import org.springframework.kafka.listener.*;
 import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
@@ -46,17 +42,45 @@ import java.util.Map;
 @Configuration(proxyBeanMethods = false)
 class PalletKafkaConsumerConfiguration {
 
+    /**
+     * Not a bean: a second {@code KafkaTemplate} bean would trip the primary template's
+     * {@code @ConditionalOnMissingBean(KafkaTemplate.class)}. The delegating serializer forwards a
+     * deserialization failure's original bytes verbatim and re-serializes a processing failure's JSON.
+     */
+    private static KafkaTemplate<String, Object> deadLetterTemplate(KafkaProperties kafkaProperties,
+                                                                    ObjectProvider<JsonMapper> jsonMapper) {
+        Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
+        byType.put(byte[].class, new ByteArraySerializer());
+        byType.put(Object.class, PalletKafkaProducerConfiguration.jsonValueSerializer(jsonMapper));
+
+        DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(
+            PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties),
+            new StringSerializer(),
+            new DelegatingByTypeSerializer(byType, true));
+        KafkaTemplate<String, Object> template = new KafkaTemplate<>(factory);
+        template.setObservationEnabled(true);
+        return template;
+    }
+
+    /**
+     * The interceptor is declared {@code RecordInterceptor<Object, Object>}; the factory wants the narrowed type.
+     */
+    @SuppressWarnings("unchecked")
+    private static RecordInterceptor<String, JsonNode> adapt(CorrelationConsumerInterceptor interceptor) {
+        return (RecordInterceptor<String, JsonNode>) (RecordInterceptor<?, ?>) interceptor;
+    }
+
     @Bean
     @ConditionalOnMissingBean(name = "palletKafkaConsumerFactory")
     ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory(KafkaProperties kafkaProperties,
                                                                  ObjectProvider<JsonMapper> jsonMapper) {
         JsonMapper mapper = jsonMapper.getIfAvailable(() -> JsonMapper.builder().build());
         ErrorHandlingDeserializer<String> keyDeserializer =
-                new ErrorHandlingDeserializer<>(new StringDeserializer());
+            new ErrorHandlingDeserializer<>(new StringDeserializer());
         ErrorHandlingDeserializer<JsonNode> valueDeserializer =
-                new ErrorHandlingDeserializer<>(new JacksonJsonDeserializer<>(JsonNode.class, mapper, false));
+            new ErrorHandlingDeserializer<>(new JacksonJsonDeserializer<>(JsonNode.class, mapper, false));
         return new DefaultKafkaConsumerFactory<>(
-                kafkaProperties.buildConsumerProperties(), keyDeserializer, valueDeserializer);
+            kafkaProperties.buildConsumerProperties(), keyDeserializer, valueDeserializer);
     }
 
     @Bean
@@ -65,8 +89,8 @@ class PalletKafkaConsumerConfiguration {
                                                ObjectProvider<JsonMapper> jsonMapper,
                                                MessagingProperties properties) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                deadLetterTemplate(kafkaProperties, jsonMapper),
-                (record, exception) -> new TopicPartition(Topics.deadLetter(record.topic()), -1));
+            deadLetterTemplate(kafkaProperties, jsonMapper),
+            (record, exception) -> new TopicPartition(Topics.deadLetter(record.topic()), -1));
 
         MessagingProperties.Retry retry = properties.retry();
         ExponentialBackOff backOff = new ExponentialBackOff();
@@ -84,13 +108,13 @@ class PalletKafkaConsumerConfiguration {
     @Bean
     @ConditionalOnMissingBean(name = "kafkaListenerContainerFactory")
     ConcurrentKafkaListenerContainerFactory<String, JsonNode> kafkaListenerContainerFactory(
-            ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory,
-            CommonErrorHandler palletKafkaErrorHandler,
-            MessagingProperties properties,
-            ObjectProvider<CorrelationConsumerInterceptor> correlationInterceptor) {
+        ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory,
+        CommonErrorHandler palletKafkaErrorHandler,
+        MessagingProperties properties,
+        ObjectProvider<CorrelationConsumerInterceptor> correlationInterceptor) {
 
         ConcurrentKafkaListenerContainerFactory<String, JsonNode> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+            new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(palletKafkaConsumerFactory);
         factory.setConcurrency(properties.consumerConcurrency());
         factory.setCommonErrorHandler(palletKafkaErrorHandler);
@@ -98,31 +122,5 @@ class PalletKafkaConsumerConfiguration {
         factory.getContainerProperties().setObservationEnabled(true);
         correlationInterceptor.ifAvailable(interceptor -> factory.setRecordInterceptor(adapt(interceptor)));
         return factory;
-    }
-
-    /**
-     * Not a bean: a second {@code KafkaTemplate} bean would trip the primary template's
-     * {@code @ConditionalOnMissingBean(KafkaTemplate.class)}. The delegating serializer forwards a
-     * deserialization failure's original bytes verbatim and re-serializes a processing failure's JSON.
-     */
-    private static KafkaTemplate<String, Object> deadLetterTemplate(KafkaProperties kafkaProperties,
-                                                                   ObjectProvider<JsonMapper> jsonMapper) {
-        Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
-        byType.put(byte[].class, new ByteArraySerializer());
-        byType.put(Object.class, PalletKafkaProducerConfiguration.jsonValueSerializer(jsonMapper));
-
-        DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(
-                PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties),
-                new StringSerializer(),
-                new DelegatingByTypeSerializer(byType, true));
-        KafkaTemplate<String, Object> template = new KafkaTemplate<>(factory);
-        template.setObservationEnabled(true);
-        return template;
-    }
-
-    /** The interceptor is declared {@code RecordInterceptor<Object, Object>}; the factory wants the narrowed type. */
-    @SuppressWarnings("unchecked")
-    private static RecordInterceptor<String, JsonNode> adapt(CorrelationConsumerInterceptor interceptor) {
-        return (RecordInterceptor<String, JsonNode>) (RecordInterceptor<?, ?>) interceptor;
     }
 }

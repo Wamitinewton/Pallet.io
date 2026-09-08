@@ -124,11 +124,20 @@ jobs:
       - name: SpotBugs + FindSecBugs
         run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
+  # .editorconfig conformance (whitespace, EOL, charset) across every tracked
+  # file. Runs regardless of local pre-commit hooks, since those are opt-in
+  # per contributor and can be skipped with --no-verify.
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pre-commit/action@v3.0.1
+
   # Single stable status check to require in branch protection. Passes when the
   # build path that actually ran (reactor or module matrix) succeeded; a
   # skipped job is fine, it means the other path covered the change.
   build:
-    needs: [scope, reactor, module, security]
+    needs: [scope, reactor, module, security, style]
     if: always()
     runs-on: ubuntu-latest
     steps:

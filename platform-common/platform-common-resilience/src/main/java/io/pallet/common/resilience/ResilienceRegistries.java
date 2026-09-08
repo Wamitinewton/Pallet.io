@@ -31,9 +31,40 @@ public final class ResilienceRegistries {
         this.timeLimiterRegistry = TimeLimiterRegistry.of(toTimeLimiterConfig(properties.defaults().timeLimiter()));
     }
 
+    private static CircuitBreakerConfig toCircuitBreakerConfig(ResilienceProperties.CircuitBreaker properties) {
+        return CircuitBreakerConfig.custom()
+            .failureRateThreshold(properties.failureRateThreshold())
+            .slidingWindowSize(properties.slidingWindowSize())
+            .minimumNumberOfCalls(properties.minimumNumberOfCalls())
+            .waitDurationInOpenState(properties.waitDurationInOpenState())
+            .permittedNumberOfCallsInHalfOpenState(properties.permittedCallsInHalfOpenState())
+            .slowCallRateThreshold(properties.slowCallRateThreshold())
+            .slowCallDurationThreshold(properties.slowCallDurationThreshold())
+            .ignoreExceptions(AppException.class, IllegalArgumentException.class)
+            .build();
+    }
+
+    // AppException/IllegalArgumentException are deterministic client-side failures: retrying them
+    // wastes an attempt and a breaker slot on something a fresh attempt can never fix.
+    private static RetryConfig toRetryConfig(ResilienceProperties.Retry properties) {
+        return RetryConfig.custom()
+            .maxAttempts(properties.maxAttempts())
+            .intervalFunction(IntervalFunction.ofExponentialBackoff(
+                properties.waitDuration(), properties.exponentialBackoffMultiplier(), properties.maxWaitDuration()))
+            .ignoreExceptions(AppException.class, IllegalArgumentException.class)
+            .build();
+    }
+
+    private static TimeLimiterConfig toTimeLimiterConfig(ResilienceProperties.TimeLimiter properties) {
+        return TimeLimiterConfig.custom()
+            .timeoutDuration(properties.timeout())
+            .cancelRunningFuture(properties.cancelRunningFuture())
+            .build();
+    }
+
     public CircuitBreaker circuitBreaker(String policy) {
         return circuitBreakerRegistry.circuitBreaker(policy,
-                () -> toCircuitBreakerConfig(properties.resolve(policy).circuitBreaker()));
+            () -> toCircuitBreakerConfig(properties.resolve(policy).circuitBreaker()));
     }
 
     public Retry retry(String policy) {
@@ -42,7 +73,7 @@ public final class ResilienceRegistries {
 
     public TimeLimiter timeLimiter(String policy) {
         return timeLimiterRegistry.timeLimiter(policy,
-                () -> toTimeLimiterConfig(properties.resolve(policy).timeLimiter()));
+            () -> toTimeLimiterConfig(properties.resolve(policy).timeLimiter()));
     }
 
     public CircuitBreakerRegistry circuitBreakerRegistry() {
@@ -55,36 +86,5 @@ public final class ResilienceRegistries {
 
     public TimeLimiterRegistry timeLimiterRegistry() {
         return timeLimiterRegistry;
-    }
-
-    private static CircuitBreakerConfig toCircuitBreakerConfig(ResilienceProperties.CircuitBreaker properties) {
-        return CircuitBreakerConfig.custom()
-                .failureRateThreshold(properties.failureRateThreshold())
-                .slidingWindowSize(properties.slidingWindowSize())
-                .minimumNumberOfCalls(properties.minimumNumberOfCalls())
-                .waitDurationInOpenState(properties.waitDurationInOpenState())
-                .permittedNumberOfCallsInHalfOpenState(properties.permittedCallsInHalfOpenState())
-                .slowCallRateThreshold(properties.slowCallRateThreshold())
-                .slowCallDurationThreshold(properties.slowCallDurationThreshold())
-                .ignoreExceptions(AppException.class, IllegalArgumentException.class)
-                .build();
-    }
-
-    // AppException/IllegalArgumentException are deterministic client-side failures: retrying them
-    // wastes an attempt and a breaker slot on something a fresh attempt can never fix.
-    private static RetryConfig toRetryConfig(ResilienceProperties.Retry properties) {
-        return RetryConfig.custom()
-                .maxAttempts(properties.maxAttempts())
-                .intervalFunction(IntervalFunction.ofExponentialBackoff(
-                        properties.waitDuration(), properties.exponentialBackoffMultiplier(), properties.maxWaitDuration()))
-                .ignoreExceptions(AppException.class, IllegalArgumentException.class)
-                .build();
-    }
-
-    private static TimeLimiterConfig toTimeLimiterConfig(ResilienceProperties.TimeLimiter properties) {
-        return TimeLimiterConfig.custom()
-                .timeoutDuration(properties.timeout())
-                .cancelRunningFuture(properties.cancelRunningFuture())
-                .build();
     }
 }

@@ -54,7 +54,7 @@ class CorrelationConsumerInterceptorTest {
     void readsTraceIdFromTraceparent() {
         ConsumerRecord<Object, Object> record = record(json.createObjectNode());
         record.headers().add(EventHeaders.TRACEPARENT,
-                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01".getBytes(StandardCharsets.UTF_8));
+            "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01".getBytes(StandardCharsets.UTF_8));
 
         interceptor.intercept(record, null);
 
