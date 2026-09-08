@@ -4,13 +4,12 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.MDC;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.slf4j.MDC;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Puts a stable {@code X-Correlation-Id} into the MDC for the request and echoes it on the
@@ -37,11 +36,11 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         String inbound = request.getHeader(header);
         String correlationId = inbound != null && SAFE.matcher(inbound).matches()
-            ? inbound
-            : UUID.randomUUID().toString();
+                ? inbound
+                : UUID.randomUUID().toString();
         response.setHeader(header, correlationId);
 
         MDC.put(CorrelationId.MDC_KEY, correlationId);

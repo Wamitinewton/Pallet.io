@@ -1,14 +1,13 @@
 package io.pallet.common.messaging;
 
 import io.pallet.common.events.Topics;
+import java.util.stream.Stream;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaAdmin;
-
-import java.util.stream.Stream;
 
 /**
  * Creates a topic and its {@code .DLT} sibling for every {@link Topics#all()} entry,
@@ -25,10 +24,10 @@ class PalletTopicConfiguration {
         int partitions = properties.topicPartitions();
         short replicas = properties.topicReplicas();
         NewTopic[] topics = Topics.all().stream()
-            .flatMap(name -> Stream.of(
-                new NewTopic(name, partitions, replicas),
-                new NewTopic(Topics.deadLetter(name), partitions, replicas)))
-            .toArray(NewTopic[]::new);
+                .flatMap(name -> Stream.of(
+                        new NewTopic(name, partitions, replicas),
+                        new NewTopic(Topics.deadLetter(name), partitions, replicas)))
+                .toArray(NewTopic[]::new);
         return new KafkaAdmin.NewTopics(topics);
     }
 }

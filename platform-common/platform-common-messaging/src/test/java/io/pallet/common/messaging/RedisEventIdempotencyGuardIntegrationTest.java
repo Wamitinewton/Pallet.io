@@ -1,5 +1,12 @@
 package io.pallet.common.messaging;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -14,23 +21,16 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 @SpringBootTest(classes = RedisEventIdempotencyGuardIntegrationTest.TestApp.class)
 @Testcontainers
 class RedisEventIdempotencyGuardIntegrationTest {
 
     @Container
-    static final GenericContainer<?> REDIS =
-        new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+
     @Autowired
     private EventIdempotencyGuard guard;
+
     @Autowired
     private StringRedisTemplate redisTemplate;
 

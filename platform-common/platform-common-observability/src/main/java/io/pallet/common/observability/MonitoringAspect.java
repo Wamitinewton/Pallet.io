@@ -41,11 +41,11 @@ public class MonitoringAspect {
             MethodSignature signature = (MethodSignature) pjp.getSignature();
             String name = monitored.value().isBlank() ? DEFAULT_METRIC : monitored.value();
             sample.stop(Timer.builder(name)
-                .tag("class", signature.getDeclaringType().getSimpleName())
-                .tag("method", signature.getName())
-                .tag("outcome", outcome)
-                .tag("exception", exception)
-                .register(registry));
+                    .tag("class", signature.getDeclaringType().getSimpleName())
+                    .tag("method", signature.getName())
+                    .tag("outcome", outcome)
+                    .tag("exception", exception)
+                    .register(registry));
         }
     }
 }

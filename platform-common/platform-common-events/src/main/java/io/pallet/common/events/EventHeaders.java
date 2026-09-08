@@ -17,6 +17,6 @@ public final class EventHeaders {
     public static final String ORG_ID = "org-id";
     public static final String TRACEPARENT = "traceparent";
     public static final String CORRELATION_ID = "X-Correlation-Id";
-    private EventHeaders() {
-    }
+
+    private EventHeaders() {}
 }

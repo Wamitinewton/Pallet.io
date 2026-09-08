@@ -15,16 +15,16 @@ import java.util.UUID;
  * It is nullable. {@code variables} is intentionally loose per ADR-0006.
  */
 public record NotificationRequested(
-    UUID eventId,
-    String eventType,
-    String orgId,
-    Instant occurredAt,
-    String notificationType,
-    String recipient,
-    String channel,
-    String dedupeKey,
-    Map<String, Object> variables
-) implements PlatformEvent {
+        UUID eventId,
+        String eventType,
+        String orgId,
+        Instant occurredAt,
+        String notificationType,
+        String recipient,
+        String channel,
+        String dedupeKey,
+        Map<String, Object> variables)
+        implements PlatformEvent {
 
     public static final String TYPE = Topics.NOTIFICATION_REQUESTED;
 
@@ -33,14 +33,21 @@ public record NotificationRequested(
     }
 
     public static NotificationRequested of(
-        String orgId,
-        String notificationType,
-        String recipient,
-        String channel,
-        String dedupeKey,
-        Map<String, Object> variables) {
+            String orgId,
+            String notificationType,
+            String recipient,
+            String channel,
+            String dedupeKey,
+            Map<String, Object> variables) {
         return new NotificationRequested(
-            UUID.randomUUID(), TYPE, orgId, Instant.now(),
-            notificationType, recipient, channel, dedupeKey, variables);
+                UUID.randomUUID(),
+                TYPE,
+                orgId,
+                Instant.now(),
+                notificationType,
+                recipient,
+                channel,
+                dedupeKey,
+                variables);
     }
 }

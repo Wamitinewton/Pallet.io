@@ -1,8 +1,8 @@
 package io.pallet.common.events;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
 
 class DeployStateChangedTest {
 

@@ -1,7 +1,6 @@
 package io.pallet.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -25,17 +24,21 @@ public class PersistenceExceptionHandler {
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ErrorResponse> handleOptimisticLocking(
-        OptimisticLockingFailureException ex, HttpServletRequest request) {
+            OptimisticLockingFailureException ex, HttpServletRequest request) {
         log.warn("[CONCURRENT_MODIFICATION] {} {}", request.getMethod(), request.getRequestURI());
-        return HandlerSupport.render(HttpStatus.CONFLICT, "This resource was changed by someone else. Please retry.",
-            "CONCURRENT_MODIFICATION", request);
+        return HandlerSupport.render(
+                HttpStatus.CONFLICT,
+                "This resource was changed by someone else. Please retry.",
+                "CONCURRENT_MODIFICATION",
+                request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(
-        DataIntegrityViolationException ex, HttpServletRequest request) {
-        log.warn("[DATA_INTEGRITY_VIOLATION] {} {} — {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
-        return HandlerSupport.render(HttpStatus.CONFLICT, "This request conflicts with existing data.",
-            "DATA_INTEGRITY_VIOLATION", request);
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+        log.warn(
+                "[DATA_INTEGRITY_VIOLATION] {} {} — {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return HandlerSupport.render(
+                HttpStatus.CONFLICT, "This request conflicts with existing data.", "DATA_INTEGRITY_VIOLATION", request);
     }
 }

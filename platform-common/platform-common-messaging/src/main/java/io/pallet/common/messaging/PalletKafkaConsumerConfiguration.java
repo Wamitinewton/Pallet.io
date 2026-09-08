@@ -2,6 +2,8 @@ package io.pallet.common.messaging;
 
 import io.pallet.common.events.Topics;
 import io.pallet.common.observability.CorrelationConsumerInterceptor;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serializer;
@@ -25,9 +27,6 @@ import org.springframework.util.backoff.ExponentialBackOff;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * The shared consumer side. Values deserialize to {@link JsonNode} — a topic can
  * carry more than one event type and consumers read fields by name (ADR-0006).
@@ -47,16 +46,16 @@ class PalletKafkaConsumerConfiguration {
      * {@code @ConditionalOnMissingBean(KafkaTemplate.class)}. The delegating serializer forwards a
      * deserialization failure's original bytes verbatim and re-serializes a processing failure's JSON.
      */
-    private static KafkaTemplate<String, Object> deadLetterTemplate(KafkaProperties kafkaProperties,
-                                                                    ObjectProvider<JsonMapper> jsonMapper) {
+    private static KafkaTemplate<String, Object> deadLetterTemplate(
+            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper) {
         Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
         byType.put(byte[].class, new ByteArraySerializer());
         byType.put(Object.class, PalletKafkaProducerConfiguration.jsonValueSerializer(jsonMapper));
 
         DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(
-            PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties),
-            new StringSerializer(),
-            new DelegatingByTypeSerializer(byType, true));
+                PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties),
+                new StringSerializer(),
+                new DelegatingByTypeSerializer(byType, true));
         KafkaTemplate<String, Object> template = new KafkaTemplate<>(factory);
         template.setObservationEnabled(true);
         return template;
@@ -72,25 +71,23 @@ class PalletKafkaConsumerConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(name = "palletKafkaConsumerFactory")
-    ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory(KafkaProperties kafkaProperties,
-                                                                 ObjectProvider<JsonMapper> jsonMapper) {
+    ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory(
+            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper) {
         JsonMapper mapper = jsonMapper.getIfAvailable(() -> JsonMapper.builder().build());
-        ErrorHandlingDeserializer<String> keyDeserializer =
-            new ErrorHandlingDeserializer<>(new StringDeserializer());
+        ErrorHandlingDeserializer<String> keyDeserializer = new ErrorHandlingDeserializer<>(new StringDeserializer());
         ErrorHandlingDeserializer<JsonNode> valueDeserializer =
-            new ErrorHandlingDeserializer<>(new JacksonJsonDeserializer<>(JsonNode.class, mapper, false));
+                new ErrorHandlingDeserializer<>(new JacksonJsonDeserializer<>(JsonNode.class, mapper, false));
         return new DefaultKafkaConsumerFactory<>(
-            kafkaProperties.buildConsumerProperties(), keyDeserializer, valueDeserializer);
+                kafkaProperties.buildConsumerProperties(), keyDeserializer, valueDeserializer);
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "palletKafkaErrorHandler")
-    CommonErrorHandler palletKafkaErrorHandler(KafkaProperties kafkaProperties,
-                                               ObjectProvider<JsonMapper> jsonMapper,
-                                               MessagingProperties properties) {
+    CommonErrorHandler palletKafkaErrorHandler(
+            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper, MessagingProperties properties) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-            deadLetterTemplate(kafkaProperties, jsonMapper),
-            (record, exception) -> new TopicPartition(Topics.deadLetter(record.topic()), -1));
+                deadLetterTemplate(kafkaProperties, jsonMapper),
+                (record, exception) -> new TopicPartition(Topics.deadLetter(record.topic()), -1));
 
         MessagingProperties.Retry retry = properties.retry();
         ExponentialBackOff backOff = new ExponentialBackOff();
@@ -108,13 +105,13 @@ class PalletKafkaConsumerConfiguration {
     @Bean
     @ConditionalOnMissingBean(name = "kafkaListenerContainerFactory")
     ConcurrentKafkaListenerContainerFactory<String, JsonNode> kafkaListenerContainerFactory(
-        ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory,
-        CommonErrorHandler palletKafkaErrorHandler,
-        MessagingProperties properties,
-        ObjectProvider<CorrelationConsumerInterceptor> correlationInterceptor) {
+            ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory,
+            CommonErrorHandler palletKafkaErrorHandler,
+            MessagingProperties properties,
+            ObjectProvider<CorrelationConsumerInterceptor> correlationInterceptor) {
 
         ConcurrentKafkaListenerContainerFactory<String, JsonNode> factory =
-            new ConcurrentKafkaListenerContainerFactory<>();
+                new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(palletKafkaConsumerFactory);
         factory.setConcurrency(properties.consumerConcurrency());
         factory.setCommonErrorHandler(palletKafkaErrorHandler);

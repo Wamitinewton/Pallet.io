@@ -1,10 +1,9 @@
 package io.pallet.common.security;
 
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
-
-import java.util.Optional;
 
 /**
  * Reads the {@code org_id} claim off the current access token.
@@ -21,8 +20,7 @@ public final class OrgContext {
      */
     public static final String ORG_CLAIM = "org_id";
 
-    private OrgContext() {
-    }
+    private OrgContext() {}
 
     /**
      * @return the caller's org id
@@ -30,8 +28,8 @@ public final class OrgContext {
      *                               carries no {@code org_id} claim
      */
     public static String requireOrgId() {
-        return currentOrgId().orElseThrow(() ->
-            new IllegalStateException("No " + ORG_CLAIM + " claim on the current token"));
+        return currentOrgId()
+                .orElseThrow(() -> new IllegalStateException("No " + ORG_CLAIM + " claim on the current token"));
     }
 
     public static Optional<String> currentOrgId() {

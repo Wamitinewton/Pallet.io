@@ -1,7 +1,6 @@
 package io.pallet.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -26,14 +25,17 @@ public class SecurityExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("[ACCESS_DENIED] {} {}", request.getMethod(), request.getRequestURI());
-        return HandlerSupport.render(HttpStatus.FORBIDDEN, "You do not have permission to perform this action.",
-            "ACCESS_DENIED", request);
+        return HandlerSupport.render(
+                HttpStatus.FORBIDDEN, "You do not have permission to perform this action.", "ACCESS_DENIED", request);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
         log.warn("[AUTHENTICATION_REQUIRED] {} {}", request.getMethod(), request.getRequestURI());
-        return HandlerSupport.render(HttpStatus.UNAUTHORIZED, "Authentication is required to access this resource.",
-            "AUTHENTICATION_REQUIRED", request);
+        return HandlerSupport.render(
+                HttpStatus.UNAUTHORIZED,
+                "Authentication is required to access this resource.",
+                "AUTHENTICATION_REQUIRED",
+                request);
     }
 }

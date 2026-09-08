@@ -1,11 +1,10 @@
 package io.pallet.common.error;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.http.HttpStatus;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 
 /**
  * The failure-side counterpart of {@code io.pallet.common.api.ApiResponse}. Every
@@ -18,14 +17,14 @@ import java.util.Map;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ErrorResponse(
-    boolean success,
-    String message,
-    String error,
-    int statusCode,
-    Instant timestamp,
-    String path,
-    List<ValidationError> validationErrors,
-    Map<String, Object> meta) {
+        boolean success,
+        String message,
+        String error,
+        int statusCode,
+        Instant timestamp,
+        String path,
+        List<ValidationError> validationErrors,
+        Map<String, Object> meta) {
 
     public static ErrorResponse of(HttpStatus status, String message, String errorCode, String path) {
         return new ErrorResponse(false, message, errorCode, status.value(), Instant.now(), path, null, null);
@@ -39,6 +38,5 @@ public record ErrorResponse(
         return new ErrorResponse(success, message, error, statusCode, timestamp, path, validationErrors, meta);
     }
 
-    public record ValidationError(String field, String message) {
-    }
+    public record ValidationError(String field, String message) {}
 }

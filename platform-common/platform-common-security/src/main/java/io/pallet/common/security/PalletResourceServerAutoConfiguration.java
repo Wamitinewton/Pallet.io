@@ -1,5 +1,8 @@
 package io.pallet.common.security;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -15,10 +18,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Map;
-
 /**
  * Secure-by-default resource server baseline for every Pallet service.
  *
@@ -32,13 +31,11 @@ import java.util.Map;
 @EnableWebSecurity
 public class PalletResourceServerAutoConfiguration {
 
-    private static final String[] PUBLIC_PATHS = {
-        "/actuator/health/**", "/actuator/info", "/actuator/prometheus"
-    };
+    private static final String[] PUBLIC_PATHS = {"/actuator/health/**", "/actuator/info", "/actuator/prometheus"};
 
     private static Collection<?> realmRoles(Jwt jwt) {
         if (jwt.getClaim("realm_access") instanceof Map<?, ?> realmAccess
-            && realmAccess.get("roles") instanceof Collection<?> roles) {
+                && realmAccess.get("roles") instanceof Collection<?> roles) {
             return roles;
         }
         return java.util.List.of();
@@ -47,14 +44,14 @@ public class PalletResourceServerAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
     SecurityFilterChain palletSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(PUBLIC_PATHS).permitAll()
-                .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                jwt.jwtAuthenticationConverter(keycloakRoleConverter())));
+        http.csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(PUBLIC_PATHS)
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .oauth2ResourceServer(
+                        oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRoleConverter())));
         return http.build();
     }
 

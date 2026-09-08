@@ -7,6 +7,9 @@ import io.github.resilience4j.micrometer.tagged.TaggedTimeLimiterMetrics;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -14,10 +17,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Builds the Resilience4j registries from {@link ResilienceProperties}, the shared
@@ -31,7 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PalletResilienceAutoConfiguration {
 
     // Small and fixed by default: this pool executes the guarded supplier while the time limiter enforces the timeout.
-    // Services with high concurrency / long-running blocking calls should override the palletResilienceScheduler bean with a suitably sized executor.
+    // Services with high concurrency / long-running blocking calls should override the palletResilienceScheduler bean
+    // with a suitably sized executor.
     private static final int SCHEDULER_POOL_SIZE = 8;
 
     private static final AtomicInteger THREAD_COUNT = new AtomicInteger();
@@ -69,7 +69,8 @@ public class PalletResilienceAutoConfiguration {
     @Bean(destroyMethod = "shutdown")
     @ConditionalOnMissingBean(name = "palletResilienceScheduler")
     ScheduledExecutorService palletResilienceScheduler() {
-        return Executors.newScheduledThreadPool(SCHEDULER_POOL_SIZE, PalletResilienceAutoConfiguration::newDaemonThread);
+        return Executors.newScheduledThreadPool(
+                SCHEDULER_POOL_SIZE, PalletResilienceAutoConfiguration::newDaemonThread);
     }
 
     @Bean
@@ -83,9 +84,11 @@ public class PalletResilienceAutoConfiguration {
     @ConditionalOnMissingBean(name = "resilienceMetricsBinder")
     ApplicationRunner resilienceMetricsBinder(ResilienceRegistries registries, MeterRegistry meterRegistry) {
         return args -> {
-            TaggedCircuitBreakerMetrics.ofCircuitBreakerRegistry(registries.circuitBreakerRegistry()).bindTo(meterRegistry);
+            TaggedCircuitBreakerMetrics.ofCircuitBreakerRegistry(registries.circuitBreakerRegistry())
+                    .bindTo(meterRegistry);
             TaggedRetryMetrics.ofRetryRegistry(registries.retryRegistry()).bindTo(meterRegistry);
-            TaggedTimeLimiterMetrics.ofTimeLimiterRegistry(registries.timeLimiterRegistry()).bindTo(meterRegistry);
+            TaggedTimeLimiterMetrics.ofTimeLimiterRegistry(registries.timeLimiterRegistry())
+                    .bindTo(meterRegistry);
         };
     }
 }

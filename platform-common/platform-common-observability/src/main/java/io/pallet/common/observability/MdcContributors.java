@@ -1,10 +1,9 @@
 package io.pallet.common.observability;
 
-import org.slf4j.MDC;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.MDC;
 
 /**
  * Applies and unwinds a set of {@link MdcContributor} beans over a request or record scope.

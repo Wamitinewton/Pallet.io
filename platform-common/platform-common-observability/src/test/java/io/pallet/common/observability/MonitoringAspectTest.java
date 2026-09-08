@@ -1,12 +1,12 @@
 package io.pallet.common.observability;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MonitoringAspectTest {
 
@@ -25,9 +25,11 @@ class MonitoringAspectTest {
         sample.ok();
 
         var timer = registry.get(MonitoringAspect.DEFAULT_METRIC)
-            .tag("class", "Sample").tag("method", "ok")
-            .tag("outcome", "success").tag("exception", "none")
-            .timer();
+                .tag("class", "Sample")
+                .tag("method", "ok")
+                .tag("outcome", "success")
+                .tag("exception", "none")
+                .timer();
         assertThat(timer.count()).isEqualTo(1);
     }
 
@@ -36,8 +38,9 @@ class MonitoringAspectTest {
         assertThatThrownBy(sample::boom).isInstanceOf(IllegalStateException.class);
 
         var timer = registry.get(MonitoringAspect.DEFAULT_METRIC)
-            .tag("outcome", "failure").tag("exception", "IllegalStateException")
-            .timer();
+                .tag("outcome", "failure")
+                .tag("exception", "IllegalStateException")
+                .timer();
         assertThat(timer.count()).isEqualTo(1);
     }
 

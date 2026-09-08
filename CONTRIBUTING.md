@@ -66,11 +66,21 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
   disabled in `.editorconfig-checker.json`. Set up once per clone:
   ```bash
   pip install pre-commit   # or: brew install pre-commit / pipx install pre-commit
-  pre-commit install
+  pre-commit install --hook-type pre-commit --hook-type pre-push
   ```
-  `make format-check` runs the same check on demand (`pre-commit run
-  --all-files`). It also runs in CI (`style` job) regardless of whether the
-  local hook is installed.
+  Installing both hook types means a bad commit is caught at `git commit`,
+  and `git push` re-checks anything that slipped through (e.g. a commit made
+  with `--no-verify`) before it reaches `origin`. `make format-check` runs
+  the same checks on demand (`pre-commit run --all-files`). They also run in
+  CI (`style` job) regardless of whether the local hooks are installed.
+- Java formatting (import order, unused imports, wrapping, brace placement)
+  is [Palantir Java Format](https://github.com/palantir/palantir-java-format)
+  via the Spotless Maven plugin, not `.editorconfig` — editorconfig only
+  covers whitespace-level rules, not language formatting. `mvn spotless:check`
+  is bound to the `verify` phase, so it runs on every `./mvnw clean verify` /
+  CI build without any extra flag. `make format` (`mvn spotless:apply`) fixes
+  drift; the pre-commit hook runs `spotless:check` when a commit touches a
+  `.java` file, so a violation is caught before it lands rather than at CI.
 
 ## CI
 

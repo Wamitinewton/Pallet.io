@@ -1,8 +1,7 @@
 package io.pallet.common.messaging;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
-
 import java.time.Duration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * Distributed guard: {@code SET key 1 NX EX retention} is the atomic reservation,

@@ -35,23 +35,22 @@ public final class Topics {
     public static final String BILLING_PAYMENT_RECEIVED = "billing.payment.received";
     public static final String AUDIT_EVENT_RECORDED = "audit.event.recorded";
     private static final Set<String> ALL = Set.of(
-        NOTIFICATION_REQUESTED,
-        DEPLOY_ROLLBACK_TRIGGERED,
-        GIT_PUSH_RECEIVED,
-        BUILD_STARTED,
-        BUILD_SUCCEEDED,
-        BUILD_FAILED,
-        DEPLOY_STEP_COMPLETED,
-        DEPLOY_STATE_CHANGED,
-        DNS_RECORD_UPDATED,
-        TLS_CERT_ISSUED,
-        HEALTH_CHECK_FAILED,
-        USAGE_RECORDED,
-        BILLING_PAYMENT_RECEIVED,
-        AUDIT_EVENT_RECORDED);
+            NOTIFICATION_REQUESTED,
+            DEPLOY_ROLLBACK_TRIGGERED,
+            GIT_PUSH_RECEIVED,
+            BUILD_STARTED,
+            BUILD_SUCCEEDED,
+            BUILD_FAILED,
+            DEPLOY_STEP_COMPLETED,
+            DEPLOY_STATE_CHANGED,
+            DNS_RECORD_UPDATED,
+            TLS_CERT_ISSUED,
+            HEALTH_CHECK_FAILED,
+            USAGE_RECORDED,
+            BILLING_PAYMENT_RECEIVED,
+            AUDIT_EVENT_RECORDED);
 
-    private Topics() {
-    }
+    private Topics() {}
 
     /**
      * The dead-letter topic a message lands on after retries are exhausted or it fails to deserialize.

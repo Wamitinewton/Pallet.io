@@ -26,10 +26,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 @AutoConfiguration(before = KafkaAutoConfiguration.class)
 @ConditionalOnClass(KafkaTemplate.class)
 @EnableConfigurationProperties(MessagingProperties.class)
-@Import({
-    PalletKafkaProducerConfiguration.class,
-    PalletKafkaConsumerConfiguration.class,
-    PalletTopicConfiguration.class
+@Import({PalletKafkaProducerConfiguration.class, PalletKafkaConsumerConfiguration.class, PalletTopicConfiguration.class
 })
 public class PalletMessagingAutoConfiguration {
 
@@ -37,9 +34,8 @@ public class PalletMessagingAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    PlatformEventPublisher platformEventPublisher(KafkaTemplate<String, Object> kafkaTemplate,
-                                                  MeterRegistry meterRegistry,
-                                                  MessagingProperties properties) {
+    PlatformEventPublisher platformEventPublisher(
+            KafkaTemplate<String, Object> kafkaTemplate, MeterRegistry meterRegistry, MessagingProperties properties) {
         return new DefaultPlatformEventPublisher(kafkaTemplate, meterRegistry, properties);
     }
 
@@ -64,7 +60,7 @@ public class PalletMessagingAutoConfiguration {
     @ConditionalOnMissingBean(EventIdempotencyGuard.class)
     EventIdempotencyGuard inMemoryEventIdempotencyGuard() {
         log.warn("Using the in-memory EventIdempotencyGuard: it dedupes within a single instance only. "
-            + "Add spring-data-redis, or override the bean, before scaling a consumer out.");
+                + "Add spring-data-redis, or override the bean, before scaling a consumer out.");
         return new InMemoryEventIdempotencyGuard();
     }
 }

@@ -1,6 +1,13 @@
 package io.pallet.common.observability;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import jakarta.servlet.ServletException;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -8,14 +15,6 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CorrelationIdFilterTest {
 
@@ -70,7 +69,7 @@ class CorrelationIdFilterTest {
         };
 
         assertThatThrownBy(() -> filter(List.of()).doFilter(request, response, chain))
-            .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(RuntimeException.class);
         assertThat(MDC.get(CorrelationId.MDC_KEY)).isNull();
     }
 
@@ -98,7 +97,7 @@ class CorrelationIdFilterTest {
         return new MockFilterChain() {
             @Override
             public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse res)
-                throws IOException, ServletException {
+                    throws IOException, ServletException {
                 target.set(MDC.get(CorrelationId.MDC_KEY));
                 super.doFilter(req, res);
             }

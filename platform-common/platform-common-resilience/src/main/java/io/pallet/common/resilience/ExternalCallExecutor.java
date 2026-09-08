@@ -5,7 +5,6 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.pallet.common.error.AppException;
 import io.pallet.common.error.ExternalServiceException;
-
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
@@ -63,8 +62,8 @@ public class ExternalCallExecutor implements ExternalCall {
         Retry retry = registries.retry(policy);
         TimeLimiter timeLimiter = registries.timeLimiter(policy);
 
-        Callable<T> timeLimited = TimeLimiter.decorateFutureSupplier(
-            timeLimiter, () -> timeLimiterExecutor.submit(supplier::get));
+        Callable<T> timeLimited =
+                TimeLimiter.decorateFutureSupplier(timeLimiter, () -> timeLimiterExecutor.submit(supplier::get));
         Supplier<T> retried = Retry.decorateSupplier(retry, () -> callUnchecked(timeLimited));
         return CircuitBreaker.decorateSupplier(circuitBreaker, retried);
     }

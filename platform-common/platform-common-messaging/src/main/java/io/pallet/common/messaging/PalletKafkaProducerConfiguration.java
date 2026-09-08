@@ -1,5 +1,6 @@
 package io.pallet.common.messaging;
 
+import java.util.Map;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.ObjectProvider;
@@ -12,8 +13,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.util.Map;
 
 /**
  * The JSON, idempotent producer. String keys, flat-JSON values (no {@code __TypeId__}
@@ -35,18 +34,18 @@ class PalletKafkaProducerConfiguration {
     }
 
     static JacksonJsonSerializer<Object> jsonValueSerializer(ObjectProvider<JsonMapper> jsonMapper) {
-        JacksonJsonSerializer<Object> serializer =
-            new JacksonJsonSerializer<>(jsonMapper.getIfAvailable(() -> JsonMapper.builder().build()));
+        JacksonJsonSerializer<Object> serializer = new JacksonJsonSerializer<>(
+                jsonMapper.getIfAvailable(() -> JsonMapper.builder().build()));
         serializer.setAddTypeInfo(false);
         return serializer;
     }
 
     @Bean
     @ConditionalOnMissingBean(ProducerFactory.class)
-    ProducerFactory<String, Object> palletKafkaProducerFactory(KafkaProperties kafkaProperties,
-                                                               ObjectProvider<JsonMapper> jsonMapper) {
+    ProducerFactory<String, Object> palletKafkaProducerFactory(
+            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper) {
         DefaultKafkaProducerFactory<String, Object> factory =
-            new DefaultKafkaProducerFactory<>(idempotentProducerConfig(kafkaProperties));
+                new DefaultKafkaProducerFactory<>(idempotentProducerConfig(kafkaProperties));
         factory.setValueSerializer(jsonValueSerializer(jsonMapper));
         return factory;
     }

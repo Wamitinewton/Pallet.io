@@ -1,17 +1,16 @@
 package io.pallet.common.observability;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.pallet.common.events.EventHeaders;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
-
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class CorrelationConsumerInterceptorTest {
 
@@ -53,8 +52,10 @@ class CorrelationConsumerInterceptorTest {
     @Test
     void readsTraceIdFromTraceparent() {
         ConsumerRecord<Object, Object> record = record(json.createObjectNode());
-        record.headers().add(EventHeaders.TRACEPARENT,
-            "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01".getBytes(StandardCharsets.UTF_8));
+        record.headers()
+                .add(
+                        EventHeaders.TRACEPARENT,
+                        "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01".getBytes(StandardCharsets.UTF_8));
 
         interceptor.intercept(record, null);
 

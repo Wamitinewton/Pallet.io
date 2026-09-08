@@ -1,8 +1,7 @@
 package io.pallet.common.observability;
 
-import org.slf4j.MDC;
-
 import java.util.Optional;
+import org.slf4j.MDC;
 
 /**
  * The stable end-to-end request handle — the value a user reads off an error toast.
@@ -15,8 +14,7 @@ public final class CorrelationId {
     public static final String HEADER = "X-Correlation-Id";
     public static final String MDC_KEY = "correlationId";
 
-    private CorrelationId() {
-    }
+    private CorrelationId() {}
 
     /**
      * The correlation id on the calling thread's MDC, if one has been installed.

@@ -1,9 +1,21 @@
 package io.pallet.common.messaging;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
 import io.pallet.common.events.DeployStateChanged;
 import io.pallet.common.events.EventHeaders;
 import io.pallet.common.events.NotificationRequested;
 import io.pallet.common.events.Topics;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.junit.jupiter.api.Test;
@@ -22,31 +34,21 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
-
-@SpringBootTest(classes = MessagingRoundTripIntegrationTest.TestApp.class,
-    properties = "spring.autoconfigure.exclude="
-        + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration")
+@SpringBootTest(
+        classes = MessagingRoundTripIntegrationTest.TestApp.class,
+        properties = "spring.autoconfigure.exclude="
+                + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration")
 @ActiveProfiles("test")
 @Testcontainers
 class MessagingRoundTripIntegrationTest {
 
     @Container
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))
-        .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false"); // topics must come from our NewTopics beans
+            .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false"); // topics must come from our NewTopics beans
+
     @Autowired
     private PlatformEventPublisher publisher;
+
     @Autowired
     private Listeners listeners;
 
@@ -73,7 +75,8 @@ class MessagingRoundTripIntegrationTest {
         assertThat(received.value().get("deploymentId").asString()).isEqualTo("dep_rt");
         assertThat(received.value().get("fromState").asString()).isEqualTo("BUILDING");
         assertThat(received.value().get("toState").asString()).isEqualTo("ROUTING");
-        assertThat(header(received, EventHeaders.EVENT_ID)).isEqualTo(event.eventId().toString());
+        assertThat(header(received, EventHeaders.EVENT_ID))
+                .isEqualTo(event.eventId().toString());
         assertThat(header(received, EventHeaders.EVENT_TYPE)).isEqualTo(Topics.DEPLOY_STATE_CHANGED);
         assertThat(header(received, EventHeaders.ORG_ID)).isEqualTo("org_9k2j7f");
         assertThat(header(received, EventHeaders.TRACEPARENT)).isNotBlank();
@@ -83,12 +86,20 @@ class MessagingRoundTripIntegrationTest {
     void aGuardedListenerHandlesFiveCopiesOfOneEventIdOnce() {
         UUID eventId = UUID.randomUUID();
         for (int i = 0; i < 5; i++) {
-            publisher.publish(new NotificationRequested(eventId, NotificationRequested.TYPE, "org_dup",
-                Instant.now(), "TEST", "a@b.c", "EMAIL", null, Map.of("copy", i)));
+            publisher.publish(new NotificationRequested(
+                    eventId,
+                    NotificationRequested.TYPE,
+                    "org_dup",
+                    Instant.now(),
+                    "TEST",
+                    "a@b.c",
+                    "EMAIL",
+                    null,
+                    Map.of("copy", i)));
         }
 
         await().atMost(Duration.ofSeconds(20))
-            .untilAsserted(() -> assertThat(listeners.notificationReceived).hasValueGreaterThanOrEqualTo(5));
+                .untilAsserted(() -> assertThat(listeners.notificationReceived).hasValueGreaterThanOrEqualTo(5));
         assertThat(listeners.notificationHandled).hasValue(1);
     }
 
