@@ -482,7 +482,7 @@ flowchart LR
     CR --> RL{OrgRateLimiter<br/>non-blocking permission check}
     RL -- permitted --> Send[EmailChannel / InAppChannel]
     RL -- rejected --> Th[(mark delivery THROTTLED)]
-    Th -. picked up later .-> Sched[DeliveryRetryScheduler<br/>@Scheduled sweep]
+    Th -. picked up later .-> Sched["DeliveryRetryScheduler<br/>@Scheduled sweep"]
     Sched --> RL
 ```
 
