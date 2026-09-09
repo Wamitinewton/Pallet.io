@@ -1,14 +1,10 @@
 # Pallet
 
-A self-built platform as a service, and a testbed for distributed systems
-patterns. Connect a Git repo, push code, get back a live URL with TLS. Built in
+A self-built platform as a service, Connect a Git repo, push code, get back a live URL with TLS. Built in
 public, one service at a time.
 
 The full design brief is [`PROJECT.md`](PROJECT.md). Decisions and their
 rationale are in [`docs/adr/`](docs/adr/README.md).
-
-Status: **initial setup**. The `platform-common` reactor, shared libraries, local infra, and
-`config-server` are in place. No feature services yet.
 
 ## Tech stack
 
