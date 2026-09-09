@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.pallet</groupId>
+        <artifactId>pallet-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>platform-common-test</artifactId>
+    <name>platform-common-test</name>
+    <description>Composed test-slice annotations, singleton Testcontainers holders and
+        ApiResponse/ErrorResponse/PageResponse AssertJ assertions every service test depends on.
+        Test-scope only: a consuming service adds this with scope=test and Maven's scope
+        transitivity confines the whole chain to src/test.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-exception</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+        </dependency>
+        <!-- Backs PalletJwtRequestPostProcessors. Optional: unlike Postgres/Kafka/JPA/WebMvc above,
+             not every service is secured, and Spring Security auto-configures a secure-by-default
+             filter chain the moment it's on the classpath - bleeding it into every consumer
+             transitively would silently start requiring auth on unsecured services' tests. A
+             service that already depends on platform-common-security (so it's secured for real)
+             adds this itself to use the mock-JWT helper. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- this module's own tests, needed to compile/run the fixtures under src/test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- spring-kafka-test brings kafka-clients/kafka-server test runtime, but not spring-kafka
+             itself (no KafkaTemplate/KafkaAdmin) - needed for IntegrationTestAnnotationIntegrationTest
+             to prove a real Kafka bean resolves against the singleton Kafka container. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Brings RedisContainerConnectionDetailsFactory, needed for RedisTestContainerConfigurationTest
+             to prove @ServiceConnection resolves against the singleton Redis container. A consuming
+             service adds this itself (main scope) once it actually uses Redis - see
+             RedisTestContainerConfiguration's javadoc. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Brings RestTemplateBuilder, needed for @AutoConfigureTestRestTemplate to resolve a
+             TestRestTemplate bean in KeycloakTestContainerConfigurationIntegrationTest. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

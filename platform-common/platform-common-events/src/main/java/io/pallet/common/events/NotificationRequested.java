@@ -23,13 +23,17 @@ public record NotificationRequested(
         String recipient,
         String channel,
         String dedupeKey,
-        Map<String, Object> variables)
+        Map<String, Object> variables,
+        String audience)
         implements PlatformEvent {
 
     public static final String TYPE = Topics.NOTIFICATION_REQUESTED;
+    public static final String AUDIENCE_SINGLE = "SINGLE";
+    public static final String AUDIENCE_ORG = "ORG";
 
     public NotificationRequested {
         variables = variables == null ? Map.of() : Map.copyOf(variables);
+        audience = audience == null || audience.isBlank() ? AUDIENCE_SINGLE : audience;
     }
 
     public static NotificationRequested of(
@@ -48,6 +52,22 @@ public record NotificationRequested(
                 recipient,
                 channel,
                 dedupeKey,
-                variables);
+                variables,
+                AUDIENCE_SINGLE);
+    }
+
+    public static NotificationRequested broadcast(
+            String orgId, String notificationType, String dedupeKey, Map<String, Object> variables) {
+        return new NotificationRequested(
+                UUID.randomUUID(),
+                TYPE,
+                orgId,
+                Instant.now(),
+                notificationType,
+                null,
+                null,
+                dedupeKey,
+                variables,
+                AUDIENCE_ORG);
     }
 }

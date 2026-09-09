@@ -95,7 +95,8 @@ class MessagingRoundTripIntegrationTest {
                     "a@b.c",
                     "EMAIL",
                     null,
-                    Map.of("copy", i)));
+                    Map.of("copy", i),
+                    null));
         }
 
         await().atMost(Duration.ofSeconds(20))

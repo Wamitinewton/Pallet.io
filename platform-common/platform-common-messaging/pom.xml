@@ -78,6 +78,32 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- RedisTestContainerConfiguration: the shared singleton-container @ServiceConnection
+             wiring for Redis, so RedisEventIdempotencyGuardIntegrationTest doesn't hand-roll its
+             own @Testcontainers/@Container/@DynamicPropertySource. This module has no repository
+             or controller layer, so the JPA/web test slices platform-common-test bundles for
+             @RepositoryTest/@ControllerTest are excluded - left in, they put HibernateJpaAutoConfiguration
+             on every @SpringBootTest's classpath here and break DeadLetterRoutingIntegrationTest /
+             MessagingRoundTripIntegrationTest, which never configure a datasource. -->
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-webmvc-test</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers-postgresql</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka-test</artifactId>

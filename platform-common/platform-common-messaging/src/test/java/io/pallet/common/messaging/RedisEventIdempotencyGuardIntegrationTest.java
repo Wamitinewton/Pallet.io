@@ -2,6 +2,7 @@ package io.pallet.common.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -14,31 +15,18 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(classes = RedisEventIdempotencyGuardIntegrationTest.TestApp.class)
-@Testcontainers
+@Import(RedisTestContainerConfiguration.class)
 class RedisEventIdempotencyGuardIntegrationTest {
-
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @Autowired
     private EventIdempotencyGuard guard;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
-
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-    }
 
     @Test
     void firstCallerWinsReleaseReopensAndExpiryFrees() throws InterruptedException {

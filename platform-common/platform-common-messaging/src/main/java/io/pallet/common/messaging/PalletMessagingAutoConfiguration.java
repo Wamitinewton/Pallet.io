@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -46,21 +47,29 @@ public class PalletMessagingAutoConfiguration {
         return new DeadLetterTopicListener(meterRegistry);
     }
 
-    // Redis first, in-memory fallback second: within one @Configuration, @ConditionalOnMissingBean
-    // on a later @Bean method sees an earlier one that matched, so the order here is the priority.
-    @Bean
-    @ConditionalOnClass(StringRedisTemplate.class)
-    @ConditionalOnBean(StringRedisTemplate.class)
-    @ConditionalOnMissingBean(EventIdempotencyGuard.class)
-    EventIdempotencyGuard redisEventIdempotencyGuard(StringRedisTemplate redisTemplate) {
-        return new RedisEventIdempotencyGuard(redisTemplate);
-    }
-
     @Bean
     @ConditionalOnMissingBean(EventIdempotencyGuard.class)
     EventIdempotencyGuard inMemoryEventIdempotencyGuard() {
         log.warn("Using the in-memory EventIdempotencyGuard: it dedupes within a single instance only. "
                 + "Add spring-data-redis, or override the bean, before scaling a consumer out.");
         return new InMemoryEventIdempotencyGuard();
+    }
+
+    // A nested, classpath-gated configuration: a StringRedisTemplate-typed method parameter directly
+    // on PalletMessagingAutoConfiguration would fail Class#getDeclaredMethods() reflection for every
+    // condition check on this class once a service omits spring-data-redis entirely (not merely leaves
+    // its autoconfiguration disabled) — the type is unresolvable in the class file, not just absent as a
+    // bean. Isolating it in its own nested class means that reflection only happens once @ConditionalOnClass
+    // has already confirmed the type exists.
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(StringRedisTemplate.class)
+    static class RedisIdempotencyGuardConfiguration {
+
+        @Bean
+        @ConditionalOnBean(StringRedisTemplate.class)
+        @ConditionalOnMissingBean(EventIdempotencyGuard.class)
+        EventIdempotencyGuard redisEventIdempotencyGuard(StringRedisTemplate redisTemplate) {
+            return new RedisEventIdempotencyGuard(redisTemplate);
+        }
     }
 }
