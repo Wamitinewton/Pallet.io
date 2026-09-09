@@ -102,6 +102,11 @@
                 <artifactId>platform-common-resilience</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.pallet</groupId>
+                <artifactId>platform-common-test</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

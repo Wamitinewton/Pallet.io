@@ -353,8 +353,8 @@ looks them up by `Channel` enum, so adding Slack later is "implement the interfa
 public record NotificationTemplate(
         String notificationType,
         Set<Channel> defaultChannels,
-        String subjectTemplate,   // used by EMAIL
-        String bodyTemplate) {}    // used by both EMAIL and IN_APP (title/body derived from it)
+        String subjectTemplate,   // plain-variable substitution, used by EMAIL
+        String bodyTemplate) {}    // Thymeleaf HTML template name, used by both EMAIL and IN_APP
 ```
 
 `NotificationTemplateRegistry` loads these from template files keyed by `notificationType`
@@ -362,6 +362,19 @@ public record NotificationTemplate(
 `PROJECT.md` already commits to) and fails service startup if a producer-declared
 `notificationType` from the event catalog has no matching template. Failing loud at boot beats
 failing quiet on a redelivered message a producer already sent.
+
+**Body templates are HTML, rendered with Thymeleaf.** A notification type is two files: a small
+metadata file (`notificationType`, `defaultChannels`, `subjectTemplate`) and a paired Thymeleaf
+`.html` template for the body, escaping every variable it interpolates by default (`th:text`, not
+`th:utext`) — the template author has to opt into raw, unescaped HTML rather than opt out of it,
+which closes off the HTML-injection risk a producer-supplied variable would otherwise carry
+straight into a rendered email. `subjectTemplate` stays plain-variable substitution (`{{var}}`) —
+a one-line email subject has no structure worth a templating engine, and a subject line rendered
+as HTML would show literal markup to the recipient. The rendered body is stored once on
+`Notification.renderedBody` and reused by both channels, per the "render once, fan out many"
+rule above: `EmailChannel` sends it as the email's HTML body, and `InAppChannel`'s persisted copy
+is the same HTML string — the tenant dashboard's job to display or sanitize further, not this
+service's.
 
 ## Broadcast notifications and future org-team-service integration
 

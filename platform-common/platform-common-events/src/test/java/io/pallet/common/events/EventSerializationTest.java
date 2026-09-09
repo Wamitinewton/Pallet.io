@@ -40,7 +40,8 @@ class EventSerializationTest {
                         "recipient",
                         "channel",
                         "dedupeKey",
-                        "variables");
+                        "variables",
+                        "audience");
 
         assertThat(json.readValue(json.writeValueAsString(event), NotificationRequested.class))
                 .isEqualTo(event);

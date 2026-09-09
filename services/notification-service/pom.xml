@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.pallet</groupId>
+        <artifactId>pallet-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>notification-service</artifactId>
+    <name>notification-service</name>
+    <description>Consumes notification.requested, renders it from a template and delivers it on
+        email and in-app channels. The first feature service and the reference event consumer.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-exception</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-events</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-observability</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-messaging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-resilience</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.pallet</groupId>
+            <artifactId>platform-common-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

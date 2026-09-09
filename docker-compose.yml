@@ -27,7 +27,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./deploy/local/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+      - ./deploy/local/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro,Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pallet"]
       interval: 5s
@@ -111,7 +111,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./infra/keycloak:/opt/keycloak/data/import:ro
+      - ./infra/keycloak:/opt/keycloak/data/import:ro,Z
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,7 +180,7 @@ services:
     restart: unless-stopped
     command: ["--config=/etc/otel/config.yaml"]
     volumes:
-      - ./deploy/local/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+      - ./deploy/local/otel-collector-config.yaml:/etc/otel/config.yaml:ro,Z
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -189,7 +189,7 @@ services:
     networks: [pallet]
 
   jaeger:
-    image: jaegertracing/all-in-one:1.62
+    image: jaegertracing/all-in-one:1.62.0
     container_name: pallet-jaeger
     profiles: ["observability"]
     restart: unless-stopped
@@ -208,7 +208,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.enable-lifecycle"
     volumes:
-      - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
     ports:
       - "9090:9090"
     networks: [pallet]
@@ -235,7 +235,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./deploy/local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/local/grafana/provisioning:/etc/grafana/provisioning:ro,Z
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus

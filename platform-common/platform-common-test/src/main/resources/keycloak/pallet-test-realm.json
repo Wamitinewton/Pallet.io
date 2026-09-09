@@ -1,0 +1,99 @@
+{
+  "realm": "pallet-test",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 300,
+
+  "roles": {
+    "realm": [
+      { "name": "owner", "description": "Full control of an organization" },
+      { "name": "admin", "description": "Manage apps, deployments and team members" },
+      { "name": "viewer", "description": "Read-only access to an organization" }
+    ]
+  },
+
+  "clientScopes": [
+    {
+      "name": "org",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "org_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "org_id",
+            "claim.name": "org_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        }
+      ]
+    }
+  ],
+
+  "defaultDefaultClientScopes": ["org", "roles"],
+
+  "clients": [
+    {
+      "clientId": "pallet-test-client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "defaultClientScopes": ["org", "roles"]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "test-owner",
+      "enabled": true,
+      "email": "owner@pallet-test.local",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Owner",
+      "requiredActions": [],
+      "attributes": { "org_id": ["org-test-1"] },
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["owner", "admin"]
+    },
+    {
+      "username": "test-viewer",
+      "enabled": true,
+      "email": "viewer@pallet-test.local",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Viewer",
+      "requiredActions": [],
+      "attributes": { "org_id": ["org-test-2"] },
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["viewer"]
+    }
+  ]
+}
