@@ -16,17 +16,13 @@
     <name>config-server</name>
     <description>Spring Cloud Config Server. The reactor's spine, stood up first per the build roadmap.</description>
 
-    <!-- Fully independent service build: no parent POM shared with any other Pallet service or
-         with platform-common (see CONTRIBUTING.md). Every version this service needs is pinned
-         right here. platform-common-* is consumed as a real GitHub Packages dependency, pinned
-         by hand via ${platform-common.version} - never as a reactor sibling. See PACKAGES.md. -->
     <properties>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <spring-cloud.version>2025.1.3</spring-cloud.version>
-        <platform-common.version>0.1.0</platform-common.version>
+        <platform-common.version>0.2.0</platform-common.version>
 
         <spotless.version>3.10.2</spotless.version>
         <palantir-java-format.version>2.97.0</palantir-java-format.version>
