@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     printf '<settings><servers><server><id>pallet-github</id><username>x-access-token</username><password>%s</password></server></servers></settings>\n' "$GITHUB_TOKEN" > /root/.m2/settings.xml && \
     ./mvnw -B package -DskipTests
 
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 RUN useradd --system --uid 1001 pallet
 USER pallet
