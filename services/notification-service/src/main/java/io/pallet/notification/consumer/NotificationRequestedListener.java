@@ -27,18 +27,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Pure wiring over checkpoints 3-7, in the exact order {@code ARCHITECTURE.md}'s processing
- * pipeline specifies: idempotency pre-check, resolve template, render, insert the
- * {@link Notification} once, resolve audience, fan out. The real dedupe guarantee is the
- * {@code source_event_id} unique-constraint violation caught in {@link #insertOnce}, not the
- * pre-check alone.
- *
- * <p>The shared consumer factory deserializes values to {@link JsonNode} (one topic can carry
- * more than one event type), so the record is converted to {@link NotificationRequested}
- * explicitly here rather than declared as the listener parameter type — Spring Kafka has no
- * registered converter from a JSON tree to an arbitrary record.
- */
 @Component
 class NotificationRequestedListener {
 
