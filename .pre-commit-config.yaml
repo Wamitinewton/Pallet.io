@@ -6,10 +6,26 @@ repos:
 
   - repo: local
     hooks:
-      - id: spotless-check
-        name: Spotless (Palantir Java Format)
-        description: Java formatting/import-order — mvn spotless:apply to fix
-        entry: ./mvnw -q spotless:check
+      - id: spotless-check-platform-common
+        name: Spotless (platform-common)
+        description: Java formatting/import-order — cd platform-common && ./mvnw spotless:apply to fix
+        entry: platform-common/mvnw -q -f platform-common/pom.xml spotless:check
         language: system
-        files: \.java$
+        files: ^platform-common/.*\.java$
+        pass_filenames: false
+
+      - id: spotless-check-config-server
+        name: Spotless (config-server)
+        description: Java formatting/import-order — cd services/config-server && ./mvnw spotless:apply to fix
+        entry: services/config-server/mvnw -q -f services/config-server/pom.xml spotless:check
+        language: system
+        files: ^services/config-server/.*\.java$
+        pass_filenames: false
+
+      - id: spotless-check-notification-service
+        name: Spotless (notification-service)
+        description: Java formatting/import-order — cd services/notification-service && ./mvnw spotless:apply to fix
+        entry: services/notification-service/mvnw -q -f services/notification-service/pom.xml spotless:check
+        language: system
+        files: ^services/notification-service/.*\.java$
         pass_filenames: false

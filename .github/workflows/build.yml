@@ -12,21 +12,17 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
-  # Work out what a change touches. A push to main always runs a full reactor
-  # build — that is the canonical green signal. A PR builds only the affected
-  # modules with `-pl <module> -am -amd` (also-make: the module's own
-  # dependencies, so it compiles; also-make-dependents: anything that depends
-  # on it, so a platform-common change is verified against every consumer),
-  # unless it touches something the whole reactor depends on (the parent POM,
-  # the Maven wrapper, the platform-common aggregator POM, shared config, or
-  # this workflow), in which case it falls back to a full build.
+
   scope:
     runs-on: ubuntu-latest
     outputs:
       full: ${{ steps.classify.outputs.full }}
-      modules: ${{ steps.classify.outputs.modules }}
+      common_modules: ${{ steps.classify.outputs.common_modules }}
+      services_matrix: ${{ steps.classify.outputs.services_matrix }}
+      services_all: ${{ steps.classify.outputs.services_all }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,10 +35,15 @@ jobs:
         run: |
           set -euo pipefail
 
+          services_all="$(find services -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R . | jq -cs .)"
+          echo "services_all=$services_all" >> "$GITHUB_OUTPUT"
+          echo "known services: $services_all"
+
           if [ "$EVENT" != "pull_request" ]; then
-            echo "full=true"  >> "$GITHUB_OUTPUT"
-            echo "modules=[]" >> "$GITHUB_OUTPUT"
-            echo "push build -> full reactor"
+            echo "full=true"              >> "$GITHUB_OUTPUT"
+            echo "common_modules=[]"      >> "$GITHUB_OUTPUT"
+            echo "services_matrix=$services_all" >> "$GITHUB_OUTPUT"
+            echo "push build -> platform-common reactor + every service"
             exit 0
           fi
 
@@ -50,28 +51,29 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "$changed"
 
-          # Any changed path that is not inside a single module (services/<name>/...
-          # or platform-common/<name>/...) forces a full build: the parent POM, the
-          # platform-common aggregator POM, shared config and the workflow itself
-          # apply to every module, so a change there can break anything.
-          shared="$(printf '%s\n' "$changed" | grep -Ev '^(services|platform-common)/[^/]+/' || true)"
+          shared="$(printf '%s\n' "$changed" | grep -E '^platform-common/(pom\.xml|mvnw|mvnw\.cmd|spotbugs-exclude\.xml|owasp-suppressions\.xml)$|^platform-common/\.mvn/|^\.github/workflows/build\.yml$' || true)"
           if [ -n "$shared" ]; then
-            echo "full=true"  >> "$GITHUB_OUTPUT"
-            echo "modules=[]" >> "$GITHUB_OUTPUT"
-            echo "shared change -> full reactor"
+            echo "full=true"              >> "$GITHUB_OUTPUT"
+            echo "common_modules=[]"      >> "$GITHUB_OUTPUT"
+            echo "services_matrix=$services_all" >> "$GITHUB_OUTPUT"
+            echo "shared change -> platform-common reactor + every service"
             exit 0
           fi
 
-          # Only specific modules changed: collect the affected ones, service or
-          # platform-common alike.
-          modules="$(printf '%s\n' "$changed" \
-            | sed -nE 's#^((services|platform-common)/[^/]+)/.*#\1#p' \
+          common_modules="$(printf '%s\n' "$changed" \
+            | sed -nE 's#^platform-common/([^/]+)/.*#\1#p' \
             | sort -u | jq -R . | jq -cs .)"
-          echo "full=false"        >> "$GITHUB_OUTPUT"
-          echo "modules=$modules"  >> "$GITHUB_OUTPUT"
-          echo "affected modules: $modules"
+          services_matrix="$(printf '%s\n' "$changed" \
+            | sed -nE 's#^services/([^/]+)/.*#\1#p' \
+            | sort -u | jq -R . | jq -cs .)"
 
-  reactor:
+          echo "full=false"                        >> "$GITHUB_OUTPUT"
+          echo "common_modules=$common_modules"     >> "$GITHUB_OUTPUT"
+          echo "services_matrix=$services_matrix"   >> "$GITHUB_OUTPUT"
+          echo "affected platform-common modules: $common_modules"
+          echo "affected services: $services_matrix"
+
+  common-reactor:
     needs: scope
     if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
@@ -84,18 +86,22 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+          server-id: pallet-github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
-      - name: Build, unit + integration tests
+      - name: Build platform-common, unit + integration tests
+        working-directory: platform-common
         run: ./mvnw -B clean verify
 
-  module:
+  common-module:
     needs: scope
-    if: needs.scope.outputs.full == 'false' && needs.scope.outputs.modules != '[]'
+    if: needs.scope.outputs.full == 'false' && needs.scope.outputs.common_modules != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        module: ${{ fromJSON(needs.scope.outputs.modules) }}
+        module: ${{ fromJSON(needs.scope.outputs.common_modules) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -105,11 +111,42 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+          server-id: pallet-github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
-      - name: Build ${{ matrix.module }}, its dependencies and its dependents
+      - name: Build platform-common/${{ matrix.module }}, its dependencies and its dependents
+        working-directory: platform-common
         run: ./mvnw -B -pl "${{ matrix.module }}" -am -amd clean verify
 
-  security:
+  service:
+    needs: scope
+    if: needs.scope.outputs.services_matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.scope.outputs.services_matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          server-id: pallet-github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Build ${{ matrix.service }}, unit + integration tests
+        working-directory: services/${{ matrix.service }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./mvnw -B clean verify
+
+  security-common:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -120,24 +157,55 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+          server-id: pallet-github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
-      - name: SpotBugs + FindSecBugs
+      - name: SpotBugs + FindSecBugs (platform-common)
+        working-directory: platform-common
         run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
+  # Runs unconditionally, same as security-common - every service owns its own security profile
+  # and its own SpotBugs exclude / OWASP suppression files now (see CONTRIBUTING.md), so there is
+  # no single reactor-wide command left that covers all of them.
+  security-service:
+    needs: scope
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.scope.outputs.services_all) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          server-id: pallet-github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: SpotBugs + FindSecBugs (${{ matrix.service }})
+        working-directory: services/${{ matrix.service }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
   style:
     runs-on: ubuntu-latest
     env:
-      SKIP: spotless-check
+      SKIP: spotless-check-platform-common,spotless-check-config-server,spotless-check-notification-service
     steps:
       - uses: actions/checkout@v7
       - uses: pre-commit/action@v3.0.1
 
-  # Single stable status check to require in branch protection. Passes when the
-  # build path that actually ran (reactor or module matrix) succeeded; a
-  # skipped job is fine, it means the other path covered the change.
+  # Single stable status check to require in branch protection. Passes when every build path
+  # that actually ran succeeded; a skipped job is fine, it means nothing in its scope changed.
   build:
-    needs: [scope, reactor, module, security, style]
+    needs: [scope, common-reactor, common-module, service, security-common, security-service, style]
     if: always()
     runs-on: ubuntu-latest
     steps:

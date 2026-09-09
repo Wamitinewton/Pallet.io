@@ -1,6 +1,6 @@
 # Testing Pallet
 
-This is the guide for how tests get written across the reactor. The short version: every
+This is the guide for how tests get written across Pallet. The short version: every
 service leans on `platform-common-test` instead of rolling its own Testcontainers setup, mocks
 are for collaborators you own, not for Postgres or Kafka, and a test's name tells you which
 Maven plugin runs it before you even open the file.
@@ -30,9 +30,10 @@ the real thing.
 ## Naming decides who runs your test
 
 Surefire runs `*Test`. Failsafe runs `*IntegrationTest`, during `mvn verify`, after the
-`package` phase. This is not a style preference — it's wired into the parent POM, and the
-naming is how the build tells the two plugins apart. Get it wrong and your test either doesn't
-run in CI, or runs at the wrong phase and blocks a build it shouldn't.
+`package` phase. This is not a style preference — it's wired into every buildable POM in this
+repo (`platform-common`'s and every service's own), and the naming is how the build tells the
+two plugins apart. Get it wrong and your test either doesn't run in CI, or runs at the wrong
+phase and blocks a build it shouldn't.
 
 - `@UnitTest`, `@ControllerTest`, `@RepositoryTest` classes are named `*Test`.
 - `@IntegrationTest`, `@MessagingIntegrationTest` classes are named `*IntegrationTest`.
@@ -151,7 +152,9 @@ CI runs both on every PR.
 ```bash
 ./mvnw test                              # fast: unit + slice tests, no containers
 ./mvnw verify                            # full: adds Failsafe + real containers
-./mvnw -pl services/notification-service -am verify   # one service + its dependencies
+
+# a single service is a fully independent Maven project - run its own wrapper from its own directory
+cd services/notification-service && ./mvnw verify
 ```
 
 If a container-backed test is slow to start locally, that's almost always Docker pulling an

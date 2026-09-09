@@ -70,7 +70,7 @@ flowchart LR
 
 ## Tech stack
 
-On the language and build side: Java 21, Spring Boot 4.1, and a Maven multi-module reactor tying all 24 services together under one parent POM. The parent POM is what keeps Spring Boot, Spring Cloud, Resilience4j, and Micrometer versions in sync across every service instead of drifting apart one dependency bump at a time. Spring Boot 4.1 pairs with Spring Cloud 2025.1.2 (Oakwood); earlier Spring Cloud releases don't run against it. Boot 4's modular starters mean several dependency names differ from the 3.x examples most of the internet is still written against, `spring-boot-starter-webmvc` rather than `-web`, `spring-boot-starter-security-oauth2-resource-server` rather than `-oauth2-resource-server`, `spring-boot-starter-aspectj` rather than `-aop`, and Jackson 3 moves databind types to `tools.jackson.*` while leaving annotations under `com.fasterxml.jackson.annotation`. `docs/adr/0005-java-21-spring-boot-4.md` has the full list.
+On the language and build side: Java 21, Spring Boot 4.1. `platform-common/` — the shared libraries every service depends on — is one Maven multi-module reactor under its own parent POM, published as versioned artifacts to GitHub Packages. Each of the 24 services, though, is its own fully independent Maven project: its own POM (parented directly to `spring-boot-starter-parent`, not to anything else in this repo), its own Maven wrapper, its own build/security/format tooling. A service pulls in `platform-common-*` the same way an external consumer would — a real published dependency, version pinned by hand — never as a reactor sibling. That buys genuine independence (any service builds, tests, and deploys with zero knowledge of any other service, which matters once there are 24 of them owned incrementally over a long build-in-public timeline) at the cost of Spring Boot/Spring Cloud/Resilience4j/Micrometer versions needing to be bumped per service rather than once in a shared parent — see `CONTRIBUTING.md` and `PACKAGES.md` for the full mechanics and the tradeoff it was chosen for. Spring Boot 4.1 pairs with Spring Cloud 2025.1.2 (Oakwood); earlier Spring Cloud releases don't run against it. Boot 4's modular starters mean several dependency names differ from the 3.x examples most of the internet is still written against, `spring-boot-starter-webmvc` rather than `-web`, `spring-boot-starter-security-oauth2-resource-server` rather than `-oauth2-resource-server`, `spring-boot-starter-aspectj` rather than `-aop`, and Jackson 3 moves databind types to `tools.jackson.*` while leaving annotations under `com.fasterxml.jackson.annotation`. `docs/adr/0005-java-21-spring-boot-4.md` has the full list.
 
 For networking and resilience: `spring-cloud-gateway` at the edge, `spring-boot-starter-kafka` (Boot's managed wrapper over `spring-kafka`) for the event backbone, and Resilience4j for circuit breakers, retries, and timeouts. Resilience4j is the right pick here over Netflix's Hystrix, which stopped receiving updates a few years ago. Neither is wired per service. `platform-common-messaging` owns the Kafka wiring — a JSON producer with the idempotent flag set, a consumer container factory with an `ErrorHandlingDeserializer`, exponential-backoff retry, a `DeadLetterPublishingRecoverer` that routes to `<topic>.DLT`, Micrometer observation on both sides, and a typed `PlatformEventPublisher` that resolves a topic from the event type and stamps the standard headers. `platform-common-resilience` owns the Resilience4j defaults (circuit breaker, retry, and time limiter configs, plus the Micrometer binding so breaker state and retry counts land in Prometheus). A service depends on those two modules and gets the whole setup; both exist before the first feature service so nothing is retrofitted.
 
@@ -207,11 +207,11 @@ Everything lives in one repository, `github.com/Wamitinewton/Pallet.io`, under t
 
 ```
 pallet/
-├── pom.xml                            # parent POM, pins Spring Boot, Spring Cloud,
-│                                       # Resilience4j, Micrometer, plugin versions
-├── mvnw / .mvn/                       # Maven wrapper (no local Maven needed)
-├── Makefile                          # make up / build / verify / obs / kind-up ...
-├── platform-common/
+├── Makefile                          # make up / obs / kind-up (infra) + repo-wide format check
+├── platform-common/                   # self-contained Maven reactor, published to GitHub Packages
+│   ├── pom.xml                        # pins Spring Boot, Spring Cloud, Resilience4j, plugin versions
+│   ├── mvnw / .mvn/                   # this reactor's own Maven wrapper (no local Maven needed)
+│   ├── Makefile                       # this reactor's own build targets
 │   ├── platform-common-events/        # event contracts (envelope + domain records) + topic catalog
 │   ├── platform-common-messaging/     # Kafka wiring: JSON producer/consumer, retry, DLT,
 │   │                                   # tracing, the typed PlatformEventPublisher
@@ -219,8 +219,9 @@ pallet/
 │   │                                   # time limiter) + Micrometer binding
 │   ├── platform-common-security/      # OAuth2 resource server baseline + org_id check
 │   └── platform-common-observability/ # metrics / tracing / logging deps every service pulls in
-├── services/
-│   ├── config-server/                 # scaffolded (the reactor's spine)
+├── services/                          # each <name>/ below is a fully independent Maven project:
+│   │                                   # own pom.xml, own mvnw, own Makefile — no shared parent
+│   ├── config-server/                 # scaffolded first
 │   ├── notification-service/          # built first: the reference event consumer
 │   ├── api-gateway/
 │   ├── identity-service/
@@ -264,7 +265,7 @@ Testing the tenant deploy path itself needs an actual Kubernetes API to talk to,
 
 ## CI/CD
 
-The end state: each service gets its own GitHub Actions job, triggered only when its folder, or a shared `platform-common` module it depends on, changes, so a path filter keeps a change to one service from rebuilding all 24. While the reactor is still small, CI builds and tests it whole on every PR (`.github/workflows/build.yml`), with a separate job for the security scans; the paths-filter-plus-matrix split happens once the build time makes it worth it. Integration tests run against real Kafka, Postgres, ClickHouse, and Keycloak containers through Testcontainers instead of mocks, since the point of this project is seeing how these pieces behave together, not testing against a mock that hides the interesting failure modes.
+Each service already gets its own GitHub Actions job (`.github/workflows/build.yml`), triggered only when its own folder changes — a path filter keeps a change to one service from rebuilding any other, and since every service is a fully independent Maven project (own POM, own wrapper — see `CONTRIBUTING.md`) there's no reactor sibling relationship left for a change to spill across. `platform-common` keeps its own separate path-filtered matrix, one job per changed module of its reactor. A push to `main`, or a change to the workflow file itself, builds everything as the canonical green signal. Security scanning (SpotBugs + FindSecBugs) runs unconditionally on every PR, once for `platform-common` and once per service. Integration tests run against real Kafka, Postgres, ClickHouse, and Keycloak containers through Testcontainers instead of mocks, since the point of this project is seeing how these pieces behave together, not testing against a mock that hides the interesting failure modes.
 
 Once `platform-infra` exists as its own repository, deployment follows GitOps: a merge to its main branch is what ArgoCD actually watches and applies, not a direct push from CI.
 

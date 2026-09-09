@@ -4,29 +4,60 @@ Pallet is a build-in-public learning project. The premise is that other people
 follow along and, once a service gets interesting, send pull requests. This
 document is how the build fits together.
 
-## The reactor build
+## The build: one shared reactor, independent services
 
-One Maven multi-module reactor, one parent POM (`pom.xml`) that pins Spring
-Boot, Spring Cloud, Resilience4j, and every plugin version. Two aggregator
-modules:
+Two different build shapes on purpose:
 
-- `platform-common/` — libraries every service depends on. Three modules:
-  `platform-common-events` (Kafka contracts), `platform-common-security`
-  (resource-server baseline + `org_id` check), `platform-common-observability`
-  (metrics/tracing/logging dependencies).
-- `services/` — one module per microservice, added as each is built.
+- `platform-common/` is one Maven multi-module reactor, self-contained: `platform-common/pom.xml`
+  is parented directly to `spring-boot-starter-parent` and pins Spring Boot, Spring Cloud,
+  Resilience4j, and every plugin version for the reactor beneath it. Eight modules:
+  `platform-common-api` (response envelope + pagination shapes), `platform-common-exception`
+  (`AppException` hierarchy + global handler), `platform-common-events` (Kafka event contracts +
+  topic catalog), `platform-common-security` (resource-server baseline + `org_id` check),
+  `platform-common-observability` (metrics/tracing/logging dependencies),
+  `platform-common-messaging` (Kafka wiring, retry, DLT), `platform-common-resilience`
+  (Resilience4j defaults), `platform-common-test` (composed Testcontainers test-slice
+  annotations, test-scope only). It's published as versioned artifacts to GitHub Packages — see
+  `PACKAGES.md`.
+- Every service under `services/<name>/` is a **fully independent Maven project**: its own
+  `pom.xml` (parented directly to `spring-boot-starter-parent`, not to anything in this repo),
+  its own Maven wrapper (`services/<name>/mvnw`), its own SpotBugs exclude / OWASP suppression
+  files, its own `Makefile`. No service shares a parent POM with `platform-common` or with any
+  other service. A service consumes `platform-common-*` the same way an external repo would: a
+  real GitHub Packages dependency, version pinned by hand in that service's own `pom.xml`
+  (`<platform-common.version>`) — never a reactor sibling. The tradeoff this buys: a service
+  builds, tests, and releases with zero knowledge of any sibling service, at the cost of some
+  duplicated build config (compiler/Spotless/SpotBugs/OWASP plugin setup is copied into each
+  service's `pom.xml` rather than defined once) — see `PACKAGES.md` for the mechanics and why.
 
-Every service depends on `platform-common-observability` (which transitively
-brings Actuator, the Prometheus registry, and OTLP export) and, once it serves
-tenant data, on `platform-common-security`.
+Every service depends on `platform-common-observability` (which transitively brings Actuator, the
+Prometheus registry, and OTLP export) and, once it serves tenant data, on
+`platform-common-security`.
 
 ```bash
-./mvnw -pl services/config-server -am package   # build one service + its deps
-./mvnw clean verify                             # whole reactor, unit + integration tests
-./mvnw -P security verify                       # + SpotBugs and OWASP Dependency-Check
+cd platform-common
+./mvnw clean verify                              # platform-common reactor: unit + integration tests
+./mvnw -P security verify                        # platform-common + SpotBugs / OWASP Dependency-Check
+
+cd services/config-server
+./mvnw clean verify                              # this service alone: unit + integration tests
+./mvnw -P security verify                        # + SpotBugs / OWASP Dependency-Check
 ```
 
-`make` wraps the common commands — `make help`.
+The root `Makefile` only wraps shared local infrastructure (`make up` / `make obs` /
+`make kind-up`, ...) and repo-wide formatting (`make format-check`) — `make help` at the repo
+root. `platform-common/` and each service directory carry their own `Makefile` with the same
+target names (`build`, `test`, `verify`, `security`, `format-check`, `format`, and `run` for
+services), scoped to that project: `make -C platform-common build`, `make -C services/config-server
+build`, or `cd platform-common && make help`.
+
+### Adding a new service
+
+Copy an existing service directory (`pom.xml`, `mvnw`/`mvnw.cmd`/`.mvn/`, `Makefile`,
+`spotbugs-exclude.xml`, `owasp-suppressions.xml`) as the starting point rather than writing a
+`pom.xml` from scratch — it keeps the plugin versions and profile wiring consistent even though
+nothing enforces that automatically anymore. CI discovers new services from the directory listing
+under `services/` (see the `CI` section below), so no workflow change is needed there.
 
 ## Spring Boot 4 gotchas
 
@@ -78,37 +109,63 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
   via the Spotless Maven plugin, not `.editorconfig` — editorconfig only
   covers whitespace-level rules, not language formatting. `mvn spotless:check`
   is bound to the `verify` phase, so it runs on every `./mvnw clean verify` /
-  CI build without any extra flag. `make format` (`mvn spotless:apply`) fixes
-  drift; the pre-commit hook runs `spotless:check` when a commit touches a
-  `.java` file, so a violation is caught before it lands rather than at CI.
+  CI build without any extra flag, in `platform-common` and in every service
+  alike (each service's own `pom.xml` carries the same plugin config — see
+  "The build" above). `make -C platform-common format` or `make -C
+  services/<name> format` (equivalently, `cd` into either and run `make
+  format`) fixes that project's own drift — there is no repo-wide `format`
+  target, since there's no repo-wide POM left to run it against. Locally,
+  `.pre-commit-config.yaml` has one `spotless-check-*` hook per project
+  (`platform-common`, `config-server`, `notification-service`), each scoped by
+  path so only a `.java` file under that project's own directory triggers it;
+  adding a new service needs a matching hook added by hand, same as the CI
+  `security-service`/`service` matrix jobs need no such addition but this file
+  does. CI's `style` job explicitly skips all of these
+  (`SKIP: spotless-check-...`) since each project's own `verify` already runs
+  `spotless:check` — the pre-commit hooks exist purely for fast local
+  feedback, not as CI's actual enforcement.
 
 ## CI
 
-`.github/workflows/build.yml` is path-filtered. A push to `main` always runs a
-full reactor `verify` — the canonical green signal. A PR is classified by the
+`.github/workflows/build.yml` is path-filtered. A push to `main`, or a change
+to the workflow file itself, always builds the full `platform-common` reactor
+plus every service — the canonical green signal. A PR is classified by the
 `scope` job:
 
-- touches only files under one or more `services/<name>/` or
-  `platform-common/<name>/` — a matrix job builds each affected module with
-  `./mvnw -pl <module> -am -amd clean verify` (also-make its dependencies so it
-  compiles, also-make-dependents so a `platform-common` change is verified
-  against every service that consumes it), while unrelated modules are skipped;
-- touches anything shared — the parent POM, the Maven wrapper, the
-  `platform-common` aggregator POM, `config-repo/`, or the workflow itself —
-  falls back to a full reactor build, since a shared change can break anything.
+- a change under `platform-common/<name>/` only — a matrix job builds each
+  affected `platform-common` module, from inside `platform-common/` with its
+  own wrapper (`./mvnw -pl <module> -am -amd clean verify`: also-make its
+  dependencies so it compiles, also-make-dependents so the change is verified
+  against every `platform-common` module downstream of it), while unrelated
+  `platform-common` modules are skipped;
+- a change under `services/<name>/` — since every service is now a fully
+  independent Maven project, a matrix job builds *only* that service, from
+  inside its own directory with its own wrapper (`cd services/<name> &&
+  ./mvnw clean verify`) — there is no `-am`/`-amd` step and no other service
+  is touched, because none of them share anything to also-make;
+- a change to `platform-common/pom.xml`, `platform-common`'s own Maven
+  wrapper, or its SpotBugs/OWASP files — falls back to a full
+  `platform-common` reactor build. Nothing plays this role for services any
+  more: there is no file left whose change can affect more than one service's
+  build.
 
-A separate `security` job runs on every PR regardless: SpotBugs + FindSecBugs,
-a hard fail. OWASP Dependency-Check does not run in CI (see
+Two separate `security` jobs run on every PR regardless of scope —
+`security-common` (platform-common, one command) and `security-service` (a
+matrix over every service, since each now runs its own SpotBugs/OWASP profile
+against its own exclude/suppression files) — SpotBugs + FindSecBugs, a hard
+fail. OWASP Dependency-Check does not run in CI (see
 [SECURITY.md](SECURITY.md)) — run it locally before a dependency bump. The
 `build` job is the single stable status check to require in branch protection;
-it passes when whichever build path ran succeeded.
+it passes when every build path that actually ran succeeded.
 
 Adding a service or a `platform-common` module needs no CI change — the
-`scope` job discovers both from the diff.
+`scope` job discovers both from the directory listing and the diff.
 
 ## Pull requests
 
 - Branch off `main`. Keep a PR to one service or one shared change.
-- `./mvnw clean verify` must pass. Don't disable a test or use `--no-verify` to
-  get green — fix the cause.
+- `./mvnw clean verify` must pass — inside `platform-common/` for a
+  `platform-common` change, inside the service's own directory
+  (`cd services/<name> && ./mvnw clean verify`) for a service change. Don't
+  disable a test or use `--no-verify` to get green — fix the cause.
 - A decision that changes architecture gets an ADR in the same PR.

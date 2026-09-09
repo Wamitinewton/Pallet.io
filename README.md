@@ -7,12 +7,16 @@ public, one service at a time.
 The full design brief is [`PROJECT.md`](PROJECT.md). Decisions and their
 rationale are in [`docs/adr/`](docs/adr/README.md).
 
-Status: **initial setup**. The Maven reactor, shared libraries, local infra, and
-`config-server` (the reactor's spine) are in place. No feature services yet.
+Status: **initial setup**. The `platform-common` reactor, shared libraries, local infra, and
+`config-server` are in place. No feature services yet.
 
 ## Tech stack
 
-- Java 21, Spring Boot 4.1, a Maven multi-module reactor under one parent POM
+- Java 21, Spring Boot 4.1. `platform-common/` is one self-contained Maven
+  multi-module reactor (own POM, own Maven wrapper); every service under
+  `services/<name>/` is its own fully independent Maven project (own POM, own
+  Maven wrapper) that consumes `platform-common-*` as a published dependency —
+  see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`PACKAGES.md`](PACKAGES.md)
 - Apache Kafka event backbone (`spring-boot-starter-kafka`)
 - Keycloak for identity — one realm, `org_id` claim on every token
 - PostgreSQL for most services; ClickHouse for `audit-log-service` and
@@ -29,7 +33,8 @@ conventions (modular starters, Jackson 3, Testcontainers 2).
 - JDK 21+ (the repo builds a Java 21 release; JDK 25 is fine)
 - Docker + Docker Compose
 - `kind` + `kubectl` for the deploy path (later phases)
-- Maven is not required — use the bundled `./mvnw`
+- Maven is not required — every buildable directory (`platform-common/`, and
+  each `services/<name>/`) bundles its own `./mvnw`
 
 ## Getting started
 
@@ -37,19 +42,19 @@ conventions (modular starters, Jackson 3, Testcontainers 2).
 # 1. Start core infra (postgres, redis, kafka, keycloak, clickhouse)
 make up
 
-# 2. Build the reactor
-make build
-
-# 3. Run config-server
-make run-config-server
+# 2. Run config-server — each service builds and runs independently, from its own directory
+cd services/config-server
+./mvnw spring-boot:run     # or: make run
 # → http://localhost:8888/actuator/health
 # → http://localhost:8888/config-server/default   (config it serves for itself)
 
 # Optional: observability stack (prometheus :9090, grafana :3000, jaeger :16686)
-make obs
+make obs   # from the repo root
 ```
 
-`make help` lists every target.
+`make help` at the repo root lists infra targets only (docker-compose, kind, repo-wide format
+check). `make help` inside `platform-common/` or any `services/<name>/` directory lists that
+project's own build targets — each is independent of the others.
 
 ## Local endpoints
 
@@ -67,18 +72,24 @@ make obs
 ## Layout
 
 ```
-pom.xml                     parent POM — pins Spring Boot, Spring Cloud, plugin versions
-platform-common/
-  platform-common-events/         Kafka event contracts + topic catalog
-  platform-common-security/       OAuth2 resource-server baseline + org_id check
-  platform-common-observability/  metrics / tracing / logging deps every service pulls in
+Makefile                    infra only: docker-compose, kind, repo-wide format check
+platform-common/            self-contained Maven reactor — own pom.xml, own mvnw, own Makefile
+  pom.xml                          pins Spring Boot, Spring Cloud, plugin versions for this reactor
+  platform-common-events/          Kafka event contracts + topic catalog
+  platform-common-security/        OAuth2 resource-server baseline + org_id check
+  platform-common-observability/   metrics / tracing / logging deps every service pulls in
+  ...                               (api, exception, messaging, resilience, test)
 services/
-  config-server/            Spring Cloud Config Server
+  config-server/             Spring Cloud Config Server — own pom.xml, own mvnw, own Makefile
+  notification-service/      reference event consumer — same: fully independent build
 config-repo/                config config-server serves (git-backed later)
-deploy/local/               prometheus, otel-collector, grafana, kind cluster
-infra/keycloak/             realm export (clients, roles, org_id mapper)
-docs/adr/                   architecture decision records
+deploy/local/                prometheus, otel-collector, grafana, kind cluster
+infra/keycloak/               realm export (clients, roles, org_id mapper)
+docs/adr/                     architecture decision records
 ```
+
+Every service under `services/` is a standalone Maven project with no parent POM shared with
+`platform-common` or with any other service — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Contributing
 

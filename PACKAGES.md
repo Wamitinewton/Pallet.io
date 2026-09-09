@@ -1,10 +1,27 @@
 # Publishing and consuming platform-common
 
 `platform-common-*` is published to GitHub Packages so a repo outside this monorepo can depend
-on it without cloning the whole reactor. `services/*` is never published: services are
-applications, not libraries, and their POMs inherit `pallet-parent` directly rather than
-`platform-common`, so they have no `distributionManagement` and `mvn deploy` correctly refuses
-to run against them.
+on it without cloning the whole reactor. Every service under `services/*` is never published:
+services are applications, not libraries. Each service is also a fully independent Maven project
+(own `pom.xml`, own Maven wrapper — see `CONTRIBUTING.md`) with no parent POM at all, let alone
+`platform-common`'s, so none of them has a `distributionManagement` block and `mvn deploy`
+correctly refuses to run against any of them.
+
+`platform-common` is its own Maven reactor, invoked from inside its own directory
+(`cd platform-common && ./mvnw ...`), using its own wrapper. Every service is its own separate,
+single-module Maven project,
+invoked from inside its own directory (`cd services/notification-service && ./mvnw ...`) using
+that service's own wrapper — there is no reactor spanning services, and no reactor spanning
+services and `platform-common`. This is deliberate: a service consumes `platform-common-*` as a
+real published GitHub Packages dependency, pinned in that service's own `pom.xml`
+`<platform-common.version>` property, never as a reactor sibling. If a service and
+`platform-common` were one reactor, Maven would always resolve a matching-version
+`platform-common-*` dependency from the in-flight local build (reactor resolution
+short-circuits repository resolution whenever the GAV matches a module in the same reactor)
+regardless of what repository is configured — the service would never actually touch GitHub
+Packages. The tradeoff, same as before: a `platform-common` change no longer automatically
+re-verifies against any service in CI; bump `<platform-common.version>` in the affected
+service's own `pom.xml` by hand after each release.
 
 The normal path is: bump the version, tag it, push the tag. CI takes it from there and publishes
 using the token GitHub injects into every workflow run automatically (`secrets.GITHUB_TOKEN`),
@@ -14,7 +31,7 @@ machine without going through a tag.
 
 ## How versioning works here
 
-All modules in the reactor share one version, set once on `pallet-parent` and inherited
+All modules in the reactor share one version, set once on `platform-common/pom.xml` and inherited
 everywhere via `${project.version}`. A release bumps that one version, tags it, and lets CI
 publish; then the version is bumped again to the next `-SNAPSHOT` so ongoing work keeps building
 locally without colliding with anything already published.
@@ -25,13 +42,16 @@ distinct from any future deployment tag a service might use. That tag is what
 
 ## Cutting a release
 
-Run these from the repository root, on a clean `main`.
+Run these from the repository root, on a clean `main`, then move into `platform-common/` for the
+Maven steps.
 
 ```bash
 # 1. Confirm you're releasing what you think you're releasing.
 git checkout main
 git pull
 git status   # must be clean
+
+cd platform-common
 
 # 2. Drop the -SNAPSHOT suffix across every module in one shot.
 #    Example: 0.1.0-SNAPSHOT -> 0.1.0
@@ -92,8 +112,8 @@ rather than appending a second `<settings>` root.
 # Set the token for this shell session only. Needs write:packages scope.
 export GITHUB_TOKEN=<your-token>
 
-# Deploy just platform-common and its modules, not the whole reactor.
-./mvnw -f platform-common/pom.xml clean deploy
+cd platform-common
+./mvnw clean deploy
 
 # Clear it once you're done.
 unset GITHUB_TOKEN
@@ -101,8 +121,8 @@ unset GITHUB_TOKEN
 
 ## Consuming a published module from another repository
 
-A repo outside this monorepo (or a service here that deliberately wants the published jar
-instead of building from the reactor) adds the GitHub Packages repository and the dependency:
+A repo outside this monorepo adds the GitHub Packages repository and the dependency exactly the
+way every service's own `pom.xml` already does it in this repo:
 
 ```xml
 <repositories>
@@ -148,3 +168,6 @@ token that has at least `read:packages` scope:
       `platform-common-resilience`, and `platform-common-test`.
 - [ ] From a scratch directory, try adding one of them as a dependency with a fresh
       `~/.m2/settings.xml` to confirm the consumer-side story actually works end to end.
+- [ ] Confirm `cd services/notification-service && ./mvnw clean verify` (and the same for every
+      other service) succeeds locally with your own `~/.m2/settings.xml` `pallet-github` entry in
+      place — this is the same check, but for the in-repo consumers.
