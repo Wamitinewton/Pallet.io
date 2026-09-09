@@ -5,9 +5,9 @@
 
     <parent>
         <groupId>io.pallet</groupId>
-        <artifactId>pallet-parent</artifactId>
+        <artifactId>platform-common</artifactId>
         <version>0.1.0</version>
-        <relativePath>../../pom.xml</relativePath>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>platform-common-events</artifactId>
