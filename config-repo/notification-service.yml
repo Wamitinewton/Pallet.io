@@ -3,3 +3,19 @@ spring:
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
     username: ${POSTGRES_USER:pallet}
     password: ${POSTGRES_PASSWORD:pallet}
+  mail:
+    host: ${SPRING_MAIL_HOST:mailpit}
+    port: 1025
+    properties:
+      mail.smtp.auth: "false"
+      mail.smtp.starttls.enable: "false"
+
+pallet:
+  notification:
+    email:
+      from: "no-reply@pallet.local"
+  resilience:
+    policies:
+      email-send:
+        time-limiter:
+          timeout: 5s

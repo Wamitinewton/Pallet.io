@@ -1,0 +1,3 @@
+notificationType: WELCOME
+defaultChannels: [EMAIL, IN_APP]
+subjectTemplate: "Welcome to Pallet, {{name}}"

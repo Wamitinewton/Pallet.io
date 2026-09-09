@@ -11,6 +11,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,13 +48,15 @@ class PalletKafkaConsumerConfiguration {
      * deserialization failure's original bytes verbatim and re-serializes a processing failure's JSON.
      */
     private static KafkaTemplate<String, Object> deadLetterTemplate(
-            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper) {
+            KafkaProperties kafkaProperties,
+            ObjectProvider<JsonMapper> jsonMapper,
+            ObjectProvider<KafkaConnectionDetails> connectionDetails) {
         Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
         byType.put(byte[].class, new ByteArraySerializer());
         byType.put(Object.class, PalletKafkaProducerConfiguration.jsonValueSerializer(jsonMapper));
 
         DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(
-                PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties),
+                PalletKafkaProducerConfiguration.idempotentProducerConfig(kafkaProperties, connectionDetails),
                 new StringSerializer(),
                 new DelegatingByTypeSerializer(byType, true));
         KafkaTemplate<String, Object> template = new KafkaTemplate<>(factory);
@@ -72,21 +75,27 @@ class PalletKafkaConsumerConfiguration {
     @Bean
     @ConditionalOnMissingBean(name = "palletKafkaConsumerFactory")
     ConsumerFactory<String, JsonNode> palletKafkaConsumerFactory(
-            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper) {
+            KafkaProperties kafkaProperties,
+            ObjectProvider<JsonMapper> jsonMapper,
+            ObjectProvider<KafkaConnectionDetails> connectionDetails) {
         JsonMapper mapper = jsonMapper.getIfAvailable(() -> JsonMapper.builder().build());
         ErrorHandlingDeserializer<String> keyDeserializer = new ErrorHandlingDeserializer<>(new StringDeserializer());
         ErrorHandlingDeserializer<JsonNode> valueDeserializer =
                 new ErrorHandlingDeserializer<>(new JacksonJsonDeserializer<>(JsonNode.class, mapper, false));
-        return new DefaultKafkaConsumerFactory<>(
-                kafkaProperties.buildConsumerProperties(), keyDeserializer, valueDeserializer);
+        Map<String, Object> consumerProperties = kafkaProperties.buildConsumerProperties();
+        PalletKafkaProducerConfiguration.applyConnectionDetails(consumerProperties, connectionDetails);
+        return new DefaultKafkaConsumerFactory<>(consumerProperties, keyDeserializer, valueDeserializer);
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "palletKafkaErrorHandler")
     CommonErrorHandler palletKafkaErrorHandler(
-            KafkaProperties kafkaProperties, ObjectProvider<JsonMapper> jsonMapper, MessagingProperties properties) {
+            KafkaProperties kafkaProperties,
+            ObjectProvider<JsonMapper> jsonMapper,
+            ObjectProvider<KafkaConnectionDetails> connectionDetails,
+            MessagingProperties properties) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                deadLetterTemplate(kafkaProperties, jsonMapper),
+                deadLetterTemplate(kafkaProperties, jsonMapper, connectionDetails),
                 (record, exception) -> new TopicPartition(Topics.deadLetter(record.topic()), -1));
 
         MessagingProperties.Retry retry = properties.retry();

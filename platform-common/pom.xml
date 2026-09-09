@@ -12,7 +12,7 @@
 
     <groupId>io.pallet</groupId>
     <artifactId>platform-common</artifactId>
-    <version>0.2.0</version>
+    <version>0.5.0</version>
     <packaging>pom</packaging>
     <name>platform-common</name>
     <description>Shared libraries every Pallet service depends on</description>

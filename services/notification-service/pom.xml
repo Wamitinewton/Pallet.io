@@ -24,10 +24,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <spring-cloud.version>2025.1.3</spring-cloud.version>
-        <platform-common.version>0.2.0</platform-common.version>
+        <platform-common.version>0.5.0</platform-common.version>
 
         <spotless.version>3.10.2</spotless.version>
         <palantir-java-format.version>2.97.0</palantir-java-format.version>
+        <greenmail.version>2.1.13</greenmail.version>
 
         <nvd.api.key></nvd.api.key>
     </properties>
@@ -105,11 +106,25 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.pallet</groupId>
             <artifactId>platform-common-test</artifactId>
             <version>${platform-common.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.icegreen</groupId>
+            <artifactId>greenmail-junit5</artifactId>
+            <version>${greenmail.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

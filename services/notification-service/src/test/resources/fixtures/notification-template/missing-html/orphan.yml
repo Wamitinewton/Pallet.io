@@ -1,0 +1,3 @@
+notificationType: ORPHAN
+defaultChannels: [EMAIL]
+subjectTemplate: "Orphan {{name}}"
