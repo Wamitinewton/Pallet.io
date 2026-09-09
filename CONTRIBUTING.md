@@ -127,10 +127,9 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 
 ## CI
 
-`.github/workflows/build.yml` is path-filtered. A push to `main`, or a change
-to the workflow file itself, always builds the full `platform-common` reactor
-plus every service — the canonical green signal. A PR is classified by the
-`scope` job:
+`.github/workflows/build.yml` is path-filtered, for both a PR and a push to
+`main`. Either is classified the same way by the `scope` job, diffing against
+the PR's base SHA or the push's previous SHA:
 
 - a change under `platform-common/<name>/` only — a matrix job builds each
   affected `platform-common` module, from inside `platform-common/` with its
@@ -144,19 +143,24 @@ plus every service — the canonical green signal. A PR is classified by the
   ./mvnw clean verify`) — there is no `-am`/`-amd` step and no other service
   is touched, because none of them share anything to also-make;
 - a change to `platform-common/pom.xml`, `platform-common`'s own Maven
-  wrapper, or its SpotBugs/OWASP files — falls back to a full
-  `platform-common` reactor build. Nothing plays this role for services any
-  more: there is no file left whose change can affect more than one service's
-  build.
+  wrapper, its SpotBugs/OWASP files, or `build.yml` itself — falls back to a
+  full `platform-common` reactor build plus every service. Nothing plays this
+  role for services any more: there is no file left whose change can affect
+  more than one service's build;
+- no usable base commit to diff against (the push's previous SHA is unset,
+  the zero SHA, or unreachable — a new branch, first push, or force push) —
+  same full-build fallback, since there's nothing safe to diff.
 
-Two separate `security` jobs run on every PR regardless of scope —
-`security-common` (platform-common, one command) and `security-service` (a
-matrix over every service, since each now runs its own SpotBugs/OWASP profile
-against its own exclude/suppression files) — SpotBugs + FindSecBugs, a hard
-fail. OWASP Dependency-Check does not run in CI (see
+Two separate `security` jobs mirror that scoping — SpotBugs + FindSecBugs, a
+hard fail. `security-common` runs whenever any `platform-common` module (or
+the whole reactor) is in scope; `security-service` matrixes over just the
+affected services, since each now runs its own SpotBugs/OWASP profile against
+its own exclude/suppression files. Neither runs when nothing in its scope
+changed. OWASP Dependency-Check does not run in CI (see
 [SECURITY.md](SECURITY.md)) — run it locally before a dependency bump. The
 `build` job is the single stable status check to require in branch protection;
-it passes when every build path that actually ran succeeded.
+it passes when every build path that actually ran succeeded, and a skipped
+job (nothing in its scope changed) counts as a pass.
 
 Adding a service or a `platform-common` module needs no CI change — the
 `scope` job discovers both from the directory listing and the diff.

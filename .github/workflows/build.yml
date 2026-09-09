@@ -32,6 +32,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
@@ -39,25 +40,30 @@ jobs:
           echo "services_all=$services_all" >> "$GITHUB_OUTPUT"
           echo "known services: $services_all"
 
-          if [ "$EVENT" != "pull_request" ]; then
-            echo "full=true"              >> "$GITHUB_OUTPUT"
-            echo "common_modules=[]"      >> "$GITHUB_OUTPUT"
-            echo "services_matrix=$services_all" >> "$GITHUB_OUTPUT"
-            echo "push build -> platform-common reactor + every service"
+          full_build() {
+            echo "full=true"                     >> "$GITHUB_OUTPUT"
+            echo "common_modules=[]"              >> "$GITHUB_OUTPUT"
+            echo "services_matrix=$services_all"  >> "$GITHUB_OUTPUT"
+            echo "$1"
             exit 0
+          }
+
+          if [ "$EVENT" = "pull_request" ]; then
+            base="$BASE_SHA"
+          else
+            base="$BEFORE_SHA"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              full_build "no usable base commit for $EVENT -> platform-common reactor + every service"
+            fi
           fi
 
-          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          changed="$(git diff --name-only "$base"...HEAD)"
           echo "Changed files:"
           printf '%s\n' "$changed"
 
           shared="$(printf '%s\n' "$changed" | grep -E '^platform-common/(pom\.xml|mvnw|mvnw\.cmd|spotbugs-exclude\.xml|owasp-suppressions\.xml)$|^platform-common/\.mvn/|^\.github/workflows/build\.yml$' || true)"
           if [ -n "$shared" ]; then
-            echo "full=true"              >> "$GITHUB_OUTPUT"
-            echo "common_modules=[]"      >> "$GITHUB_OUTPUT"
-            echo "services_matrix=$services_all" >> "$GITHUB_OUTPUT"
-            echo "shared change -> platform-common reactor + every service"
-            exit 0
+            full_build "shared change -> platform-common reactor + every service"
           fi
 
           common_modules="$(printf '%s\n' "$changed" \
@@ -147,6 +153,8 @@ jobs:
         run: ./mvnw -B clean verify
 
   security-common:
+    needs: scope
+    if: needs.scope.outputs.full == 'true' || needs.scope.outputs.common_modules != '[]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -165,16 +173,17 @@ jobs:
         working-directory: platform-common
         run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
-  # Runs unconditionally, same as security-common - every service owns its own security profile
-  # and its own SpotBugs exclude / OWASP suppression files now (see CONTRIBUTING.md), so there is
-  # no single reactor-wide command left that covers all of them.
+  # Every service owns its own SpotBugs exclude / OWASP suppression files now (see
+  # CONTRIBUTING.md), so there is no single reactor-wide command that covers all of them - each
+  # affected service gets its own matrix entry instead.
   security-service:
     needs: scope
+    if: needs.scope.outputs.services_matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        service: ${{ fromJSON(needs.scope.outputs.services_all) }}
+        service: ${{ fromJSON(needs.scope.outputs.services_matrix) }}
     steps:
       - uses: actions/checkout@v7
 
