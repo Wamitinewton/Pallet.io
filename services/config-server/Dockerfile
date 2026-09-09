@@ -1,15 +1,3 @@
-# syntax=docker/dockerfile:1
-# config-server is a fully independent Maven project (own pom.xml, own mvnw) - this build never
-# reaches into platform-common/ or any other service. config-repo/ is the one exception: it's
-# shared local-dev config, same status as docker-compose.yml at the repo root, so the build
-# context is still the repo root:
-#
-#   DOCKER_BUILDKIT=1 docker build -f services/config-server/Dockerfile \
-#     --secret id=github_token,env=GITHUB_TOKEN \
-#     -t pallet/config-server .
-#
-# GITHUB_TOKEN needs at least read:packages, to pull platform-common-observability from GitHub
-# Packages (see PACKAGES.md) - passed as a BuildKit secret, never baked into an image layer.
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY services/config-server/.mvn/ .mvn/
