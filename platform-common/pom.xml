@@ -25,4 +25,17 @@
         <module>platform-common-test</module>
     </modules>
 
+    <!-- Only platform-common-* is published: these are libraries other repos can depend on.
+         services/ inherits pallet-parent directly, not this POM, so a service never picks up
+         this block and `mvn deploy` on a service correctly fails with no distributionManagement
+         rather than accidentally publishing an application. See PACKAGES.md for the release
+         process this feeds. -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>Pallet GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Wamitinewton/Pallet.io</url>
+        </repository>
+    </distributionManagement>
+
 </project>
