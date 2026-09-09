@@ -14,6 +14,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnectionAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -75,7 +76,7 @@ class RedisEventIdempotencyGuardIntegrationTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration(DataRedisAutoConfiguration.class)
+    @ImportAutoConfiguration({DataRedisAutoConfiguration.class, ServiceConnectionAutoConfiguration.class})
     static class TestApp {
 
         @Bean
