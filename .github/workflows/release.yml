@@ -31,7 +31,8 @@ jobs:
           server-password: GITHUB_TOKEN
 
       - name: Deploy platform-common to GitHub Packages
-        run: ./mvnw -B -f platform-common/pom.xml clean deploy -DskipTests
+        working-directory: platform-common
+        run: ./mvnw -B clean deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}

@@ -12,8 +12,8 @@ Two checks run under the `security` Maven profile:
 
 | Tool | What it covers | Command | Runs in CI |
 |---|---|---|---|
-| SpotBugs + FindSecBugs | SAST over compiled bytecode (injection, crypto misuse, hardcoded secrets) | `./mvnw -P security verify` | yes, on every PR |
-| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` | no — run it locally |
+| SpotBugs + FindSecBugs | SAST over compiled bytecode (injection, crypto misuse, hardcoded secrets) | `./mvnw -P security verify` (from `platform-common/` or a service's own directory) | yes, on every PR |
+| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` (from `platform-common/` or a service's own directory) | no — run it locally |
 
 OWASP Dependency-Check does not run in CI: it depends on a rate-limited
 external NVD API key, which makes it a poor fit for a check that has to pass
@@ -36,8 +36,8 @@ Both are reviewed on every dependency bump.
 
 ## Security patch overrides
 
-The parent `pom.xml` has a block for overriding Spring Boot BOM-managed
-dependency versions when a security patch lands before the BOM catches up. Each
+`platform-common/pom.xml` (or a service's own `pom.xml`) has a block for overriding Spring Boot
+BOM-managed dependency versions when a security patch lands before the BOM catches up. Each
 override carries a CVE reference and is rechecked (and usually removed) on every
 Spring Boot upgrade.
 

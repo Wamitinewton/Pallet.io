@@ -1,35 +1,12 @@
 .DEFAULT_GOAL := help
-MVN := ./mvnw
 
 .PHONY: help
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-## ── Build ───────────────────────────────────────────────────────────────
-
-.PHONY: build
-build: ## Build the whole reactor, skipping tests
-	$(MVN) -B clean package -DskipTests
-
-.PHONY: test
-test: ## Run unit tests across the reactor
-	$(MVN) -B test
-
-.PHONY: verify
-verify: ## Run unit + integration tests (Testcontainers)
-	$(MVN) -B verify
-
-.PHONY: security
-security: ## Run SpotBugs (FindSecBugs) + OWASP Dependency-Check
-	$(MVN) -B verify -P security
-
 .PHONY: format-check
-format-check: ## Check .editorconfig conformance + Java formatting (Spotless/Palantir)
+format-check: ## Check .editorconfig conformance + Java formatting (Spotless/Palantir), repo-wide
 	pre-commit run --all-files
-
-.PHONY: format
-format: ## Auto-fix Java formatting (Spotless/Palantir)
-	$(MVN) -q spotless:apply
 
 ## ── Local infrastructure ────────────────────────────────────────────────
 
@@ -70,9 +47,3 @@ kind-up: ## Create the local kind cluster
 .PHONY: kind-down
 kind-down: ## Delete the local kind cluster
 	kind delete cluster --name pallet
-
-## ── Run ─────────────────────────────────────────────────────────────────
-
-.PHONY: run-config-server
-run-config-server: ## Run config-server locally (needs: make up)
-	$(MVN) -B -pl services/config-server -am spring-boot:run
