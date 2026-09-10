@@ -70,7 +70,11 @@ public final class NotificationTemplateRegistry {
         String subjectTemplate = requireString(metadata, "subjectTemplate", resource);
         Set<Channel> defaultChannels = parseChannels(metadata, notificationType, resource);
 
-        String baseName = stripYamlExtension(resource.getFilename());
+        String filename = resource.getFilename();
+        if (filename == null) {
+            throw new IllegalStateException("Notification template resource has no filename: " + resource);
+        }
+        String baseName = stripYamlExtension(filename);
         Resource pairedHtml;
         try {
             pairedHtml = resource.createRelative(baseName + ".html");
