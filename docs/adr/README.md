@@ -14,6 +14,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0006](0006-event-schema-format.md) | Plain JSON event payloads to start | accepted |
 | [0007](0007-local-database-strategy.md) | Shared Postgres, schema per service (local) | accepted |
 | [0008](0008-notification-service-foundation-scope.md) | notification-service foundation ships in-app + broadcast, not email-only | accepted |
+| [0010](0010-shared-api-version-prefix.md) | Shared, config-driven API version prefix (`platform-common-api`) | accepted |
 
 ## Still open (from `PROJECT.md`)
 
