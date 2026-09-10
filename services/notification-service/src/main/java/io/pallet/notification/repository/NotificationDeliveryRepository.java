@@ -40,7 +40,7 @@ public interface NotificationDeliveryRepository extends JpaRepository<Notificati
             SET d.readAt = CURRENT_TIMESTAMP, d.updatedAt = CURRENT_TIMESTAMP
             WHERE d.recipient = :recipient AND d.channel = :channel AND d.readAt IS NULL
             """)
-    int markAllReadFor(@Param("recipient") String recipient, @Param("channel") Channel channel);
+    void markAllReadFor(@Param("recipient") String recipient, @Param("channel") Channel channel);
 
     /**
      * The batch a {@code DeliveryRetryScheduler} sweep drains, oldest first. Backed by
