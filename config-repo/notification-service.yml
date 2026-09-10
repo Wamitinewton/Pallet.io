@@ -14,6 +14,11 @@ pallet:
   notification:
     email:
       from: "no-reply@pallet.local"
+    rate-limit:
+      permits-per-period: 100
+      period: 1m
+      sweep-interval: 30s
+      sweep-batch-limit: 500
   resilience:
     policies:
       email-send:
