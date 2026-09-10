@@ -5,6 +5,22 @@ spring:
   kafka:
     consumer:
       group-id: notification-service-test-${random.uuid}
+  mail:
+    # Only lets JavaMailSender's bean resolve for a full-context test that never sends mail.
+    # A test that does (EmailChannelIntegrationTest, NotificationRequestedListenerIntegrationTest)
+    # overrides host/port via @DynamicPropertySource to point at its own GreenMail instance.
+    host: localhost
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Lets the security auto-configuration build a JwtDecoder bean (and therefore
+          # PalletResourceServerAutoConfiguration's SecurityFilterChain) with no live server:
+          # NimbusJwtDecoder.withJwkSetUri(...) doesn't connect until a token is actually
+          # decoded, unlike issuer-uri, which resolves the OIDC discovery document eagerly.
+          # A test exercising real security overrides this with a real Keycloak realm via
+          # KeycloakTestContainerConfiguration (@ConditionalOnMissingBean(JwtDecoder.class)).
+          jwk-set-uri: http://localhost:1/not-used-in-tests
 
 management:
   tracing:

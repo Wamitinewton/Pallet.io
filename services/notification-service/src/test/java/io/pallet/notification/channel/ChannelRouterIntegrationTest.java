@@ -11,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pallet.common.test.annotations.RepositoryTest;
 import io.pallet.notification.audience.Recipient;
 import io.pallet.notification.domain.Audience;
@@ -18,6 +19,7 @@ import io.pallet.notification.domain.Channel;
 import io.pallet.notification.domain.DeliveryStatus;
 import io.pallet.notification.domain.Notification;
 import io.pallet.notification.domain.NotificationDelivery;
+import io.pallet.notification.ratelimit.OrgRateLimiter;
 import io.pallet.notification.repository.NotificationDeliveryRepository;
 import io.pallet.notification.repository.NotificationRepository;
 import java.util.List;
@@ -38,13 +40,20 @@ class ChannelRouterIntegrationTest {
     private NotificationDeliveryRepository deliveryRepository;
 
     private NotificationChannel emailChannel;
+    private OrgRateLimiter orgRateLimiter;
     private ChannelRouter router;
 
     @BeforeEach
     void setUp() {
         emailChannel = mock(NotificationChannel.class);
         when(emailChannel.type()).thenReturn(Channel.EMAIL);
-        router = new ChannelRouter(List.of(emailChannel, new InAppChannel()), deliveryRepository);
+        orgRateLimiter = mock(OrgRateLimiter.class);
+        when(orgRateLimiter.tryAcquire(any())).thenReturn(true);
+        router = new ChannelRouter(
+                List.of(emailChannel, new InAppChannel()),
+                deliveryRepository,
+                orgRateLimiter,
+                new SimpleMeterRegistry());
     }
 
     private Notification persistNotification() {
@@ -147,5 +156,20 @@ class ChannelRouterIntegrationTest {
         verify(emailChannel, never()).deliver(any(), eq("user2@example.com"));
         verify(emailChannel, times(1)).deliver(any(), eq("user3@example.com"));
         assertThat(deliveryRepository.findAll()).hasSize(3);
+    }
+
+    @Test
+    void aRejectedOrgPermitWritesThrottledWithoutCallingTheChannel() throws Exception {
+        Notification notification = persistNotification();
+        when(orgRateLimiter.tryAcquire(notification.getOrgId())).thenReturn(false);
+        Recipient recipient = new Recipient("user-1", "user1@example.com");
+
+        router.fanOut(notification, Set.of(Channel.EMAIL), List.of(recipient));
+
+        NotificationDelivery delivery = deliveryRepository
+                .findByNotificationIdAndChannelAndRecipient(notification.getId(), Channel.EMAIL, "user1@example.com")
+                .orElseThrow();
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.THROTTLED);
+        verify(emailChannel, never()).deliver(any(), any());
     }
 }

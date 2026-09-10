@@ -13,6 +13,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0005](0005-java-21-spring-boot-4.md) | Java 21 and Spring Boot 4.1 | accepted |
 | [0006](0006-event-schema-format.md) | Plain JSON event payloads to start | accepted |
 | [0007](0007-local-database-strategy.md) | Shared Postgres, schema per service (local) | accepted |
+| [0008](0008-notification-service-foundation-scope.md) | notification-service foundation ships in-app + broadcast, not email-only | accepted |
 
 ## Still open (from `PROJECT.md`)
 

@@ -18,4 +18,10 @@
     <Match>
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
     </Match>
+    <!-- No class here overrides finalize(), so the "finalizer attack" this rule guards against
+         doesn't apply; it otherwise fires on nearly every non-final constructor-injected bean
+         whose constructor can throw. -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
 </FindBugsFilter>
