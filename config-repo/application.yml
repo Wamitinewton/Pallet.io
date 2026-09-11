@@ -45,6 +45,8 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/pallet}
 
 pallet:
+  api:
+    prefix: /api/v1
   messaging:
     consumer-concurrency: 3
     retry:

@@ -4,7 +4,7 @@ spring:
     username: ${POSTGRES_USER:pallet}
     password: ${POSTGRES_PASSWORD:pallet}
   mail:
-    host: ${SPRING_MAIL_HOST:mailpit}
+    host: ${SPRING_MAIL_HOST:localhost}
     port: 1025
     properties:
       mail.smtp.auth: "false"

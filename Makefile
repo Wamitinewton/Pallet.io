@@ -11,7 +11,7 @@ format-check: ## Check .editorconfig conformance + Java formatting (Spotless/Pal
 ## ── Local infrastructure ────────────────────────────────────────────────
 
 .PHONY: up
-up: ## Start core infra (postgres, redis, kafka, keycloak, clickhouse)
+up: ## Start core infra (postgres, redis, kafka, keycloak, clickhouse, mailpit)
 	docker compose --profile core up -d
 
 .PHONY: obs

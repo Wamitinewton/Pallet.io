@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.pallet.common.api.PalletApiAutoConfiguration;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,9 @@ import org.springframework.web.bind.annotation.*;
 /**
  * The advice is never {@code @Import}ed here — a full {@code @SpringBootTest} exercises the
  * {@code AutoConfiguration.imports} entry, which is the thing under test. The rest is regression
- * cover for the mapping table through a real {@code DispatcherServlet}.
+ * cover for the mapping table through a real {@code DispatcherServlet}. {@link
+ * PalletApiAutoConfiguration} is excluded so the fixture's routes below stay reachable at their
+ * literal, unprefixed paths — this test isolates error rendering, not the API path prefix.
  */
 @SpringBootTest(classes = ErrorHandlingAutoConfigurationIntegrationTest.TestApp.class)
 @AutoConfigureMockMvc
@@ -73,7 +76,7 @@ class ErrorHandlingAutoConfigurationIntegrationTest {
     }
 
     @SpringBootConfiguration
-    @EnableAutoConfiguration
+    @EnableAutoConfiguration(exclude = PalletApiAutoConfiguration.class)
     static class TestApp {
 
         @RestController

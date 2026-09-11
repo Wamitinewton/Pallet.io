@@ -1,5 +1,6 @@
 package io.pallet.common.test.annotations;
 
+import io.pallet.common.api.PalletApiAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
@@ -12,6 +13,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * (via the {@code @ComponentScan} {@code @SpringBootApplication} carries), which is why
  * {@code fixtures} lives directly underneath it: a bare {@code @SpringBootConfiguration
  * @EnableAutoConfiguration} would leave test slices with nothing to scan.
+ *
+ * <p>{@link PalletApiAutoConfiguration} is excluded so the fixture controllers' literal paths
+ * ({@code /test-entities/missing}, {@code /secured/whoami}) stay reachable unprefixed — this
+ * fixture app probes other modules' auto-configurations, not the API path prefix itself.
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = PalletApiAutoConfiguration.class)
 class PlatformCommonTestApplication {}
