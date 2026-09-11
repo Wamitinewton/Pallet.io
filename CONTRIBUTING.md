@@ -36,13 +36,17 @@ Prometheus registry, and OTLP export) and, once it serves tenant data, on
 
 ```bash
 cd platform-common
-./mvnw clean verify                              # platform-common reactor: unit + integration tests
+./mvnw clean verify                              # platform-common reactor: unit + integration tests (needs Docker)
 ./mvnw -P security verify                        # platform-common + SpotBugs / OWASP Dependency-Check
 
 cd services/config-server
-./mvnw clean verify                              # this service alone: unit + integration tests
+./mvnw clean verify                              # this service alone: unit + integration tests (needs Docker)
 ./mvnw -P security verify                        # + SpotBugs / OWASP Dependency-Check
 ```
+
+CI never runs the plain `clean verify` above — see §CI: it passes `-DskipITs`, unit tests only.
+`./mvnw clean verify`, integration tests included, is a gate you run yourself before opening a
+PR (see `Test.md`'s "CI vs. local").
 
 The root `Makefile` only wraps shared local infrastructure (`make up` / `make obs` /
 `make kind-up`, ...) and repo-wide formatting (`make format-check`) — `make help` at the repo
@@ -80,7 +84,10 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 - Tests: unit tests are `*Test`, integration tests are `*IntegrationTest`.
   Surefire runs the first, Failsafe (`verify`) runs the second. Integration
   tests use Testcontainers for Kafka, Postgres, ClickHouse, and Keycloak — never
-  mock those; the failure modes they hide are the point of the project.
+  mock those; the failure modes they hide are the point of the project. CI only
+  runs Surefire (`-DskipITs`, see §CI) — Failsafe's integration tests are a
+  required local gate before opening a PR, not something CI checks for you. See
+  `Test.md` for the full testing guide.
 - Workflows (`deploy-orchestrator-service`, `billing-service` — the two services embedding a
   Temporal worker, per [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md)): workflow and
   activity unit tests are `*WorkflowTest`, using the Temporal Java SDK's
@@ -140,15 +147,15 @@ the PR's base SHA or the push's previous SHA:
 
 - a change under `platform-common/<name>/` only — a matrix job builds each
   affected `platform-common` module, from inside `platform-common/` with its
-  own wrapper (`./mvnw -pl <module> -am -amd clean verify`: also-make its
-  dependencies so it compiles, also-make-dependents so the change is verified
-  against every `platform-common` module downstream of it), while unrelated
-  `platform-common` modules are skipped;
+  own wrapper (`./mvnw -pl <module> -am -amd clean verify -DskipITs`: also-make
+  its dependencies so it compiles, also-make-dependents so the change is
+  verified against every `platform-common` module downstream of it), while
+  unrelated `platform-common` modules are skipped;
 - a change under `services/<name>/` — since every service is now a fully
   independent Maven project, a matrix job builds *only* that service, from
   inside its own directory with its own wrapper (`cd services/<name> &&
-  ./mvnw clean verify`) — there is no `-am`/`-amd` step and no other service
-  is touched, because none of them share anything to also-make;
+  ./mvnw clean verify -DskipITs`) — there is no `-am`/`-amd` step and no other
+  service is touched, because none of them share anything to also-make;
 - a change to `platform-common/pom.xml`, `platform-common`'s own Maven
   wrapper, its SpotBugs/OWASP files, or `build.yml` itself — falls back to a
   full `platform-common` reactor build plus every service. Nothing plays this
@@ -157,6 +164,18 @@ the PR's base SHA or the push's previous SHA:
 - no usable base commit to diff against (the push's previous SHA is unset,
   the zero SHA, or unreachable — a new branch, first push, or force push) —
   same full-build fallback, since there's nothing safe to diff.
+
+Every `clean verify` invocation above carries `-DskipITs`: Surefire's `*Test`
+classes run, Failsafe's `*IntegrationTest` classes (Testcontainers — Postgres,
+Kafka, Keycloak) don't. That's deliberate, not an oversight — free GitHub
+Actions runners are 2 vCPU and can't reliably boot several real containers
+alongside the app under test without the same async assertions that pass
+locally timing out under load. Integration tests remain mandatory; they're
+just a local gate (`./mvnw clean verify`, no flag, Docker required) instead of
+a CI one — see `Test.md`'s "CI vs. local" section for the full reasoning and
+what this expects of you as a contributor. `-DskipITs` is Maven Failsafe's own
+recognized property; nothing in `platform-common-test` or any service's `pom.xml`
+had to change to support it.
 
 Two separate `security` jobs mirror that scoping — SpotBugs + FindSecBugs, a
 hard fail. `security-common` runs whenever any `platform-common` module (or
@@ -175,8 +194,12 @@ Adding a service or a `platform-common` module needs no CI change — the
 ## Pull requests
 
 - Branch off `main`. Keep a PR to one service or one shared change.
-- `./mvnw clean verify` must pass — inside `platform-common/` for a
+- CI (green check on the PR) means unit tests pass — it does not run
+  integration tests (see §CI). Before opening the PR, run the full
+  `./mvnw clean verify` yourself — inside `platform-common/` for a
   `platform-common` change, inside the service's own directory
-  (`cd services/<name> && ./mvnw clean verify`) for a service change. Don't
-  disable a test or use `--no-verify` to get green — fix the cause.
+  (`cd services/<name> && ./mvnw clean verify`) for a service change — and
+  confirm it's green; Docker must be running. Don't disable a test, skip
+  integration tests as a way to dodge a real failure, or use `--no-verify` to
+  get green — fix the cause.
 - A decision that changes architecture gets an ADR in the same PR.

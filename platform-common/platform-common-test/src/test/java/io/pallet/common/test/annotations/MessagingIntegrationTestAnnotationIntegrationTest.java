@@ -23,7 +23,7 @@ import org.springframework.kafka.core.KafkaAdmin;
  * against a {@code spring.datasource.*} that nothing here sets.
  */
 @MessagingIntegrationTest
-class MessagingIntegrationTestAnnotationTest {
+class MessagingIntegrationTestAnnotationIntegrationTest {
 
     @Autowired
     private KafkaAdmin kafkaAdmin;

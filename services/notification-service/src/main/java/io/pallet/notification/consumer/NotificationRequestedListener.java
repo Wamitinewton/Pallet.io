@@ -66,7 +66,7 @@ class NotificationRequestedListener {
         this.jsonMapper = jsonMapper.getIfAvailable(() -> JsonMapper.builder().build());
     }
 
-    @KafkaListener(topics = Topics.NOTIFICATION_REQUESTED)
+    @KafkaListener(id = "notification-requested-listener", idIsGroup = false, topics = Topics.NOTIFICATION_REQUESTED)
     @Monitored
     void onMessage(ConsumerRecord<String, JsonNode> record) {
         NotificationRequested event = jsonMapper.treeToValue(record.value(), NotificationRequested.class);

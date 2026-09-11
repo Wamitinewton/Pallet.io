@@ -29,6 +29,8 @@
              decoupled the two release cadences. 26.0.12 is the closest published match. -->
         <keycloak-admin-client.version>26.0.12</keycloak-admin-client.version>
 
+        <commons-io.version>2.20.0</commons-io.version>
+
         <spotless.version>3.10.2</spotless.version>
         <palantir-java-format.version>2.97.0</palantir-java-format.version>
 
@@ -50,6 +52,13 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Spring Boot's own BOM doesn't manage commons-io - see the commons-io.version
+                 property comment above for why this pin exists. -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

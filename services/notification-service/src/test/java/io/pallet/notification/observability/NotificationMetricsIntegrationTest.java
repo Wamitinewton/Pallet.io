@@ -12,6 +12,7 @@ import com.icegreen.greenmail.util.ServerSetupTest;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.events.NotificationRequested;
+import io.pallet.common.messaging.MessagingProperties;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
@@ -25,6 +26,7 @@ import io.pallet.notification.repository.NotificationRepository;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -80,6 +84,27 @@ class NotificationMetricsIntegrationTest {
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry listenerRegistry;
+
+    @Autowired
+    private MessagingProperties messagingProperties;
+
+    /**
+     * Same rebalance-settling wait as {@code NotificationRequestedListenerIntegrationTest} — see
+     * that class for why. Order(3)/Order(4) here are the tests that actually publish and route
+     * through {@code NotificationRequestedListener}; Order(1)/Order(2) don't touch Kafka, but
+     * running this before every method (not just the ones that need it) means passing stays
+     * independent of the fixed method order rather than relying on earlier tests as incidental
+     * warm-up.
+     */
+    @BeforeEach
+    void ensureNotificationRequestedListenerHasSettled() {
+        ContainerTestUtils.waitForAssignment(
+                listenerRegistry.getListenerContainer("notification-requested-listener"),
+                messagingProperties.topicPartitions());
+    }
 
     private static RequestPostProcessor userJwt(String userId) {
         return jwt().jwt(builder -> builder.subject(userId));

@@ -96,9 +96,13 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build platform-common, unit + integration tests
+      # -DskipITs skips only Failsafe's *IntegrationTest classes (Testcontainers: Postgres,
+      # Kafka, Keycloak, ...); Surefire's *Test classes still run. Free GH Actions runners are
+      # 2 vCPU and can't reliably boot multiple real containers alongside the app under test —
+      # integration tests are a required local gate before opening a PR instead (see Test.md).
+      - name: Build platform-common, unit tests only (integration tests run locally, see Test.md)
         working-directory: platform-common
-        run: ./mvnw -B clean verify
+        run: ./mvnw -B clean verify -DskipITs
 
   common-module:
     needs: scope
@@ -121,9 +125,10 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build platform-common/${{ matrix.module }}, its dependencies and its dependents
+      # See the common-reactor job above for why -DskipITs is here.
+      - name: Build platform-common/${{ matrix.module }}, unit tests only (integration tests run locally, see Test.md)
         working-directory: platform-common
-        run: ./mvnw -B -pl "${{ matrix.module }}" -am -amd clean verify
+        run: ./mvnw -B -pl "${{ matrix.module }}" -am -amd clean verify -DskipITs
 
   service:
     needs: scope
@@ -146,11 +151,12 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Build ${{ matrix.service }}, unit + integration tests
+      # See the common-reactor job above for why -DskipITs is here.
+      - name: Build ${{ matrix.service }}, unit tests only (integration tests run locally, see Test.md)
         working-directory: services/${{ matrix.service }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./mvnw -B clean verify
+        run: ./mvnw -B clean verify -DskipITs
 
   security-common:
     needs: scope

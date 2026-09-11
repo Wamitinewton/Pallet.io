@@ -11,6 +11,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.events.NotificationRequested;
 import io.pallet.common.events.Topics;
+import io.pallet.common.messaging.MessagingProperties;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.notification.audience.OrgMember;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
@@ -81,6 +85,19 @@ class NotificationRequestedListenerIntegrationTest {
 
     @Autowired
     private DeadLetterCapture deadLetterCapture;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry listenerRegistry;
+
+    @Autowired
+    private MessagingProperties messagingProperties;
+
+    @BeforeEach
+    void ensureNotificationRequestedListenerHasSettled() {
+        ContainerTestUtils.waitForAssignment(
+                listenerRegistry.getListenerContainer("notification-requested-listener"),
+                messagingProperties.topicPartitions());
+    }
 
     @Test
     @Order(1)

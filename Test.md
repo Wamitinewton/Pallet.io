@@ -39,7 +39,8 @@ phase and blocks a build it shouldn't.
 - `@IntegrationTest`, `@MessagingIntegrationTest` classes are named `*IntegrationTest`.
 
 `./mvnw test` gives you fast feedback (unit + slice tests, no containers). `./mvnw verify` runs
-everything, containers included, and is the bar a PR has to clear.
+everything, containers included, and is the bar a PR has to clear locally before you open it —
+see §CI vs. local below for why "locally" is load-bearing.
 
 ## Don't mock what the container is there to test
 
@@ -147,7 +148,6 @@ every service pulls in.
 
 Tests that touch a container need Docker (or a Testcontainers-compatible runtime) running
 locally. `./mvnw test` never needs it — that's unit and slice tests only. `./mvnw verify` does.
-CI runs both on every PR.
 
 ```bash
 ./mvnw test                              # fast: unit + slice tests, no containers
@@ -160,3 +160,28 @@ cd services/notification-service && ./mvnw verify
 If a container-backed test is slow to start locally, that's almost always Docker pulling an
 image for the first time — after that first pull, the singleton pattern means every test class
 in the same run reuses the same running container.
+
+## CI vs. local
+
+CI (`.github/workflows/build.yml`) runs `./mvnw clean verify -DskipITs` — Surefire's `*Test`
+classes only. It does **not** boot Postgres, Kafka, or Keycloak. This isn't a statement that
+integration tests don't matter; it's a concession to free GitHub Actions runners (2 vCPU,
+shared, no self-hosted option here): booting several real containers alongside a full Spring
+context and asserting on eventually-consistent async behaviour (Kafka consumer catch-up, email
+delivery) needs headroom those runners don't reliably have, and a CI run that fails one time in
+five for timing reasons is worse than no CI signal at all — it trains everyone to ignore red.
+
+What this means for you:
+
+- `*IntegrationTest` classes still exist, are still required, and are still the only correct way
+  to test anything that touches Postgres, Kafka, Keycloak, or ClickHouse — nothing in this
+  section changes `CONTRIBUTING.md`'s "never mock those" rule.
+- Running the full suite — `./mvnw clean verify`, no `-DskipITs` — is **your** job before you
+  open a PR, not CI's. A green CI check on a PR means "unit tests pass," not "this works." Say so
+  in the PR description if you skipped this for some reason (you shouldn't).
+- A failing `*IntegrationTest` you can't get green locally is a blocker the same way a failing
+  unit test is — it just won't be a red X on the PR telling you that. Don't take CI's silence on
+  integration tests as permission to skip running them.
+- If you're touching Testcontainers config, container images, or anything under
+  `platform-common-test`, run the full suite (`./mvnw verify`) more than once locally before
+  opening the PR — that's exactly the code CI is no longer checking for you.
