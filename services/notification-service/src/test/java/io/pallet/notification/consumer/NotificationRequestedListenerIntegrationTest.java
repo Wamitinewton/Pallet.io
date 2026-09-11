@@ -31,7 +31,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -41,8 +44,14 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 
+/**
+ * {@code GREEN_MAIL.stop()} in {@link #anEmailFailureIsRecordedButStillAcksAndNeverReachesTheDeadLetterTopic()}
+ * makes SMTP fail for the rest of the class (the static {@link GreenMailExtension} only starts
+ * and stops once per class), so that test is ordered to run last.
+ */
 @IntegrationTest
 @Import(NotificationRequestedListenerIntegrationTest.DeadLetterCapture.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class NotificationRequestedListenerIntegrationTest {
 
     @RegisterExtension
@@ -74,6 +83,7 @@ class NotificationRequestedListenerIntegrationTest {
     private DeadLetterCapture deadLetterCapture;
 
     @Test
+    @Order(1)
     void singleRecipientBothDefaultChannelsAreDeliveredAndPersisted() throws Exception {
         String orgId = "org-" + UUID.randomUUID();
         NotificationRequested event = NotificationRequested.of(
@@ -95,6 +105,7 @@ class NotificationRequestedListenerIntegrationTest {
     }
 
     @Test
+    @Order(2)
     void redeliveryOfTheSameEventIdIsANoOp() throws Exception {
         String orgId = "org-" + UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
@@ -123,6 +134,7 @@ class NotificationRequestedListenerIntegrationTest {
     }
 
     @Test
+    @Order(3)
     void unknownNotificationTypeSkipsStraightToTheDeadLetterTopic() {
         String orgId = "org-" + UUID.randomUUID();
         NotificationRequested event =
@@ -140,6 +152,7 @@ class NotificationRequestedListenerIntegrationTest {
     }
 
     @Test
+    @Order(4)
     void orgBroadcastWithNoMembersCreatesNotificationButNoDeliveries() {
         String orgId = "org-" + UUID.randomUUID();
         double before = broadcastEmptyCount();
@@ -156,6 +169,7 @@ class NotificationRequestedListenerIntegrationTest {
     }
 
     @Test
+    @Order(5)
     void orgBroadcastWithThreeActiveMembersFansOutToAllResolvedChannels() {
         String orgId = "org-" + UUID.randomUUID();
         orgMembershipRepository.saveAll(List.of(
@@ -176,6 +190,7 @@ class NotificationRequestedListenerIntegrationTest {
     }
 
     @Test
+    @Order(6)
     void anEmailFailureIsRecordedButStillAcksAndNeverReachesTheDeadLetterTopic() {
         GREEN_MAIL.stop();
         String orgId = "org-" + UUID.randomUUID();

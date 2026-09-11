@@ -76,7 +76,7 @@ class ChannelRouterIntegrationTest {
 
         router.fanOut(notification, Set.of(Channel.EMAIL, Channel.IN_APP), List.of(recipient));
 
-        assertThat(deliveryRepository.findAll())
+        assertThat(deliveriesFor(notification.getId()))
                 .extracting(NotificationDelivery::getChannel, NotificationDelivery::getRecipient)
                 .containsExactlyInAnyOrder(tuple(Channel.EMAIL, "user1@example.com"), tuple(Channel.IN_APP, "user-1"));
         verify(emailChannel, times(1)).deliver(any(), eq("user1@example.com"));
@@ -92,7 +92,7 @@ class ChannelRouterIntegrationTest {
 
         router.fanOut(notification, Set.of(Channel.EMAIL, Channel.IN_APP), recipients);
 
-        assertThat(deliveryRepository.findAll()).hasSize(6);
+        assertThat(deliveriesFor(notification.getId())).hasSize(6);
     }
 
     @Test
@@ -155,7 +155,13 @@ class ChannelRouterIntegrationTest {
         verify(emailChannel, never()).deliver(any(), eq("user1@example.com"));
         verify(emailChannel, never()).deliver(any(), eq("user2@example.com"));
         verify(emailChannel, times(1)).deliver(any(), eq("user3@example.com"));
-        assertThat(deliveryRepository.findAll()).hasSize(3);
+        assertThat(deliveriesFor(notification.getId())).hasSize(3);
+    }
+
+    private List<NotificationDelivery> deliveriesFor(UUID notificationId) {
+        return deliveryRepository.findAll().stream()
+                .filter(delivery -> delivery.getNotificationId().equals(notificationId))
+                .toList();
     }
 
     @Test
