@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
+    username: ${POSTGRES_USER:pallet}
+    password: ${POSTGRES_PASSWORD:pallet}
+
+pallet:
+  identity:
+    keycloak:
+      server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+      realm: ${KEYCLOAK_REALM:pallet}
+      admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:identity-service}
+      admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}

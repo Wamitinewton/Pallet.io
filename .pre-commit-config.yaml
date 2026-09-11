@@ -29,3 +29,11 @@ repos:
         language: system
         files: ^services/notification-service/.*\.java$
         pass_filenames: false
+
+      - id: spotless-check-identity-service
+        name: Spotless (identity-service)
+        description: Java formatting/import-order — cd services/identity-service && ./mvnw spotless:apply to fix
+        entry: services/identity-service/mvnw -q -f services/identity-service/pom.xml spotless:check
+        language: system
+        files: ^services/identity-service/.*\.java$
+        pass_filenames: false

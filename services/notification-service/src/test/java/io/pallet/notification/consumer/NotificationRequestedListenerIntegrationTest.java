@@ -236,12 +236,20 @@ class NotificationRequestedListenerIntegrationTest {
         return found.get();
     }
 
+    /**
+     * {@code insertPendingIfAbsent} commits a row as {@code PENDING} in its own transaction before
+     * the (possibly slow) channel send runs and a second transaction records the terminal status,
+     * so a row can be visible here before its delivery has actually finished. Waiting only for
+     * {@code expectedCount} rows to exist — without also waiting past {@code PENDING} — lets the
+     * caller observe a delivery mid-flight and race the assertion that follows.
+     */
     private List<NotificationDelivery> awaitDeliveries(UUID notificationId, int expectedCount) {
         AtomicReference<List<NotificationDelivery>> found = new AtomicReference<>(List.of());
         await().atMost(Duration.ofSeconds(10)).until(() -> {
             List<NotificationDelivery> deliveries = deliveriesFor(notificationId);
             found.set(deliveries);
-            return deliveries.size() == expectedCount;
+            return deliveries.size() == expectedCount
+                    && deliveries.stream().noneMatch(delivery -> delivery.getStatus() == DeliveryStatus.PENDING);
         });
         return found.get();
     }
