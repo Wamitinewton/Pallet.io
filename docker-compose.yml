@@ -143,6 +143,16 @@ services:
       retries: 10
     networks: [pallet]
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: pallet-mailpit
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks: [pallet]
+
   minio:
     image: minio/minio:latest
     container_name: pallet-minio
