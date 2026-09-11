@@ -14,6 +14,9 @@ rationale are in [`docs/adr/`](docs/adr/README.md).
   Maven wrapper) that consumes `platform-common-*` as a published dependency —
   see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`PACKAGES.md`](PACKAGES.md)
 - Apache Kafka event backbone (`spring-boot-starter-kafka`)
+- Temporal (Java SDK) for the deploy and billing sagas — durable workflow execution and
+  compensation, embedded as a worker in `deploy-orchestrator-service` and `billing-service` only
+  (see [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md))
 - Keycloak for identity — one realm, `org_id` claim on every token
 - PostgreSQL for most services; ClickHouse for `audit-log-service` and
   `usage-metering-service`; Redis, MinIO, Vault alongside

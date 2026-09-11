@@ -81,6 +81,13 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
   Surefire runs the first, Failsafe (`verify`) runs the second. Integration
   tests use Testcontainers for Kafka, Postgres, ClickHouse, and Keycloak — never
   mock those; the failure modes they hide are the point of the project.
+- Workflows (`deploy-orchestrator-service`, `billing-service` — the two services embedding a
+  Temporal worker, per [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md)): workflow and
+  activity unit tests are `*WorkflowTest`, using the Temporal Java SDK's
+  `TestWorkflowEnvironment`. A change to a workflow's shape also needs a replay test
+  (`WorkflowReplayer` against a history captured from the previous version) before it merges —
+  the same non-negotiable gate `./mvnw clean verify` already is for everything else, since a
+  determinism break here surfaces as a stuck production saga, not a failed build.
 - Events: add a flat record to `platform-common-events` implementing
   `PlatformEvent`, a `Topics` constant, past-tense `domain.fact` name.
 - Config: shared config is served by `config-server` from `config-repo/`.
