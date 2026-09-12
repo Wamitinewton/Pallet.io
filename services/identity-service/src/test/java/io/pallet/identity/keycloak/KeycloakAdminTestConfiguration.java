@@ -10,10 +10,15 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * {@link KeycloakTestContainerConfiguration} wires the resource-server side against, using its
  * {@code pallet-admin-client} service account — a confidential client scoped to
  * {@code realm-management.manage-users}, so {@code KeycloakAdminConfiguration}'s bean can make
- * real Admin API calls in a test the same way it does in production.
+ * real Admin API calls in a test the same way it does in production. Also points
+ * {@code token-client-id} at the fixture realm's {@code pallet-test-client} — public, with
+ * direct-access-grants enabled — so {@code KeycloakTokenClient} can exercise a real password/
+ * refresh grant against it.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class KeycloakAdminTestConfiguration {
+
+    private static final String TOKEN_CLIENT_ID = "pallet-test-client";
 
     @Bean
     DynamicPropertyRegistrar identityKeycloakAdminPropertiesRegistrar() {
@@ -26,6 +31,7 @@ public class KeycloakAdminTestConfiguration {
             registry.add(
                     "pallet.identity.keycloak.admin-client-secret",
                     () -> KeycloakTestContainerConfiguration.ADMIN_CLIENT_SECRET);
+            registry.add("pallet.identity.keycloak.token-client-id", () -> TOKEN_CLIENT_ID);
         };
     }
 }

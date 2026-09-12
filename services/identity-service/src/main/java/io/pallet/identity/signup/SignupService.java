@@ -10,6 +10,7 @@ import io.pallet.identity.account.IdentityUser;
 import io.pallet.identity.account.IdentityUserRepository;
 import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.config.IdentityServiceProperties;
+import io.pallet.identity.verification.EmailVerificationService;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ class SignupService {
 
     private static final String KEYCLOAK_ADMIN_POLICY = "keycloak-admin";
     private static final String OWNER_ROLE = "owner";
+    private static final String VERIFY_EMAIL_REQUIRED_ACTION = "VERIFY_EMAIL";
     private static final String WELCOME_NOTIFICATION_TYPE = "WELCOME";
     private static final String SIGNUP_AUDIT_ACTION = "sign-up";
 
@@ -53,6 +55,7 @@ class SignupService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final PlatformEventPublisher platformEventPublisher;
     private final AuditPublisher auditPublisher;
+    private final EmailVerificationService emailVerificationService;
 
     SignupService(
             Keycloak keycloakAdminClient,
@@ -63,7 +66,8 @@ class SignupService {
             PlatformTransactionManager transactionManager,
             ApplicationEventPublisher applicationEventPublisher,
             PlatformEventPublisher platformEventPublisher,
-            AuditPublisher auditPublisher) {
+            AuditPublisher auditPublisher,
+            EmailVerificationService emailVerificationService) {
         this.keycloakAdminClient = keycloakAdminClient;
         this.properties = properties;
         this.externalCall = externalCall;
@@ -73,6 +77,7 @@ class SignupService {
         this.applicationEventPublisher = applicationEventPublisher;
         this.platformEventPublisher = platformEventPublisher;
         this.auditPublisher = auditPublisher;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @Monitored
@@ -107,6 +112,7 @@ class SignupService {
             user.setEmail(request.email());
             user.setEnabled(true);
             user.setEmailVerified(false);
+            user.setRequiredActions(List.of(VERIFY_EMAIL_REQUIRED_ACTION));
             user.singleAttribute("org_id", orgId);
             user.setCredentials(List.of(ownerPasswordCredential(request.password())));
 
@@ -150,11 +156,13 @@ class SignupService {
     private void persistLocally(String orgId, SignupRequest request, String keycloakUserId) {
         orgBootstrapRepository.save(
                 new OrgBootstrapRecord(orgId, request.organizationName(), request.slug(), keycloakUserId));
-        identityUserRepository.save(new IdentityUser(orgId, keycloakUserId, request.email(), request.displayName()));
+        IdentityUser user = identityUserRepository.save(
+                new IdentityUser(orgId, keycloakUserId, request.email(), request.displayName()));
         applicationEventPublisher.publishEvent(new SignupCompletedEvent(
                 orgId,
                 request.organizationName(),
                 request.slug(),
+                user.getId(),
                 keycloakUserId,
                 request.email(),
                 request.displayName()));
@@ -176,6 +184,10 @@ class SignupService {
                 null,
                 null,
                 Map.of("name", event.ownerDisplayName(), "orgName", event.orgName())));
+        emailVerificationService.issueCode(identityUserRepository
+                .findById(event.userId())
+                .orElseThrow(
+                        () -> new IllegalStateException("Sign-up user " + event.userId() + " vanished after commit")));
         auditPublisher.publish(
                 event.orgId(),
                 event.ownerUserId(),

@@ -63,6 +63,11 @@ public class IdentityUser {
         this.updatedAt = Instant.now();
     }
 
+    public void updateDisplayName(String displayName) {
+        this.displayName = displayName;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }

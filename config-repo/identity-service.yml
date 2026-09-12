@@ -11,8 +11,23 @@ pallet:
       realm: ${KEYCLOAK_REALM:pallet}
       admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:identity-service}
       admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+      token-client-id: ${KEYCLOAK_TOKEN_CLIENT_ID:pallet-dashboard}
+    email-verification:
+      code-ttl: PT15M
+      max-attempts: 5
+    password-reset:
+      token-ttl: PT1H
+      dashboard-base-url: ${DASHBOARD_BASE_URL:http://localhost:5173}
+  invites:
+    # Shared HMAC secret for signed action tokens (ARCHITECTURE.md §Signed action tokens).
+    # org-team-service mints invite tokens with this same secret under the same env var name;
+    # rotating it means rolling it in both services at once.
+    signing-key: ${PALLET_INVITES_SIGNING_KEY}
   resilience:
     policies:
       keycloak-admin:
+        time-limiter:
+          timeout: 5s
+      keycloak-token:
         time-limiter:
           timeout: 5s

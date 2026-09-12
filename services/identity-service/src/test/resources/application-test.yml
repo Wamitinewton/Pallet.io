@@ -24,6 +24,9 @@ pallet:
       realm: pallet-test
       admin-client-id: identity-service-test
       admin-client-secret: not-used-in-tests
+      token-client-id: not-used-in-tests
+  invites:
+    signing-key: test-only-signing-key-not-used-in-production
 
 management:
   tracing:

@@ -27,11 +27,23 @@ class SecurityConfiguration {
             HttpSecurity http, ApiPathProperties apiPathProperties, JwtAuthenticationConverter keycloakRoleConverter)
             throws Exception {
         String signupPath = apiPathProperties.prefix() + "/signup";
+        String resendVerificationPath = apiPathProperties.prefix() + "/auth/email/resend-verification";
+        String verifyEmailPath = apiPathProperties.prefix() + "/auth/email/verify";
+        String inviteAcceptPath = apiPathProperties.prefix() + "/invites/*/accept";
+        String loginPath = apiPathProperties.prefix() + "/auth/login";
+        String refreshPath = apiPathProperties.prefix() + "/auth/refresh";
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(PUBLIC_ACTUATOR_PATHS)
                         .permitAll()
-                        .requestMatchers(HttpMethod.POST, signupPath)
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                signupPath,
+                                resendVerificationPath,
+                                verifyEmailPath,
+                                inviteAcceptPath,
+                                loginPath,
+                                refreshPath)
                         .permitAll()
                         .anyRequest()
                         .authenticated())
