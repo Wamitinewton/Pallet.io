@@ -11,3 +11,8 @@ pallet:
       realm: ${KEYCLOAK_REALM:pallet}
       admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:identity-service}
       admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+  resilience:
+    policies:
+      keycloak-admin:
+        time-limiter:
+          timeout: 5s

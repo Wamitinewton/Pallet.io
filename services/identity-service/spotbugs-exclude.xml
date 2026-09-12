@@ -24,4 +24,22 @@
     <Match>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+    <!-- identitySecurityFilterChain declares throws Exception only because HttpSecurity.build()
+         does; that signature is fixed by Spring Security, so it can't be narrowed. -->
+    <Match>
+        <Class name="io.pallet.identity.config.SecurityConfiguration"/>
+        <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+    </Match>
+    <!-- SignupService.provision rethrows the caught RuntimeException unchanged, after triggering the
+         compensating Keycloak delete, to preserve its exact type/status for GlobalExceptionHandler. -->
+    <Match>
+        <Class name="io.pallet.identity.signup.SignupService"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- The slug pattern is a bounded, non-backtracking shape (a fixed literal separator between
+         quantified groups, no ambiguity between them) — a false positive for this validator. -->
+    <Match>
+        <Class name="io.pallet.identity.signup.SignupRequest"/>
+        <Bug pattern="REDOS"/>
+    </Match>
 </FindBugsFilter>

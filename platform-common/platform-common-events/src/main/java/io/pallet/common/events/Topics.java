@@ -34,6 +34,7 @@ public final class Topics {
     public static final String USAGE_RECORDED = "usage.recorded";
     public static final String BILLING_PAYMENT_RECEIVED = "billing.payment.received";
     public static final String AUDIT_EVENT_RECORDED = "audit.event.recorded";
+    public static final String ORG_PROVISIONED = "org.provisioned";
     private static final Set<String> ALL = Set.of(
             NOTIFICATION_REQUESTED,
             DEPLOY_ROLLBACK_TRIGGERED,
@@ -48,7 +49,8 @@ public final class Topics {
             HEALTH_CHECK_FAILED,
             USAGE_RECORDED,
             BILLING_PAYMENT_RECEIVED,
-            AUDIT_EVENT_RECORDED);
+            AUDIT_EVENT_RECORDED,
+            ORG_PROVISIONED);
 
     private Topics() {}
 

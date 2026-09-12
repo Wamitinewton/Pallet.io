@@ -43,7 +43,8 @@ public class PalletResourceServerAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    SecurityFilterChain palletSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain palletSecurityFilterChain(HttpSecurity http, JwtAuthenticationConverter keycloakRoleConverter)
+            throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(PUBLIC_PATHS)
@@ -51,15 +52,20 @@ public class PalletResourceServerAutoConfiguration {
                         .anyRequest()
                         .authenticated())
                 .oauth2ResourceServer(
-                        oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRoleConverter())));
+                        oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRoleConverter)));
         return http.build();
     }
 
     /**
-     * Maps Keycloak {@code realm_access.roles} onto {@code ROLE_*} authorities
-     * so {@code hasRole(...)} works, keeping the default scope authorities too.
+     * Maps Keycloak {@code realm_access.roles} onto {@code ROLE_*} authorities so
+     * {@code hasRole(...)} works, keeping the default scope authorities too. Exposed as a bean
+     * (rather than kept private) so a service defining its own {@link SecurityFilterChain} — to
+     * add public routes this default chain doesn't allow for — can still reuse the same
+     * role-mapping instead of re-deriving it.
      */
-    private JwtAuthenticationConverter keycloakRoleConverter() {
+    @Bean
+    @ConditionalOnMissingBean
+    JwtAuthenticationConverter keycloakRoleConverter() {
         JwtGrantedAuthoritiesConverter scopeAuthorities = new JwtGrantedAuthoritiesConverter();
 
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();

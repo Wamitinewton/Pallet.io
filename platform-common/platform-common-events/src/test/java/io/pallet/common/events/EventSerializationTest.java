@@ -48,6 +48,28 @@ class EventSerializationTest {
     }
 
     @Test
+    void orgProvisionedIsFlatAndRoundTrips() {
+        OrgProvisioned event =
+                OrgProvisioned.of("org_9k2j7f", "Acme Inc", "acme", "usr_owner_1", "owner@acme.test", "Ada Lovelace");
+
+        JsonNode tree = json.readTree(json.writeValueAsString(event));
+        assertThat(tree.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "eventId",
+                        "eventType",
+                        "orgId",
+                        "occurredAt",
+                        "orgName",
+                        "slug",
+                        "ownerUserId",
+                        "ownerEmail",
+                        "ownerDisplayName");
+
+        assertThat(json.readValue(json.writeValueAsString(event), OrgProvisioned.class))
+                .isEqualTo(event);
+    }
+
+    @Test
     void occurredAtRoundTripsAsIso8601Utc() {
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_4f8a21", "BUILDING", "ROUTING");
 

@@ -18,10 +18,23 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * that reads it directly (e.g. {@link KeycloakTestTokens}'s callers wiring their own client).
  *
  * <p>Use {@link KeycloakTestTokens} to fetch a real access token for one of the realm's two
- * fixture users once this is wired in.
+ * fixture users once this is wired in. A service whose own Keycloak Admin client needs to point
+ * at this same container (rather than only validating tokens against it) uses {@link #serverUrl()}
+ * and {@link #realm()} plus the {@link #ADMIN_CLIENT_ID} / {@link #ADMIN_CLIENT_SECRET} fixture
+ * credentials — a confidential client with a service account holding
+ * {@code realm-management.manage-users}, the same least-privilege scope the real realm grants
+ * {@code identity-service} in production.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class KeycloakTestContainerConfiguration {
+
+    /**
+     * Confidential client id of the fixture realm's service account, scoped to
+     * {@code realm-management.manage-users}.
+     */
+    public static final String ADMIN_CLIENT_ID = "pallet-admin-client";
+
+    public static final String ADMIN_CLIENT_SECRET = "pallet-admin-client-secret";
 
     @Bean
     @ConditionalOnMissingBean(JwtDecoder.class)
@@ -34,9 +47,21 @@ public class KeycloakTestContainerConfiguration {
         return registry -> registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", this::issuerUri);
     }
 
-    private String issuerUri() {
+    /**
+     * Base URL of the running fixture container, e.g. {@code http://localhost:54321} — the value a
+     * {@code KeycloakBuilder.serverUrl(...)} call needs, as opposed to {@link #issuerUri()}'s
+     * realm-qualified form.
+     */
+    public static String serverUrl() {
         return "http://" + KeycloakContainerHolder.CONTAINER.getHost() + ":"
-                + KeycloakContainerHolder.CONTAINER.getMappedPort(KeycloakContainerHolder.HTTP_PORT) + "/realms/"
-                + KeycloakContainerHolder.REALM;
+                + KeycloakContainerHolder.CONTAINER.getMappedPort(KeycloakContainerHolder.HTTP_PORT);
+    }
+
+    public static String realm() {
+        return KeycloakContainerHolder.REALM;
+    }
+
+    private String issuerUri() {
+        return serverUrl() + "/realms/" + KeycloakContainerHolder.REALM;
     }
 }
