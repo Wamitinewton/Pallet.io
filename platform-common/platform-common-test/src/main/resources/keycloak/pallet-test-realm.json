@@ -54,10 +54,24 @@
           }
         }
       ]
+    },
+    {
+      "name": "basic",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": { "access.token.claim": "true", "introspection.token.claim": "true" }
+        }
+      ]
     }
   ],
 
-  "defaultDefaultClientScopes": ["org", "roles"],
+  "defaultDefaultClientScopes": ["org", "roles", "basic"],
 
   "clients": [
     {
@@ -66,7 +80,7 @@
       "publicClient": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
-      "defaultClientScopes": ["org", "roles"]
+      "defaultClientScopes": ["org", "roles", "basic"]
     },
     {
       "clientId": "pallet-admin-client",

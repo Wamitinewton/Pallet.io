@@ -70,6 +70,47 @@ class EventSerializationTest {
     }
 
     @Test
+    void orgInviteAcceptedIsFlatAndRoundTrips() {
+        OrgInviteAccepted event = OrgInviteAccepted.of(
+                "org_9k2j7f",
+                "9e6f1c2a-4b3d-4a7e-8f1a-2c3d4e5f6a7b",
+                "usr_invited_1",
+                "dev@acme.test",
+                "Ada Lovelace",
+                "admin");
+
+        JsonNode tree = json.readTree(json.writeValueAsString(event));
+        assertThat(tree.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "eventId",
+                        "eventType",
+                        "orgId",
+                        "occurredAt",
+                        "inviteId",
+                        "userId",
+                        "email",
+                        "displayName",
+                        "role");
+
+        assertThat(json.readValue(json.writeValueAsString(event), OrgInviteAccepted.class))
+                .isEqualTo(event);
+    }
+
+    @Test
+    void userProfileUpdatedIsFlatAndRoundTrips() {
+        UserProfileUpdated event =
+                UserProfileUpdated.of("org_9k2j7f", "usr_owner_1", "owner@acme.test", "Ada Lovelace");
+
+        JsonNode tree = json.readTree(json.writeValueAsString(event));
+        assertThat(tree.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "eventId", "eventType", "orgId", "occurredAt", "userId", "email", "displayName");
+
+        assertThat(json.readValue(json.writeValueAsString(event), UserProfileUpdated.class))
+                .isEqualTo(event);
+    }
+
+    @Test
     void occurredAtRoundTripsAsIso8601Utc() {
         DeployStateChanged event = DeployStateChanged.of("org_9k2j7f", "dep_4f8a21", "BUILDING", "ROUTING");
 

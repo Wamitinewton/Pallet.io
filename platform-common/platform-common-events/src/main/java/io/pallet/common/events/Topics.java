@@ -35,6 +35,8 @@ public final class Topics {
     public static final String BILLING_PAYMENT_RECEIVED = "billing.payment.received";
     public static final String AUDIT_EVENT_RECORDED = "audit.event.recorded";
     public static final String ORG_PROVISIONED = "org.provisioned";
+    public static final String ORG_INVITE_ACCEPTED = "org.invite.accepted";
+    public static final String USER_PROFILE_UPDATED = "user.profile.updated";
     private static final Set<String> ALL = Set.of(
             NOTIFICATION_REQUESTED,
             DEPLOY_ROLLBACK_TRIGGERED,
@@ -50,7 +52,9 @@ public final class Topics {
             USAGE_RECORDED,
             BILLING_PAYMENT_RECEIVED,
             AUDIT_EVENT_RECORDED,
-            ORG_PROVISIONED);
+            ORG_PROVISIONED,
+            ORG_INVITE_ACCEPTED,
+            USER_PROFILE_UPDATED);
 
     private Topics() {}
 
