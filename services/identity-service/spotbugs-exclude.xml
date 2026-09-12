@@ -36,6 +36,12 @@
         <Class name="io.pallet.identity.signup.SignupService"/>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
+    <!-- InviteAcceptService.accept rethrows the caught RuntimeException unchanged, after triggering the
+         compensating Keycloak delete, to preserve its exact type/status for GlobalExceptionHandler. -->
+    <Match>
+        <Class name="io.pallet.identity.invite.InviteAcceptService"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
     <!-- The slug pattern is a bounded, non-backtracking shape (a fixed literal separator between
          quantified groups, no ambiguity between them) — a false positive for this validator. -->
     <Match>
