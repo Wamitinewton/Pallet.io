@@ -1,5 +1,6 @@
 package io.pallet.identity.verification;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.events.NotificationRequested;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.observability.Monitored;
@@ -35,9 +36,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class EmailVerificationService {
 
+    public static final String SOURCE_SIGNUP = "signup";
+    public static final String SOURCE_RESEND = "resend";
+
     private static final String KEYCLOAK_ADMIN_POLICY = "keycloak-admin";
     private static final String EMAIL_VERIFICATION_NOTIFICATION_TYPE = "EMAIL_VERIFICATION";
     private static final String EMAIL_VERIFIED_AUDIT_ACTION = "email-verified";
+    private static final String REQUESTED_METRIC = "identity.email_verification.requested";
+    private static final String VERIFIED_METRIC = "identity.email_verification.verified";
+    private static final String ATTEMPTS_EXHAUSTED_METRIC = "identity.email_verification.attempts_exhausted";
+    private static final String SOURCE_TAG = "source";
 
     private final EmailVerificationCodeRepository codeRepository;
     private final IdentityUserRepository identityUserRepository;
@@ -48,6 +56,7 @@ public class EmailVerificationService {
     private final AuditPublisher auditPublisher;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final MeterRegistry meterRegistry;
 
     EmailVerificationService(
             EmailVerificationCodeRepository codeRepository,
@@ -58,7 +67,8 @@ public class EmailVerificationService {
             PlatformEventPublisher platformEventPublisher,
             AuditPublisher auditPublisher,
             PlatformTransactionManager transactionManager,
-            ApplicationEventPublisher applicationEventPublisher) {
+            ApplicationEventPublisher applicationEventPublisher,
+            MeterRegistry meterRegistry) {
         this.codeRepository = codeRepository;
         this.identityUserRepository = identityUserRepository;
         this.properties = properties;
@@ -68,10 +78,11 @@ public class EmailVerificationService {
         this.auditPublisher = auditPublisher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.applicationEventPublisher = applicationEventPublisher;
+        this.meterRegistry = meterRegistry;
     }
 
     @Monitored
-    public void issueCode(IdentityUser user) {
+    public void issueCode(IdentityUser user, String source) {
         String rawCode = VerificationCodeGenerator.generate();
         Duration ttl = properties.emailVerification().codeTtl();
         transactionTemplate.executeWithoutResult(status -> {
@@ -86,10 +97,11 @@ public class EmailVerificationService {
                 null,
                 null,
                 Map.of("code", rawCode, "expiresInMinutes", ttl.toMinutes())));
+        meterRegistry.counter(REQUESTED_METRIC, SOURCE_TAG, source).increment();
     }
 
     public void resend(String email) {
-        identityUserRepository.findByEmail(email).ifPresent(this::issueCode);
+        identityUserRepository.findByEmail(email).ifPresent(user -> issueCode(user, SOURCE_RESEND));
     }
 
     @Monitored
@@ -101,6 +113,7 @@ public class EmailVerificationService {
 
         if (code.getAttempts() >= properties.emailVerification().maxAttempts()) {
             codeRepository.delete(code);
+            meterRegistry.counter(ATTEMPTS_EXHAUSTED_METRIC).increment();
             throw new InvalidTokenException("Email verification code attempt budget exhausted");
         }
 
@@ -123,6 +136,7 @@ public class EmailVerificationService {
     void onEmailVerified(EmailVerifiedEvent event) {
         auditPublisher.publish(
                 event.orgId(), event.keycloakUserId(), EMAIL_VERIFIED_AUDIT_ACTION, "user:" + event.userId(), Map.of());
+        meterRegistry.counter(VERIFIED_METRIC).increment();
     }
 
     private EmailVerificationCode findActiveCode(IdentityUser user) {

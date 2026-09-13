@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+  <p>Your Pallet verification code is:</p>
+  <p><strong th:text="${code}">12345678</strong></p>
+  <p>This code expires in <span th:text="${expiresInMinutes}">10</span> minutes.</p>
+  <p>If you didn't request this, you can safely ignore this email.</p>
+</body>
+</html>

@@ -710,7 +710,7 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | Scenario | Behavior |
 |---|---|
 | Keycloak unreachable during sign-up | `ExternalCall`'s `keycloak-admin` policy retries, then circuit-breaks; sign-up returns `502`-mapped `ExternalServiceException` — no local row is written (Keycloak call happens before the local transaction). |
-| Local commit fails after Keycloak user already created | Named, not hidden — same compensating-delete mitigation as the existing checkpoint 3 design; the residual gap is checkpoint 12's decision. |
+| Local commit fails after Keycloak user already created | Named, not hidden — same compensating-delete mitigation as the existing checkpoint 3 design. **Checkpoint 12 decision: accepted as sufficient for Phase 1, no outbox built** — see below. |
 | Dashboard reads `org-team-service` immediately after a `201` from `/signup` | May briefly 404 or return a partial projection — `org.provisioned`'s consumer hasn't necessarily run yet. The dashboard should treat "org not found yet" right after a fresh sign-up as "still provisioning," not an error; the sign-up response itself carries enough (`orgId`/`orgName`/`slug`) to render an immediate first screen without needing `org-team-service` at all. |
 | Invite token replayed after first successful accept | `409 CONFLICT` — `consumed_invite_tokens(jti)` already has a row. |
 | Invite token expired | `400 INVALID_TOKEN` — `SignedActionToken.verify` checks `exp` before this service ever looks at a database. |
@@ -720,6 +720,54 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | An email-verification code is guessed beyond the configured attempt budget | The code is invalidated outright — a subsequent correct-code attempt still fails until a fresh `/auth/email/resend-verification` call. A bounded, self-contained defense; broader per-IP/per-email rate limiting on the endpoint itself is checkpoint 12's deliberate decision. |
 | A self-registered account never completes email verification | The account exists in both Keycloak and locally indefinitely but can never obtain a token via `/auth/login` — by design. There's no expiry on the *account*, only on each unconsumed code; a fresh one can always be requested. |
 | An account is disabled (removed from its only org) and the same email tries to sign up again | Keycloak's own email-uniqueness rejects it — surfaces as `409 CONFLICT`, "an account with this email already exists." No automatic reactivation; a genuinely different flow (account recovery) that isn't designed here — see [Open questions](#open-questions--deferred). |
+
+### Checkpoint 12 decisions: dual-write gap, rate limiting, and observability
+
+Closing the two questions checkpoint 3 and ADR-0011 each named but deliberately deferred, plus
+the observability work every prior checkpoint's behavior needed to become visible.
+
+**Dual-write gap — accepted, not resolved with an outbox.** Local testing under induced failure
+(forcing the local transaction to fail after the Keycloak user already exists, for both sign-up
+and invite-accept) confirms the existing compensating-delete mitigation works as designed: the
+orphaned Keycloak account is removed and no local row or event survives the failed request. Phase
+1 accepts this mitigation as sufficient — the transactional outbox is **not** pulled forward from
+`docs/PROJECT.md`'s Phase 8 default. `identity.signups.compensating_delete` is the counter that
+watches the residual gap (the compensating delete itself failing, which needs both a local-commit
+failure *and* Keycloak becoming unreachable in the following moments — doubly rare) in production;
+the named trigger to revisit this decision is that counter firing more than a handful of times in
+a week in any real environment, per `docs/PROJECT.md`'s own stated escape hatch.
+
+**Rate limiting — built for all four named endpoints.** `/signup`, `/auth/login`,
+`/auth/email/verify`, and `/auth/email/resend-verification` are each guarded by
+`io.pallet.identity.ratelimit.AuthRateLimiter`: one zero-wait Resilience4j `RateLimiter` per
+(client address, endpoint) key, applied via a `HandlerInterceptor`
+(`RateLimitWebConfiguration`/`AuthRateLimitInterceptor`) so a caller's burst on one endpoint never
+throttles a different caller or a different endpoint. A rejected request surfaces as
+`429 TOO_MANY_REQUESTS` through the platform's existing `TooManyRequestsException` — no new error
+shape. This closes the gap ADR-0011 named for `/auth/login` and `/signup`, and, per this
+checkpoint's own emphasis on `/auth/email/verify` as the sharper case, applies identically there
+and to `/auth/email/resend-verification`: resetting a code's attempt budget by requesting a fresh
+one is exactly the residual gap a per-(caller, endpoint) limiter closes on top of checkpoint 5's
+own per-code attempt budget. Deliberately simple, per this checkpoint's own guidance: one
+in-memory Resilience4j registry per instance, no distributed rate limiting, no CAPTCHA — proportionate
+because no gateway/WAF layer exists yet (`api-gateway` is Phase 2). Configurable via
+`pallet.identity.rate-limit.*` (default: 20 requests per client per endpoint per minute).
+
+**Observability.** `identity.signups`, `identity.signups.compensating_delete`,
+`identity.invites.accepted`, `identity.invites.replayed`, `identity.logins.{success,failed,unverified}`,
+`identity.email_verification.{requested,verified,attempts_exhausted}`, and
+`identity.membership_sync.{processed,noop}` are exported from `SignupService`, `InviteAcceptService`,
+`AuthService`, `EmailVerificationService`, and the three membership listeners respectively — the
+diagnosability signals the two decisions above and the membership-sync no-op gap depend on. The
+existing `@Monitored` placements on `SignupService.provision`, `InviteAcceptService.accept`, and
+each membership listener's `onMessage` already compose into one trace per operation, the Keycloak
+`ExternalCall` span included — confirmed, not newly built; this service's own
+consume-then-external-call trace shape (new to the repo) links correctly for all three listeners.
+`keycloak-admin` and `keycloak-token` circuit-breaker state is already a Prometheus gauge via
+`platform-common-resilience`'s existing binding. Spring Security's default response headers
+(`X-Content-Type-Options`, `X-Frame-Options`, cache-control, HSTS once behind TLS) are present on
+every endpoint including the public ones — neither `PalletResourceServerAutoConfiguration` nor
+this service's own `SecurityConfiguration` disables `.headers()`, so no change was needed here.
 
 ## Component view
 
@@ -850,11 +898,11 @@ starter already required for `platform-common-security` — no new dependency to
   not designed here because it depends on decisions ([Extension points](#extension-points)) about
   what "delete vs. disable" should mean long-term.
 - **Rate limiting `/auth/login`, `/signup`, `/auth/email/verify`, and
-  `/auth/email/resend-verification`.** All four are unauthenticated and exactly the shape of
-  endpoint an abuse script targets — the email-verification pair doubly so, since `/verify` is an
-  online OTP-guessing surface even with its own per-code attempt budget. Deferred to the existing
-  checkpoint 12 hardening review (`docs/workflows/identity-service/12-observability-and-hardening.md`),
-  which already names this as a decision to make deliberately rather than default into.
+  `/auth/email/resend-verification`.** Resolved at checkpoint 12: built, not deferred — see
+  [Checkpoint 12 decisions](#checkpoint-12-decisions-dual-write-gap-rate-limiting-and-observability)
+  above for the mechanism and reasoning. Revisit only if `api-gateway` (Phase 2) makes a
+  service-level limiter redundant, or if real traffic shows the default 20-per-minute-per-endpoint
+  budget needs tuning.
 
 ## Relationship to existing planning docs
 

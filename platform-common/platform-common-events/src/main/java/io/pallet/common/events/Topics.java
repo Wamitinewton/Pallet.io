@@ -37,6 +37,9 @@ public final class Topics {
     public static final String ORG_PROVISIONED = "org.provisioned";
     public static final String ORG_INVITE_ACCEPTED = "org.invite.accepted";
     public static final String USER_PROFILE_UPDATED = "user.profile.updated";
+    public static final String ORG_MEMBER_REMOVED = "org.member.removed";
+    public static final String ORG_MEMBER_ROLE_CHANGED = "org.member.role.changed";
+    public static final String ORG_DELETED = "org.deleted";
     private static final Set<String> ALL = Set.of(
             NOTIFICATION_REQUESTED,
             DEPLOY_ROLLBACK_TRIGGERED,
@@ -54,7 +57,10 @@ public final class Topics {
             AUDIT_EVENT_RECORDED,
             ORG_PROVISIONED,
             ORG_INVITE_ACCEPTED,
-            USER_PROFILE_UPDATED);
+            USER_PROFILE_UPDATED,
+            ORG_MEMBER_REMOVED,
+            ORG_MEMBER_ROLE_CHANGED,
+            ORG_DELETED);
 
     private Topics() {}
 

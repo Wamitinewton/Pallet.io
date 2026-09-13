@@ -9,11 +9,13 @@ import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.auth.KeycloakTokenClient;
 import io.pallet.identity.config.IdentityServiceProperties;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.UserSessionRepresentation;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class UserService {
     private static final String PASSWORD_CHANGED_AUDIT_ACTION = "password-changed";
     private static final String REALM_ACCESS_CLAIM = "realm_access";
     private static final String REALM_ROLES_CLAIM = "roles";
+    private static final String SESSION_ID_CLAIM = "sid";
 
     private final IdentityUserRepository identityUserRepository;
     private final IdentityServiceProperties properties;
@@ -104,6 +107,43 @@ public class UserService {
                 PASSWORD_CHANGED_AUDIT_ACTION,
                 "user:" + user.getId(),
                 Map.of());
+    }
+
+    public List<SessionResponse> listSessions(Jwt jwt) {
+        return fetchSessions(jwt.getSubject()).stream()
+                .map(SessionResponse::from)
+                .toList();
+    }
+
+    public void revokeSession(Jwt jwt, String sessionId) {
+        UserSessionRepresentation session = fetchSessions(jwt.getSubject()).stream()
+                .filter(candidate -> candidate.getId().equals(sessionId))
+                .findFirst()
+                .orElseThrow(() -> new SessionNotFoundException(sessionId));
+        deleteSession(session.getId());
+    }
+
+    public void revokeOtherSessions(Jwt jwt) {
+        String currentSessionId = jwt.getClaimAsString(SESSION_ID_CLAIM);
+        fetchSessions(jwt.getSubject()).stream()
+                .filter(session -> !session.getId().equals(currentSessionId))
+                .forEach(session -> deleteSession(session.getId()));
+    }
+
+    private List<UserSessionRepresentation> fetchSessions(String keycloakUserId) {
+        return externalCall.call(
+                KEYCLOAK_ADMIN_POLICY,
+                () -> keycloakAdminClient
+                        .realm(properties.keycloak().realm())
+                        .users()
+                        .get(keycloakUserId)
+                        .getUserSessions());
+    }
+
+    private void deleteSession(String sessionId) {
+        externalCall.run(
+                KEYCLOAK_ADMIN_POLICY,
+                () -> keycloakAdminClient.realm(properties.keycloak().realm()).deleteSession(sessionId, false));
     }
 
     private void resetKeycloakPassword(String keycloakUserId, String newPassword) {

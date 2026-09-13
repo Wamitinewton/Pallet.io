@@ -8,7 +8,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record IdentityServiceProperties(
         @DefaultValue KeycloakAdmin keycloak,
         @DefaultValue EmailVerification emailVerification,
-        @DefaultValue PasswordReset passwordReset) {
+        @DefaultValue PasswordReset passwordReset,
+        @DefaultValue RateLimit rateLimit) {
 
     public record KeycloakAdmin(
             String serverUrl,
@@ -24,4 +25,13 @@ public record IdentityServiceProperties(
     public record PasswordReset(
             @DefaultValue("PT1H") Duration tokenTtl,
             @DefaultValue("http://localhost:5173") String dashboardBaseUrl) {}
+
+    /**
+     * Per-(client address, endpoint) budget guarding {@code /signup}, {@code /auth/login},
+     * {@code /auth/email/verify} and {@code /auth/email/resend-verification} — see
+     * {@code io.pallet.identity.ratelimit.AuthRateLimiter}.
+     */
+    public record RateLimit(
+            @DefaultValue("20") int permitsPerPeriod,
+            @DefaultValue("PT1M") Duration period) {}
 }

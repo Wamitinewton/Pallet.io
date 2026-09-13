@@ -107,7 +107,8 @@ class KeycloakTokenClientTest {
         return new IdentityServiceProperties(
                 new IdentityServiceProperties.KeycloakAdmin(serverUrl, REALM, "admin", "secret", "pallet-test-client"),
                 new IdentityServiceProperties.EmailVerification(Duration.ofMinutes(15), 5),
-                new IdentityServiceProperties.PasswordReset(Duration.ofHours(1), "http://localhost:5173"));
+                new IdentityServiceProperties.PasswordReset(Duration.ofHours(1), "http://localhost:5173"),
+                new IdentityServiceProperties.RateLimit(20, Duration.ofMinutes(1)));
     }
 
     private ExternalCall externalCall() {

@@ -1,5 +1,6 @@
 package io.pallet.identity.signup;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.error.ConflictException;
 import io.pallet.common.events.NotificationRequested;
 import io.pallet.common.events.OrgProvisioned;
@@ -45,6 +46,8 @@ class SignupService {
     private static final String VERIFY_EMAIL_REQUIRED_ACTION = "VERIFY_EMAIL";
     private static final String WELCOME_NOTIFICATION_TYPE = "WELCOME";
     private static final String SIGNUP_AUDIT_ACTION = "sign-up";
+    private static final String SIGNUPS_METRIC = "identity.signups";
+    private static final String COMPENSATING_DELETE_METRIC = "identity.signups.compensating_delete";
 
     private final Keycloak keycloakAdminClient;
     private final IdentityServiceProperties properties;
@@ -56,6 +59,7 @@ class SignupService {
     private final PlatformEventPublisher platformEventPublisher;
     private final AuditPublisher auditPublisher;
     private final EmailVerificationService emailVerificationService;
+    private final MeterRegistry meterRegistry;
 
     SignupService(
             Keycloak keycloakAdminClient,
@@ -67,7 +71,8 @@ class SignupService {
             ApplicationEventPublisher applicationEventPublisher,
             PlatformEventPublisher platformEventPublisher,
             AuditPublisher auditPublisher,
-            EmailVerificationService emailVerificationService) {
+            EmailVerificationService emailVerificationService,
+            MeterRegistry meterRegistry) {
         this.keycloakAdminClient = keycloakAdminClient;
         this.properties = properties;
         this.externalCall = externalCall;
@@ -78,6 +83,7 @@ class SignupService {
         this.platformEventPublisher = platformEventPublisher;
         this.auditPublisher = auditPublisher;
         this.emailVerificationService = emailVerificationService;
+        this.meterRegistry = meterRegistry;
     }
 
     @Monitored
@@ -184,19 +190,23 @@ class SignupService {
                 null,
                 null,
                 Map.of("name", event.ownerDisplayName(), "orgName", event.orgName())));
-        emailVerificationService.issueCode(identityUserRepository
-                .findById(event.userId())
-                .orElseThrow(
-                        () -> new IllegalStateException("Sign-up user " + event.userId() + " vanished after commit")));
+        emailVerificationService.issueCode(
+                identityUserRepository
+                        .findById(event.userId())
+                        .orElseThrow(() ->
+                                new IllegalStateException("Sign-up user " + event.userId() + " vanished after commit")),
+                EmailVerificationService.SOURCE_SIGNUP);
         auditPublisher.publish(
                 event.orgId(),
                 event.ownerUserId(),
                 SIGNUP_AUDIT_ACTION,
                 "organization:" + event.orgId(),
                 Map.of("slug", event.slug()));
+        meterRegistry.counter(SIGNUPS_METRIC).increment();
     }
 
     private void compensateOrphanedKeycloakUser(String keycloakUserId, RuntimeException cause) {
+        meterRegistry.counter(COMPENSATING_DELETE_METRIC).increment();
         try {
             externalCall.run(
                     KEYCLOAK_ADMIN_POLICY,

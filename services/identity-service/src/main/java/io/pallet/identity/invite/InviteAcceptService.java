@@ -1,5 +1,6 @@
 package io.pallet.identity.invite;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.error.ConflictException;
 import io.pallet.common.events.OrgInviteAccepted;
 import io.pallet.common.messaging.PlatformEventPublisher;
@@ -43,6 +44,8 @@ class InviteAcceptService {
     private static final String KEYCLOAK_ADMIN_POLICY = "keycloak-admin";
     private static final String INVITE_TOKEN_PURPOSE = "invite";
     private static final String INVITE_ACCEPTED_AUDIT_ACTION = "invite-accepted";
+    private static final String ACCEPTED_METRIC = "identity.invites.accepted";
+    private static final String REPLAYED_METRIC = "identity.invites.replayed";
 
     private final Keycloak keycloakAdminClient;
     private final IdentityServiceProperties identityServiceProperties;
@@ -54,6 +57,7 @@ class InviteAcceptService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final PlatformEventPublisher platformEventPublisher;
     private final AuditPublisher auditPublisher;
+    private final MeterRegistry meterRegistry;
 
     InviteAcceptService(
             Keycloak keycloakAdminClient,
@@ -65,7 +69,8 @@ class InviteAcceptService {
             PlatformTransactionManager transactionManager,
             ApplicationEventPublisher applicationEventPublisher,
             PlatformEventPublisher platformEventPublisher,
-            AuditPublisher auditPublisher) {
+            AuditPublisher auditPublisher,
+            MeterRegistry meterRegistry) {
         this.keycloakAdminClient = keycloakAdminClient;
         this.identityServiceProperties = identityServiceProperties;
         this.inviteProperties = inviteProperties;
@@ -76,6 +81,7 @@ class InviteAcceptService {
         this.applicationEventPublisher = applicationEventPublisher;
         this.platformEventPublisher = platformEventPublisher;
         this.auditPublisher = auditPublisher;
+        this.meterRegistry = meterRegistry;
     }
 
     @Monitored
@@ -89,6 +95,7 @@ class InviteAcceptService {
         String displayName = displayNameFrom(claims, email);
 
         if (consumedInviteTokenRepository.existsById(jti)) {
+            meterRegistry.counter(REPLAYED_METRIC).increment();
             throw new InviteAlreadyConsumedException(jti);
         }
 
@@ -174,6 +181,7 @@ class InviteAcceptService {
                 INVITE_ACCEPTED_AUDIT_ACTION,
                 "user:" + event.userId(),
                 Map.of("role", event.role()));
+        meterRegistry.counter(ACCEPTED_METRIC).increment();
     }
 
     private void compensateOrphanedKeycloakUser(String keycloakUserId, RuntimeException cause) {

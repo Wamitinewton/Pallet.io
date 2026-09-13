@@ -1,0 +1,3 @@
+notificationType: EMAIL_VERIFICATION
+defaultChannels: [EMAIL]
+subjectTemplate: "Verify your Pallet email"
