@@ -34,3 +34,9 @@ pallet:
       keycloak-token:
         time-limiter:
           timeout: 5s
+
+springdoc:
+  api-docs:
+    path: /api/v1/identity/v3/api-docs
+  swagger-ui:
+    enabled: false
