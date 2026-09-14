@@ -23,10 +23,9 @@ class GatewaySecurityConfiguration {
         "/actuator/health/**", "/actuator/info", "/actuator/prometheus"
     };
 
-    // Where a tripped circuit breaker forwards internally (GatewayFallbackHandler) — never a path
-    // an external caller routes to directly, but the security filter chain still runs on a
-    // servlet FORWARD, so it needs its own allowance independent of any route's public-paths.
     private static final String[] PUBLIC_INTERNAL_PATHS = {"/gateway-fallback/**"};
+
+    private static final String[] PUBLIC_DOCS_PATHS = {"/docs", "/docs/**"};
 
     @Bean
     SecurityFilterChain gatewaySecurityFilterChain(HttpSecurity http, GatewayProperties properties) throws Exception {
@@ -37,6 +36,8 @@ class GatewaySecurityConfiguration {
                         .requestMatchers(PUBLIC_ACTUATOR_PATHS)
                         .permitAll()
                         .requestMatchers(PUBLIC_INTERNAL_PATHS)
+                        .permitAll()
+                        .requestMatchers(PUBLIC_DOCS_PATHS)
                         .permitAll()
                         .anyRequest()
                         .authenticated())

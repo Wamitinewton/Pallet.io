@@ -12,7 +12,15 @@ pallet:
           - /api/v1/identity/auth/refresh
           - /api/v1/identity/auth/email/verify
           - /api/v1/identity/auth/email/resend-verification
+          - /api/v1/identity/v3/api-docs
         resilience-policy: identity-service
+      notification-service:
+        uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8081}
+        path: /api/v1/notification/**
+        allowed-methods: [GET, POST, PATCH]
+        public-paths:
+          - /api/v1/notification/v3/api-docs
+        resilience-policy: notification-service
     rate-limit:
       enabled: true
       capacity: 60
