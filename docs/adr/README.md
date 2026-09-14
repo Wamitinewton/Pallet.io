@@ -18,6 +18,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0010](0010-shared-api-version-prefix.md) | Shared, config-driven API version prefix (`platform-common-api`) | accepted |
 | [0011](0011-identity-org-team-service-boundary.md) | identity-service / org-team-service boundary, signed action tokens, single-org accounts | accepted |
 | [0012](0012-api-gateway-edge-architecture.md) | api-gateway: servlet-stack Gateway Server MVC, additive edge auth, no shared trust secret | accepted |
+| [0013](0013-per-service-api-path-namespace.md) | Per-service API path namespace (`/api/v1/<service>/**`), one gateway route per backend | accepted |
 
 ## Still open (from `PROJECT.md`)
 

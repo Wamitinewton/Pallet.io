@@ -88,7 +88,7 @@ class NotificationControllerIntegrationTest {
 
     @Test
     void anUnauthenticatedRequestIsRejected() throws Exception {
-        mvc.perform(get("/api/v1/notifications")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/notification/notifications")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -97,7 +97,7 @@ class NotificationControllerIntegrationTest {
         persistDelivery(Channel.IN_APP, userId);
         persistDelivery(Channel.IN_APP, "someone-else-" + UUID.randomUUID());
 
-        mvc.perform(get("/api/v1/notifications").with(userJwt(userId)))
+        mvc.perform(get("/api/v1/notification/notifications").with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content.length()").value(1))
@@ -108,7 +108,9 @@ class NotificationControllerIntegrationTest {
     void sizeAboveMaxIsClampedToPageQueryMaxSize() throws Exception {
         String userId = "user-" + UUID.randomUUID();
 
-        mvc.perform(get("/api/v1/notifications").param("size", "100000").with(userJwt(userId)))
+        mvc.perform(get("/api/v1/notification/notifications")
+                        .param("size", "100000")
+                        .with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size").value(100));
     }
@@ -119,13 +121,15 @@ class NotificationControllerIntegrationTest {
         String stranger = "user-" + UUID.randomUUID();
         NotificationDelivery delivery = persistDelivery(Channel.IN_APP, owner);
 
-        mvc.perform(get("/api/v1/notifications/" + delivery.getId()).with(userJwt(stranger)))
+        mvc.perform(get("/api/v1/notification/notifications/" + delivery.getId())
+                        .with(userJwt(stranger)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void getForAnUnknownDeliveryIdReturns404() throws Exception {
-        mvc.perform(get("/api/v1/notifications/" + UUID.randomUUID()).with(userJwt("user-" + UUID.randomUUID())))
+        mvc.perform(get("/api/v1/notification/notifications/" + UUID.randomUUID())
+                        .with(userJwt("user-" + UUID.randomUUID())))
                 .andExpect(status().isNotFound());
     }
 
@@ -134,9 +138,11 @@ class NotificationControllerIntegrationTest {
         String userId = "user-" + UUID.randomUUID();
         NotificationDelivery delivery = persistDelivery(Channel.IN_APP, userId);
 
-        mvc.perform(patch("/api/v1/notifications/" + delivery.getId() + "/read").with(userJwt(userId)))
+        mvc.perform(patch("/api/v1/notification/notifications/" + delivery.getId() + "/read")
+                        .with(userJwt(userId)))
                 .andExpect(status().isOk());
-        mvc.perform(patch("/api/v1/notifications/" + delivery.getId() + "/read").with(userJwt(userId)))
+        mvc.perform(patch("/api/v1/notification/notifications/" + delivery.getId() + "/read")
+                        .with(userJwt(userId)))
                 .andExpect(status().isOk());
 
         assertThat(deliveryRepository.findById(delivery.getId()).orElseThrow().getReadAt())
@@ -149,7 +155,7 @@ class NotificationControllerIntegrationTest {
         NotificationDelivery first = persistDelivery(Channel.IN_APP, userId);
         NotificationDelivery second = persistDelivery(Channel.IN_APP, userId);
 
-        mvc.perform(post("/api/v1/notifications/read-all").with(userJwt(userId)))
+        mvc.perform(post("/api/v1/notification/notifications/read-all").with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
@@ -168,7 +174,7 @@ class NotificationControllerIntegrationTest {
         deliveryRepository.saveAndFlush(read);
         persistDelivery(Channel.EMAIL, userId);
 
-        mvc.perform(get("/api/v1/notifications/unread-count").with(userJwt(userId)))
+        mvc.perform(get("/api/v1/notification/notifications/unread-count").with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(1));
     }

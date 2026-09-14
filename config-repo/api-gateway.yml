@@ -1,0 +1,25 @@
+pallet:
+  gateway:
+    routes:
+      identity-service:
+        uri: ${IDENTITY_SERVICE_URI:http://localhost:8082}
+        path: /api/v1/identity/**
+        allowed-methods: [GET, POST, PATCH, DELETE]
+        public-paths:
+          - /api/v1/identity/signup
+          - /api/v1/identity/invites/*/accept
+          - /api/v1/identity/auth/login
+          - /api/v1/identity/auth/refresh
+          - /api/v1/identity/auth/email/verify
+          - /api/v1/identity/auth/email/resend-verification
+        resilience-policy: identity-service
+    rate-limit:
+      enabled: true
+      capacity: 60
+      window: 1m
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}

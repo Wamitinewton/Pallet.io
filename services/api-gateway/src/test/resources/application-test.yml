@@ -1,0 +1,27 @@
+pallet:
+  gateway:
+    # Off by default so tests unrelated to rate limiting aren't affected by it; tests that exercise
+    # it override this via @DynamicPropertySource.
+    rate-limit:
+      enabled: false
+      capacity: 60
+      window: 1m
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Lets the security auto-configuration build a JwtDecoder bean (and therefore
+          # PalletResourceServerAutoConfiguration's SecurityFilterChain) with no live server:
+          # NimbusJwtDecoder.withJwkSetUri(...) doesn't connect until a token is actually
+          # decoded, unlike issuer-uri, which resolves the OIDC discovery document eagerly.
+          jwk-set-uri: http://localhost:1/not-used-in-tests
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
