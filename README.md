@@ -59,6 +59,7 @@ project's own build targets — each is independent of the others.
 
 | Service | URL |
 |---|---|
+| api-gateway | http://localhost:8083 |
 | config-server | http://localhost:8888 |
 | Keycloak | http://localhost:8080 (admin / admin; realm `pallet`) |
 | Postgres | localhost:5432 (pallet / pallet) |
@@ -67,6 +68,16 @@ project's own build targets — each is independent of the others.
 | Kafka UI | http://localhost:8090 (`make up-all` or `--profile ui`) |
 | Prometheus / Grafana / Jaeger | :9090 / :3000 / :16686 (`make obs`) |
 | MinIO / Vault | :9001 / :8200 (`make data`) |
+
+## API documentation
+
+Every service that has adopted `platform-common-openapi` publishes a live OpenAPI spec under its
+own `/api/v1/<service>/v3/api-docs`. `api-gateway` aggregates all of them into one page — start
+`api-gateway` plus whichever backends you want to browse, then open
+**http://localhost:8083/docs**. The page lists a tab per service currently registered in
+`config-repo/api-gateway.yml`'s `pallet.gateway.routes` — no separate docs registry, and no gateway
+change needed when a new service adopts `platform-common-openapi`. See
+[ADR-0014](docs/adr/0014-openapi-docs-aggregation.md) for the design.
 
 ## Layout
 

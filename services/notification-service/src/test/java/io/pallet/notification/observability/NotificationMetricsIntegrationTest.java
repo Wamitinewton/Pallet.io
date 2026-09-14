@@ -136,9 +136,11 @@ class NotificationMetricsIntegrationTest {
                 new NotificationDelivery(persistNotification().getId(), Channel.IN_APP, userId));
         double before = counter(READ_METRIC);
 
-        mvc.perform(patch("/api/v1/notifications/" + delivery.getId() + "/read").with(userJwt(userId)))
+        mvc.perform(patch("/api/v1/notification/notifications/" + delivery.getId() + "/read")
+                        .with(userJwt(userId)))
                 .andExpect(status().isOk());
-        mvc.perform(patch("/api/v1/notifications/" + delivery.getId() + "/read").with(userJwt(userId)))
+        mvc.perform(patch("/api/v1/notification/notifications/" + delivery.getId() + "/read")
+                        .with(userJwt(userId)))
                 .andExpect(status().isOk());
 
         assertThat(counter(READ_METRIC)).isEqualTo(before + 1);

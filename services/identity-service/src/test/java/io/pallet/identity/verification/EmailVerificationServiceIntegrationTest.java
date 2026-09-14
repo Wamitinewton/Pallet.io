@@ -76,7 +76,7 @@ class EmailVerificationServiceIntegrationTest {
     private String signUp() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(

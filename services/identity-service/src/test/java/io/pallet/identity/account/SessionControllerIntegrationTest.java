@@ -63,7 +63,7 @@ class SessionControllerIntegrationTest {
     private String signUpAndVerify() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -71,7 +71,7 @@ class SessionControllerIntegrationTest {
                 .andExpect(status().isCreated());
 
         String rawCode = awaitAndExtractCode(email);
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, rawCode))))
                 .andExpect(status().isOk());
@@ -123,7 +123,7 @@ class SessionControllerIntegrationTest {
 
     private List<JsonNode> listSessions(String accessToken) throws Exception {
         MvcResult result = mvc.perform(
-                        get("/api/v1/users/me/sessions").header("Authorization", "Bearer " + accessToken))
+                        get("/api/v1/identity/users/me/sessions").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode data = JsonTestSupport.MAPPER
@@ -150,7 +150,7 @@ class SessionControllerIntegrationTest {
         String secondAccessToken = accessTokenFor(email, PASSWORD);
         String firstSessionId = jwtSessionId(firstAccessToken);
 
-        mvc.perform(delete("/api/v1/users/me/sessions/" + firstSessionId)
+        mvc.perform(delete("/api/v1/identity/users/me/sessions/" + firstSessionId)
                         .header("Authorization", "Bearer " + secondAccessToken))
                 .andExpect(status().isOk());
 
@@ -167,7 +167,7 @@ class SessionControllerIntegrationTest {
         String otherAccessToken = accessTokenFor(otherEmail, PASSWORD);
         String otherSessionId = jwtSessionId(otherAccessToken);
 
-        MvcResult result = mvc.perform(delete("/api/v1/users/me/sessions/" + otherSessionId)
+        MvcResult result = mvc.perform(delete("/api/v1/identity/users/me/sessions/" + otherSessionId)
                         .header("Authorization", "Bearer " + ownAccessToken))
                 .andExpect(status().isNotFound())
                 .andReturn();
@@ -188,7 +188,8 @@ class SessionControllerIntegrationTest {
         String currentAccessToken = accessTokenFor(email, PASSWORD);
         String currentSessionId = jwtSessionId(currentAccessToken);
 
-        mvc.perform(delete("/api/v1/users/me/sessions").header("Authorization", "Bearer " + currentAccessToken))
+        mvc.perform(delete("/api/v1/identity/users/me/sessions")
+                        .header("Authorization", "Bearer " + currentAccessToken))
                 .andExpect(status().isOk());
 
         List<JsonNode> remaining = listSessions(currentAccessToken);

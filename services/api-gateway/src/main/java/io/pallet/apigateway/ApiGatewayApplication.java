@@ -1,13 +1,14 @@
 package io.pallet.apigateway;
 
 import io.pallet.apigateway.config.GatewayProperties;
+import io.pallet.apigateway.docs.DocsHubProperties;
 import io.pallet.apigateway.ratelimit.RateLimitProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties({GatewayProperties.class, RateLimitProperties.class})
+@EnableConfigurationProperties({GatewayProperties.class, RateLimitProperties.class, DocsHubProperties.class})
 public class ApiGatewayApplication {
 
     public static void main(String[] args) {

@@ -4,6 +4,10 @@ import static org.springframework.http.HttpStatus.CREATED;
 
 import io.pallet.common.api.ApiResponse;
 import io.pallet.identity.idempotency.IdempotencyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/identity")
+@Tag(name = "Sign-up")
 class SignupController {
 
     private final IdempotencyService idempotencyService;
@@ -25,8 +30,13 @@ class SignupController {
     }
 
     @PostMapping("/signup")
+    @Operation(summary = "Bootstrap a new organization and its owner account")
+    @SecurityRequirements
     ResponseEntity<ApiResponse<SignupResponse>> signup(
-            @RequestHeader("Idempotency-Key") String idempotencyKey, @Valid @RequestBody SignupRequest request) {
+            @Parameter(description = "Client-generated key making a retried sign-up safe")
+                    @RequestHeader("Idempotency-Key")
+                    String idempotencyKey,
+            @Valid @RequestBody SignupRequest request) {
         SignupResponse response = idempotencyService.execute(
                 idempotencyKey, request, () -> signupService.provision(request), SignupResponse.class);
         return ResponseEntity.status(CREATED).body(ApiResponse.ok("Organization provisioned", response));

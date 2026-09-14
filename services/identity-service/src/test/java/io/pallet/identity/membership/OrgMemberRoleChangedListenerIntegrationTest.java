@@ -80,7 +80,7 @@ class OrgMemberRoleChangedListenerIntegrationTest {
     private SeededUser seedActiveUser() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        var result = mvc.perform(post("/api/v1/signup")
+        var result = mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(

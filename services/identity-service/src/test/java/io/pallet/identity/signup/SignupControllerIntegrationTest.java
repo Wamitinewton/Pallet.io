@@ -71,7 +71,7 @@ class SignupControllerIntegrationTest {
     }
 
     private ResultActions performSignup(String idempotencyKey, String body) throws Exception {
-        return mvc.perform(post("/api/v1/signup")
+        return mvc.perform(post("/api/v1/identity/signup")
                 .header("Idempotency-Key", idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));
