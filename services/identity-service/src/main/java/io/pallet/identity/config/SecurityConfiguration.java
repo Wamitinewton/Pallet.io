@@ -26,12 +26,12 @@ class SecurityConfiguration {
     SecurityFilterChain identitySecurityFilterChain(
             HttpSecurity http, ApiPathProperties apiPathProperties, JwtAuthenticationConverter keycloakRoleConverter)
             throws Exception {
-        String signupPath = apiPathProperties.prefix() + "/signup";
-        String resendVerificationPath = apiPathProperties.prefix() + "/auth/email/resend-verification";
-        String verifyEmailPath = apiPathProperties.prefix() + "/auth/email/verify";
-        String inviteAcceptPath = apiPathProperties.prefix() + "/invites/*/accept";
-        String loginPath = apiPathProperties.prefix() + "/auth/login";
-        String refreshPath = apiPathProperties.prefix() + "/auth/refresh";
+        String signupPath = apiPathProperties.prefix() + "/identity/signup";
+        String resendVerificationPath = apiPathProperties.prefix() + "/identity/auth/email/resend-verification";
+        String verifyEmailPath = apiPathProperties.prefix() + "/identity/auth/email/verify";
+        String inviteAcceptPath = apiPathProperties.prefix() + "/identity/invites/*/accept";
+        String loginPath = apiPathProperties.prefix() + "/identity/auth/login";
+        String refreshPath = apiPathProperties.prefix() + "/identity/auth/refresh";
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(PUBLIC_ACTUATOR_PATHS)

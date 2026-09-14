@@ -412,7 +412,7 @@ reuse this same opaque-token shape — see why in the next section.
 ## Mandatory email verification
 
 A self-registered account's email is unproven by construction — the caller typed it into a form.
-Before this mechanism existed, `/signup` handed back a fully usable account on that unproven
+Before this mechanism existed, `/identity/signup` handed back a fully usable account on that unproven
 address, with the only verification path being an optional, self-service action a user could
 ignore forever. That's a real identity-assurance gap: nothing stopped an account operating
 indefinitely on an email its holder never actually controlled. This section closes it: **every
@@ -468,7 +468,7 @@ this is a conscious design choice, not a gap to "fix" into symmetry with sign-up
 `NotificationRequested(EMAIL_VERIFICATION)` carries `code` and `expiresInMinutes` as variables. It
 fires twice over an account's life at most per code: once automatically, from the same
 `AFTER_COMMIT` step sign-up already publishes `OrgProvisioned`/`WELCOME`/`AuditEventRecorded` from,
-and again on demand whenever `/auth/email/resend-verification` is called (which also invalidates
+and again on demand whenever `/identity/auth/email/resend-verification` is called (which also invalidates
 the previous code). Both paths funnel through one `EmailVerificationService.issueCode` method —
 there's exactly one place a code is minted, not two copies of the same logic.
 
@@ -506,37 +506,42 @@ producer per fact, no service publishing a fact about state it doesn't own.
 ## API
 
 Every endpoint returns `ApiResponse<T>` / `PageResponse<T>` (`platform-common-api`), same as every
-other service. Base path `/api/v1`.
+other service. Base path `/api/v1`, plus `/identity` as this service's own namespace segment
+underneath it — every controller in this service is mounted under `/identity`
+([ADR-0013](../adr/0013-per-service-api-path-namespace.md)), so `api-gateway` routes the whole
+service with one path pattern (`/api/v1/identity/**`) instead of enumerating each endpoint group
+individually. A path in the tables below is written relative to `/api/v1` (e.g. `/identity/signup`
+means `POST /api/v1/identity/signup`).
 
 ### Account bootstrap (public, no bearer token)
 
 | Method | Path | Idempotency | Notes |
 |---|---|---|---|
-| `POST` | `/signup` | `Idempotency-Key` header, required | Creates the Keycloak owner (`emailVerified: false`, `VERIFY_EMAIL` required action pending) + `OrgBootstrapRecord`; publishes `OrgProvisioned`, `NotificationRequested` (`WELCOME`), `NotificationRequested` (`EMAIL_VERIFICATION`), `AuditEventRecorded`. Response includes `orgId`/`orgName`/`slug` so the dashboard's first screen doesn't need to wait on `org-team-service`'s async projection — but the account **cannot authenticate yet**; see [Mandatory email verification](#mandatory-email-verification). |
-| `POST` | `/invites/{token}/accept` | One-time-use `jti` (see `ConsumedInviteToken`), not a header | Verifies the signed token locally, creates a Keycloak user scoped to the token's `orgId`/`role`, **`emailVerified: true`, no required action** (see [Mandatory email verification](#mandatory-email-verification) for why), publishes `OrgInviteAccepted`, `AuditEventRecorded`. A token whose `jti` is already consumed returns `409 CONFLICT` (not `200`) — replaying an accept is not safely idempotent the way sign-up is, because a second accept would try to create a second Keycloak user for an email that (by definition) now already has one. |
+| `POST` | `/identity/signup` | `Idempotency-Key` header, required | Creates the Keycloak owner (`emailVerified: false`, `VERIFY_EMAIL` required action pending) + `OrgBootstrapRecord`; publishes `OrgProvisioned`, `NotificationRequested` (`WELCOME`), `NotificationRequested` (`EMAIL_VERIFICATION`), `AuditEventRecorded`. Response includes `orgId`/`orgName`/`slug` so the dashboard's first screen doesn't need to wait on `org-team-service`'s async projection — but the account **cannot authenticate yet**; see [Mandatory email verification](#mandatory-email-verification). |
+| `POST` | `/identity/invites/{token}/accept` | One-time-use `jti` (see `ConsumedInviteToken`), not a header | Verifies the signed token locally, creates a Keycloak user scoped to the token's `orgId`/`role`, **`emailVerified: true`, no required action** (see [Mandatory email verification](#mandatory-email-verification) for why), publishes `OrgInviteAccepted`, `AuditEventRecorded`. A token whose `jti` is already consumed returns `409 CONFLICT` (not `200`) — replaying an accept is not safely idempotent the way sign-up is, because a second accept would try to create a second Keycloak user for an email that (by definition) now already has one. |
 
 ### Auth actions (public)
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/auth/login` | Password-grant proxy. Returns `401` (not a retried `ExternalServiceException`) for bad credentials, or `403 EMAIL_NOT_VERIFIED` if the account's `VERIFY_EMAIL` required action is still pending — see `07-auth-login-refresh-logout.md`'s design for the exact classification mechanism. |
-| `POST` | `/auth/refresh` | Refresh-grant proxy — exchanges a refresh token for a new access/refresh pair. Same bad-token-vs-infra-failure split as login. |
-| `POST` | `/auth/logout` | Revokes the caller's current refresh token / Keycloak session (Keycloak's own revoke endpoint, `ExternalCall`-wrapped). |
-| `POST` | `/auth/password/forgot` | Always returns `202`, whether or not the email exists — enumeration-safe by construction, the same reasoning `notification-service`'s recipient-scoping already applies. Issues a `PASSWORD_RESET` one-time token and a `NotificationRequested` (new type — see [Extension points](#extension-points)) only when the email *does* match a user; the caller can't tell the difference from the response. |
-| `POST` | `/auth/password/reset` | Body: token + new password. Single-use, checked against `one_time_action_tokens.used_at`; a reused or expired token is `400 INVALID_TOKEN`. |
-| `POST` | `/auth/email/resend-verification` | Body: `email`. Same enumeration-safe `202` pattern as forgot-password. Invalidates any existing unconsumed code for that user and issues a fresh 8-character OTP via `NotificationRequested` (`EMAIL_VERIFICATION`). |
-| `POST` | `/auth/email/verify` | Body: `email` + `code` (not a URL token — see [Mandatory email verification](#mandatory-email-verification) for why this one needs both). A correct, unexpired, not-attempt-exhausted code sets `emailVerified: true` and clears the `VERIFY_EMAIL` required action, so the account can now authenticate. Wrong, expired, reused, or attempt-exhausted: `400 INVALID_TOKEN`, indistinguishable from each other and from a nonexistent email. |
+| `POST` | `/identity/auth/login` | Password-grant proxy. Returns `401` (not a retried `ExternalServiceException`) for bad credentials, or `403 EMAIL_NOT_VERIFIED` if the account's `VERIFY_EMAIL` required action is still pending — see `07-auth-login-refresh-logout.md`'s design for the exact classification mechanism. |
+| `POST` | `/identity/auth/refresh` | Refresh-grant proxy — exchanges a refresh token for a new access/refresh pair. Same bad-token-vs-infra-failure split as login. |
+| `POST` | `/identity/auth/logout` | Revokes the caller's current refresh token / Keycloak session (Keycloak's own revoke endpoint, `ExternalCall`-wrapped). |
+| `POST` | `/identity/auth/password/forgot` | Always returns `202`, whether or not the email exists — enumeration-safe by construction, the same reasoning `notification-service`'s recipient-scoping already applies. Issues a `PASSWORD_RESET` one-time token and a `NotificationRequested` (new type — see [Extension points](#extension-points)) only when the email *does* match a user; the caller can't tell the difference from the response. |
+| `POST` | `/identity/auth/password/reset` | Body: token + new password. Single-use, checked against `one_time_action_tokens.used_at`; a reused or expired token is `400 INVALID_TOKEN`. |
+| `POST` | `/identity/auth/email/resend-verification` | Body: `email`. Same enumeration-safe `202` pattern as forgot-password. Invalidates any existing unconsumed code for that user and issues a fresh 8-character OTP via `NotificationRequested` (`EMAIL_VERIFICATION`). |
+| `POST` | `/identity/auth/email/verify` | Body: `email` + `code` (not a URL token — see [Mandatory email verification](#mandatory-email-verification) for why this one needs both). A correct, unexpired, not-attempt-exhausted code sets `emailVerified: true` and clears the `VERIFY_EMAIL` required action, so the account can now authenticate. Wrong, expired, reused, or attempt-exhausted: `400 INVALID_TOKEN`, indistinguishable from each other and from a nonexistent email. |
 
 ### Self-service account (authenticated, `platform-common-security` default filter chain)
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/users/me` | `sub`, `org_id`, and full composite realm-role set from the token — the `OrgContext`-exercising endpoint from the existing checkpoint 9 design. |
-| `PATCH` | `/users/me` | Display name only (never email/password here — those have their own dedicated, more careful flows above). Publishes `UserProfileUpdated`. |
-| `POST` | `/users/me/password` | Authenticated change-password: requires the *current* password (re-verified against Keycloak, not trusted from the token alone) before setting a new one. |
-| `GET` | `/users/me/sessions` | Read-through to Keycloak's Admin API (`GET /admin/realms/pallet/users/{id}/sessions`) — no local session table, so this can never drift from what Keycloak actually has active. |
-| `DELETE` | `/users/me/sessions/{sessionId}` | Revoke one session ("log out of that other device") — a specific Keycloak Admin session-delete call. |
-| `DELETE` | `/users/me/sessions` | Revoke every session except the caller's current one. |
+| `GET` | `/identity/users/me` | `sub`, `org_id`, and full composite realm-role set from the token — the `OrgContext`-exercising endpoint from the existing checkpoint 9 design. |
+| `PATCH` | `/identity/users/me` | Display name only (never email/password here — those have their own dedicated, more careful flows above). Publishes `UserProfileUpdated`. |
+| `POST` | `/identity/users/me/password` | Authenticated change-password: requires the *current* password (re-verified against Keycloak, not trusted from the token alone) before setting a new one. |
+| `GET` | `/identity/users/me/sessions` | Read-through to Keycloak's Admin API (`GET /admin/realms/pallet/users/{id}/sessions`) — no local session table, so this can never drift from what Keycloak actually has active. |
+| `DELETE` | `/identity/users/me/sessions/{sessionId}` | Revoke one session ("log out of that other device") — a specific Keycloak Admin session-delete call. |
+| `DELETE` | `/identity/users/me/sessions` | Revoke every session except the caller's current one. |
 
 **No endpoint here reads or writes anything about teams, projects, or membership beyond the
 account's own org/role** — that surface is entirely `org-team-service`'s. There is deliberately no
@@ -557,7 +562,7 @@ sequenceDiagram
     participant DB as Postgres (identity)
     participant K as Kafka
 
-    C->>Ctl: POST /signup (Idempotency-Key)
+    C->>Ctl: POST /identity/signup (Idempotency-Key)
     Ctl->>Idem: execute(key, body, ...)
     alt key already used, same body
         Idem-->>Ctl: cached response
@@ -590,7 +595,7 @@ sequenceDiagram
     participant DB as Postgres (identity)
     participant K as Kafka
 
-    C->>Ctl: POST /invites/{token}/accept
+    C->>Ctl: POST /identity/invites/{token}/accept
     Ctl->>Tok: verify("invite", token, secret)
     Tok-->>Ctl: claims (orgId, email, role, jti, exp) or InvalidTokenException
     Ctl->>Rep: exists(jti)?
@@ -621,7 +626,7 @@ sequenceDiagram
     participant DB as Postgres (identity)
     participant K as Kafka
 
-    C->>Ctl: POST /auth/email/resend-verification (email)
+    C->>Ctl: POST /identity/auth/email/resend-verification (email)
     Ctl->>Ver: resend(email)
     alt no matching user
         Ver-->>Ctl: no-op
@@ -631,7 +636,7 @@ sequenceDiagram
     end
     Ctl-->>C: 202 (always, identical either way)
 
-    C->>Ctl: POST /auth/email/verify (email, code)
+    C->>Ctl: POST /identity/auth/email/verify (email, code)
     Ctl->>Ver: verify(email, code)
     alt no user, no active code, expired, or attempts exhausted
         Ver-->>Ctl: InvalidTokenException
@@ -695,14 +700,14 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | Replay protection for a stateless-verified token | Local `consumed_invite_tokens(jti)` row, checked after signature/expiry verification | Invite accept |
 | Idempotent mutation (HTTP) | `Idempotency-Key` + request-hash comparison, `IdempotencyKeyReuseException` (`platform-common-exception`) on mismatch | Sign-up |
 | Publish-after-commit | `@TransactionalEventListener(AFTER_COMMIT)` — never publish from inside the mutating transaction | Sign-up, invite-accept |
-| No dual local-copy of Keycloak's own state | Sessions are read-through to the Admin API, never cached locally | `GET/DELETE /users/me/sessions` |
+| No dual local-copy of Keycloak's own state | Sessions are read-through to the Admin API, never cached locally | `GET/DELETE /identity/users/me/sessions` |
 | Keeping an external system (Keycloak) in sync with another service's decisions | Consume the owning service's fact event, then make the Keycloak call — never a callback, never polling | `OrgMemberRemoved` / `OrgMemberRoleChanged` / `OrgDeleted` listeners |
 | Fast, bounded retry per external call | `ExternalCall` around every Keycloak Admin/token call, named policies (`keycloak-admin`, `keycloak-token`) | `platform-common-resilience` |
 | Don't retry a deterministic client error | Bad credentials / bad token thrown as an `AppException` *before* reaching `ExternalCall`'s retry logic | Login, refresh, token verification |
 | Identity assurance for a self-registered account | Keycloak `VERIFY_EMAIL` required action blocks the direct-grant token endpoint until an OTP is confirmed — enforcement lives in Keycloak, not a second local flag | Sign-up, `EmailVerificationService`, `KeycloakTokenClient` |
 | Bounding a brute-forceable secret | Short TTL + a hard max-attempt count that invalidates the artifact outright, on top of hashing it at rest | `EmailVerificationCode` |
 | Tracing | One trace per HTTP request; one trace per consumed event → Keycloak call | `platform-common-observability` |
-| Multi-tenancy isolation | `org_id` on every row; `/users/me*` scoped to the token's own `sub`, never a path parameter | `identity` schema; `platform-common-security` |
+| Multi-tenancy isolation | `org_id` on every row; `/identity/users/me*` scoped to the token's own `sub`, never a path parameter | `identity` schema; `platform-common-security` |
 | Consistency model | Eventual across the two services: `org.provisioned`'s consumer (`org-team-service`) may lag the sign-up response by up to normal consumer-group lag | Named explicitly in [Failure modes](#failure-modes), not hidden |
 
 ## Failure modes
@@ -711,14 +716,14 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 |---|---|
 | Keycloak unreachable during sign-up | `ExternalCall`'s `keycloak-admin` policy retries, then circuit-breaks; sign-up returns `502`-mapped `ExternalServiceException` — no local row is written (Keycloak call happens before the local transaction). |
 | Local commit fails after Keycloak user already created | Named, not hidden — same compensating-delete mitigation as the existing checkpoint 3 design. **Checkpoint 12 decision: accepted as sufficient for Phase 1, no outbox built** — see below. |
-| Dashboard reads `org-team-service` immediately after a `201` from `/signup` | May briefly 404 or return a partial projection — `org.provisioned`'s consumer hasn't necessarily run yet. The dashboard should treat "org not found yet" right after a fresh sign-up as "still provisioning," not an error; the sign-up response itself carries enough (`orgId`/`orgName`/`slug`) to render an immediate first screen without needing `org-team-service` at all. |
+| Dashboard reads `org-team-service` immediately after a `201` from `/identity/signup` | May briefly 404 or return a partial projection — `org.provisioned`'s consumer hasn't necessarily run yet. The dashboard should treat "org not found yet" right after a fresh sign-up as "still provisioning," not an error; the sign-up response itself carries enough (`orgId`/`orgName`/`slug`) to render an immediate first screen without needing `org-team-service` at all. |
 | Invite token replayed after first successful accept | `409 CONFLICT` — `consumed_invite_tokens(jti)` already has a row. |
 | Invite token expired | `400 INVALID_TOKEN` — `SignedActionToken.verify` checks `exp` before this service ever looks at a database. |
 | Invite token's `orgId` no longer exists (org deleted between invite and accept) | Accept still succeeds at the Keycloak-user-creation level — this service has no way to know the org was deleted (no sync call to `org-team-service`) — but the resulting `OrgInviteAccepted` event's consumer in `org-team-service` finds no matching organization row and drops it, logging a metric. The new account exists with an `org_id` claim pointing nowhere. This is a real, if narrow, consequence of the no-sync-call design and is named here rather than assumed away; mitigated in practice by invite tokens having a short TTL and org deletion being a rare, deliberate owner action. |
 | `OrgMemberRemoved` / `OrgMemberRoleChanged` / `OrgDeleted` arrives for an `orgId`/`userId` this service has no local row for | Logged and acknowledged as a no-op rather than treated as an error — a legitimate outcome if, e.g., `identity-service` and `org-team-service` are deployed at different times during a rollout. |
 | A password-reset token is used twice | Second use finds `used_at` already set → `400 INVALID_TOKEN`, same code path as expiry. |
-| An email-verification code is guessed beyond the configured attempt budget | The code is invalidated outright — a subsequent correct-code attempt still fails until a fresh `/auth/email/resend-verification` call. A bounded, self-contained defense; broader per-IP/per-email rate limiting on the endpoint itself is checkpoint 12's deliberate decision. |
-| A self-registered account never completes email verification | The account exists in both Keycloak and locally indefinitely but can never obtain a token via `/auth/login` — by design. There's no expiry on the *account*, only on each unconsumed code; a fresh one can always be requested. |
+| An email-verification code is guessed beyond the configured attempt budget | The code is invalidated outright — a subsequent correct-code attempt still fails until a fresh `/identity/auth/email/resend-verification` call. A bounded, self-contained defense; broader per-IP/per-email rate limiting on the endpoint itself is checkpoint 12's deliberate decision. |
+| A self-registered account never completes email verification | The account exists in both Keycloak and locally indefinitely but can never obtain a token via `/identity/auth/login` — by design. There's no expiry on the *account*, only on each unconsumed code; a fresh one can always be requested. |
 | An account is disabled (removed from its only org) and the same email tries to sign up again | Keycloak's own email-uniqueness rejects it — surfaces as `409 CONFLICT`, "an account with this email already exists." No automatic reactivation; a genuinely different flow (account recovery) that isn't designed here — see [Open questions](#open-questions--deferred). |
 
 ### Checkpoint 12 decisions: dual-write gap, rate limiting, and observability
@@ -737,16 +742,16 @@ failure *and* Keycloak becoming unreachable in the following moments — doubly 
 the named trigger to revisit this decision is that counter firing more than a handful of times in
 a week in any real environment, per `docs/PROJECT.md`'s own stated escape hatch.
 
-**Rate limiting — built for all four named endpoints.** `/signup`, `/auth/login`,
-`/auth/email/verify`, and `/auth/email/resend-verification` are each guarded by
+**Rate limiting — built for all four named endpoints.** `/identity/signup`, `/identity/auth/login`,
+`/identity/auth/email/verify`, and `/identity/auth/email/resend-verification` are each guarded by
 `io.pallet.identity.ratelimit.AuthRateLimiter`: one zero-wait Resilience4j `RateLimiter` per
 (client address, endpoint) key, applied via a `HandlerInterceptor`
 (`RateLimitWebConfiguration`/`AuthRateLimitInterceptor`) so a caller's burst on one endpoint never
 throttles a different caller or a different endpoint. A rejected request surfaces as
 `429 TOO_MANY_REQUESTS` through the platform's existing `TooManyRequestsException` — no new error
-shape. This closes the gap ADR-0011 named for `/auth/login` and `/signup`, and, per this
-checkpoint's own emphasis on `/auth/email/verify` as the sharper case, applies identically there
-and to `/auth/email/resend-verification`: resetting a code's attempt budget by requesting a fresh
+shape. This closes the gap ADR-0011 named for `/identity/auth/login` and `/identity/signup`, and, per this
+checkpoint's own emphasis on `/identity/auth/email/verify` as the sharper case, applies identically there
+and to `/identity/auth/email/resend-verification`: resetting a code's attempt budget by requesting a fresh
 one is exactly the residual gap a per-(caller, endpoint) limiter closes on top of checkpoint 5's
 own per-code attempt budget. Deliberately simple, per this checkpoint's own guidance: one
 in-memory Resilience4j registry per instance, no distributed rate limiting, no CAPTCHA — proportionate
@@ -862,7 +867,7 @@ starter already required for `platform-common-security` — no new dependency to
 ## Extension points
 
 - **MFA** (TOTP): Keycloak already supports it natively per-realm; adding it here is mostly a
-  `/auth/mfa/*` endpoint group proxying Keycloak's required-actions flow, not a new subsystem.
+  `/identity/auth/mfa/*` endpoint group proxying Keycloak's required-actions flow, not a new subsystem.
 - **SSO/SAML** for an enterprise tenant: a per-org Keycloak identity-provider link — additive to
   the realm config, no change to this service's own data model.
 - **Personal access tokens** for CLI/service automation: a new token type this service would mint
@@ -876,7 +881,7 @@ starter already required for `platform-common-security` — no new dependency to
   `PASSWORD_RESET` (variables: `resetUrl`) and `EMAIL_VERIFICATION` (variables: `code`,
   `expiresInMinutes`) — flagged the same way `notification-service`'s own `WELCOME` template
   already exists; both need new template files in `notification-service` before
-  `/auth/password/forgot` and sign-up/`/auth/email/resend-verification` can actually send
+  `/identity/auth/password/forgot` and sign-up/`/identity/auth/email/resend-verification` can actually send
   anything.
 
 ## Open questions / deferred
@@ -897,8 +902,8 @@ starter already required for `platform-common-security` — no new dependency to
   sign-up/invite for that email) and there's no reactivation endpoint. A real product needs one;
   not designed here because it depends on decisions ([Extension points](#extension-points)) about
   what "delete vs. disable" should mean long-term.
-- **Rate limiting `/auth/login`, `/signup`, `/auth/email/verify`, and
-  `/auth/email/resend-verification`.** Resolved at checkpoint 12: built, not deferred — see
+- **Rate limiting `/identity/auth/login`, `/identity/signup`, `/identity/auth/email/verify`, and
+  `/identity/auth/email/resend-verification`.** Resolved at checkpoint 12: built, not deferred — see
   [Checkpoint 12 decisions](#checkpoint-12-decisions-dual-write-gap-rate-limiting-and-observability)
   above for the mechanism and reasoning. Revisit only if `api-gateway` (Phase 2) makes a
   service-level limiter redundant, or if real traffic shows the default 20-per-minute-per-endpoint

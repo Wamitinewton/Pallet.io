@@ -25,7 +25,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Backs the authenticated {@code /users/me*} endpoints. Every method resolves "me" from the
+ * Backs the authenticated {@code /identity/users/me*} endpoints. Every method resolves "me" from the
  * caller's own token — a Keycloak user id ({@code sub}) or org id, never a path/body value — per
  * {@code docs/identity-service/ARCHITECTURE.md} §API.
  */

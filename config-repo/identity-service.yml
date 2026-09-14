@@ -19,8 +19,6 @@ pallet:
       token-ttl: PT1H
       dashboard-base-url: ${DASHBOARD_BASE_URL:http://localhost:5173}
     rate-limit:
-      # Per-(client address, endpoint) budget on /signup, /auth/login, /auth/email/verify and
-      # /auth/email/resend-verification (ARCHITECTURE.md's checkpoint 12 rate-limiting decision).
       permits-per-period: 20
       period: PT1M
   invites:

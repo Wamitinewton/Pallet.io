@@ -27,8 +27,8 @@ public record IdentityServiceProperties(
             @DefaultValue("http://localhost:5173") String dashboardBaseUrl) {}
 
     /**
-     * Per-(client address, endpoint) budget guarding {@code /signup}, {@code /auth/login},
-     * {@code /auth/email/verify} and {@code /auth/email/resend-verification} — see
+     * Per-(client address, endpoint) budget guarding {@code /identity/signup}, {@code /identity/auth/login},
+     * {@code /identity/auth/email/verify} and {@code /identity/auth/email/resend-verification} — see
      * {@code io.pallet.identity.ratelimit.AuthRateLimiter}.
      */
     public record RateLimit(
