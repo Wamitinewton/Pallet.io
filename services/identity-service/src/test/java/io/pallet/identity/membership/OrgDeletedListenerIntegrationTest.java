@@ -93,7 +93,7 @@ class OrgDeletedListenerIntegrationTest {
     private Owner seedOwner() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        var result = mvc.perform(post("/api/v1/signup")
+        var result = mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -111,7 +111,7 @@ class OrgDeletedListenerIntegrationTest {
     private String seedMember(String orgId) throws Exception {
         String email = "member-" + unique() + "@pallet-test.local";
         String token = inviteToken(orgId, email);
-        mvc.perform(post("/api/v1/invites/{token}/accept", token)
+        mvc.perform(post("/api/v1/identity/invites/{token}/accept", token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new InviteAcceptRequest(PASSWORD))))
                 .andExpect(status().isCreated());

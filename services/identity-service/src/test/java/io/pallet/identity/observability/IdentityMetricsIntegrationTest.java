@@ -130,7 +130,7 @@ class IdentityMetricsIntegrationTest {
     private String signUp() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -163,7 +163,7 @@ class IdentityMetricsIntegrationTest {
 
     private void verifyEmail(String email) throws Exception {
         String rawCode = awaitAndExtractCode(email);
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, rawCode))))
                 .andExpect(status().isOk());
@@ -172,7 +172,7 @@ class IdentityMetricsIntegrationTest {
     private record LoginJson(String email, String password) {}
 
     private MvcResult performLogin(String email, String password) throws Exception {
-        return mvc.perform(post("/api/v1/auth/login")
+        return mvc.perform(post("/api/v1/identity/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LoginJson(email, password))))
                 .andReturn();
@@ -197,7 +197,7 @@ class IdentityMetricsIntegrationTest {
     }
 
     private MvcResult performInviteAccept(String token) throws Exception {
-        return mvc.perform(post("/api/v1/invites/{token}/accept", token)
+        return mvc.perform(post("/api/v1/identity/invites/{token}/accept", token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new InviteAcceptRequest(PASSWORD))))
                 .andReturn();
@@ -226,7 +226,7 @@ class IdentityMetricsIntegrationTest {
                 .when(orgBootstrapRepository)
                 .save(argThat((OrgBootstrapRecord record) -> slug.equals(record.getSlug())));
 
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -303,12 +303,12 @@ class IdentityMetricsIntegrationTest {
         double before = counter(EMAIL_VERIFICATION_ATTEMPTS_EXHAUSTED_METRIC);
 
         for (int i = 0; i < 5; i++) {
-            mvc.perform(post("/api/v1/auth/email/verify")
+            mvc.perform(post("/api/v1/identity/auth/email/verify")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, "WRONGCOD"))))
                     .andExpect(status().isBadRequest());
         }
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, "STILLBAD"))))
                 .andExpect(status().isBadRequest());
@@ -341,7 +341,7 @@ class IdentityMetricsIntegrationTest {
 
         int lastStatus = 0;
         for (int i = 0; i < 21; i++) {
-            lastStatus = mvc.perform(post("/api/v1/auth/email/resend-verification")
+            lastStatus = mvc.perform(post("/api/v1/identity/auth/email/resend-verification")
                             .with(callerA)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(JsonTestSupport.toJson(new ResendJson(email))))
@@ -351,7 +351,7 @@ class IdentityMetricsIntegrationTest {
         }
 
         assertThat(lastStatus).isEqualTo(429);
-        mvc.perform(post("/api/v1/auth/email/resend-verification")
+        mvc.perform(post("/api/v1/identity/auth/email/resend-verification")
                         .with(callerB)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new ResendJson(email))))

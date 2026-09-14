@@ -63,7 +63,7 @@ class AuthControllerIntegrationTest {
     private String signUp() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -74,14 +74,14 @@ class AuthControllerIntegrationTest {
 
     private void verifyEmail(String email) throws Exception {
         String rawCode = awaitAndExtractCode(email);
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, rawCode))))
                 .andExpect(status().isOk());
     }
 
     private JsonNode login(String email, String password) throws Exception {
-        MvcResult result = mvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mvc.perform(post("/api/v1/identity/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LoginRequest(email, password))))
                 .andExpect(status().isOk())
@@ -128,13 +128,13 @@ class AuthControllerIntegrationTest {
     void resendVerificationAlwaysReturns202ForARealAndAFakeEmail() throws Exception {
         String email = signUp();
 
-        MvcResult realEmailResult = mvc.perform(post("/api/v1/auth/email/resend-verification")
+        MvcResult realEmailResult = mvc.perform(post("/api/v1/identity/auth/email/resend-verification")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new ResendVerificationRequest(email))))
                 .andExpect(status().isAccepted())
                 .andReturn();
 
-        MvcResult fakeEmailResult = mvc.perform(post("/api/v1/auth/email/resend-verification")
+        MvcResult fakeEmailResult = mvc.perform(post("/api/v1/identity/auth/email/resend-verification")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
                                 new ResendVerificationRequest("nobody-" + unique() + "@pallet-test.local"))))
@@ -150,7 +150,7 @@ class AuthControllerIntegrationTest {
         String email = signUp();
         String rawCode = awaitAndExtractCode(email);
 
-        MvcResult invalidResult = mvc.perform(post("/api/v1/auth/email/verify")
+        MvcResult invalidResult = mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, "WRONGCOD"))))
                 .andExpect(status().isBadRequest())
@@ -159,7 +159,7 @@ class AuthControllerIntegrationTest {
                 JsonTestSupport.fromJson(invalidResult.getResponse().getContentAsString(), ErrorResponse.class);
         assertThat(errorResponse).isFailure().hasErrorCode("INVALID_TOKEN");
 
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, rawCode))))
                 .andExpect(status().isOk());
@@ -186,7 +186,7 @@ class AuthControllerIntegrationTest {
         long before = failedCallsWithoutRetryAttempt();
         long beforeRetried = failedCallsWithRetryAttempt();
 
-        MvcResult result = mvc.perform(post("/api/v1/auth/login")
+        MvcResult result = mvc.perform(post("/api/v1/identity/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LoginRequest(email, PASSWORD))))
                 .andExpect(status().isForbidden())
@@ -206,7 +206,7 @@ class AuthControllerIntegrationTest {
         long before = failedCallsWithoutRetryAttempt();
         long beforeRetried = failedCallsWithRetryAttempt();
 
-        mvc.perform(post("/api/v1/auth/login")
+        mvc.perform(post("/api/v1/identity/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LoginRequest(email, "the-wrong-password"))))
                 .andExpect(status().isUnauthorized());
@@ -221,7 +221,7 @@ class AuthControllerIntegrationTest {
         verifyEmail(email);
         String refreshToken = login(email, PASSWORD).get("refreshToken").asString();
 
-        MvcResult result = mvc.perform(post("/api/v1/auth/refresh")
+        MvcResult result = mvc.perform(post("/api/v1/identity/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new RefreshRequest(refreshToken))))
                 .andExpect(status().isOk())
@@ -242,7 +242,7 @@ class AuthControllerIntegrationTest {
         String accessToken = tokens.get("accessToken").asString();
         String refreshToken = tokens.get("refreshToken").asString();
 
-        mvc.perform(post("/api/v1/auth/logout")
+        mvc.perform(post("/api/v1/identity/auth/logout")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LogoutRequest(refreshToken))))
@@ -251,7 +251,7 @@ class AuthControllerIntegrationTest {
         long before = failedCallsWithoutRetryAttempt();
         long beforeRetried = failedCallsWithRetryAttempt();
 
-        mvc.perform(post("/api/v1/auth/refresh")
+        mvc.perform(post("/api/v1/identity/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new RefreshRequest(refreshToken))))
                 .andExpect(status().isUnauthorized());
@@ -262,7 +262,7 @@ class AuthControllerIntegrationTest {
 
     @Test
     void logoutWithoutABearerTokenIsUnauthorized() throws Exception {
-        mvc.perform(post("/api/v1/auth/logout")
+        mvc.perform(post("/api/v1/identity/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LogoutRequest("irrelevant"))))
                 .andExpect(status().isUnauthorized());

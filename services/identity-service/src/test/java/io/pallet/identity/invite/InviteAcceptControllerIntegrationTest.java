@@ -109,7 +109,7 @@ class InviteAcceptControllerIntegrationTest {
     }
 
     private ResultActions performAccept(String token) throws Exception {
-        return mvc.perform(post("/api/v1/invites/{token}/accept", token)
+        return mvc.perform(post("/api/v1/identity/invites/{token}/accept", token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(JsonTestSupport.toJson(new InviteAcceptRequest(ACCEPT_PASSWORD))));
     }

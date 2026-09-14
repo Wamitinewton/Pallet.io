@@ -64,7 +64,7 @@ class UserControllerIntegrationTest {
     private String signUpAndVerify() throws Exception {
         String slug = "acme-" + unique();
         String email = "owner-" + unique() + "@pallet-test.local";
-        mvc.perform(post("/api/v1/signup")
+        mvc.perform(post("/api/v1/identity/signup")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
@@ -72,7 +72,7 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isCreated());
 
         String rawCode = awaitAndExtractCode(email);
-        mvc.perform(post("/api/v1/auth/email/verify")
+        mvc.perform(post("/api/v1/identity/auth/email/verify")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new VerifyEmailRequest(email, rawCode))))
                 .andExpect(status().isOk());
@@ -128,7 +128,7 @@ class UserControllerIntegrationTest {
         String accessToken = accessTokenFor(email, PASSWORD);
         String sub = SignedJWT.parse(accessToken).getJWTClaimsSet().getSubject();
 
-        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+        mvc.perform(get("/api/v1/identity/users/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpectAll(
                         jsonPath("$.data.sub").value(sub),
@@ -140,7 +140,7 @@ class UserControllerIntegrationTest {
 
     @Test
     void meWithoutATokenIsUnauthorized() throws Exception {
-        mvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/identity/users/me")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -148,13 +148,13 @@ class UserControllerIntegrationTest {
         String email = signUpAndVerify();
         String accessToken = accessTokenFor(email, PASSWORD);
 
-        mvc.perform(patch("/api/v1/users/me")
+        mvc.perform(patch("/api/v1/identity/users/me")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new UpdateProfileRequest("New Display Name"))))
                 .andExpect(status().isOk());
 
-        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+        mvc.perform(get("/api/v1/identity/users/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.displayName").value("New Display Name"));
 
@@ -173,7 +173,7 @@ class UserControllerIntegrationTest {
         String email = signUpAndVerify();
         String accessToken = accessTokenFor(email, PASSWORD);
 
-        mvc.perform(patch("/api/v1/users/me")
+        mvc.perform(patch("/api/v1/identity/users/me")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -181,7 +181,7 @@ class UserControllerIntegrationTest {
                                 """))
                 .andExpect(status().isOk());
 
-        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+        mvc.perform(get("/api/v1/identity/users/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.email").value(email));
     }
@@ -192,7 +192,7 @@ class UserControllerIntegrationTest {
         String accessToken = accessTokenFor(email, PASSWORD);
         String newPassword = "brandnewpassword123";
 
-        mvc.perform(post("/api/v1/users/me/password")
+        mvc.perform(post("/api/v1/identity/users/me/password")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new ChangePasswordRequest(PASSWORD, newPassword))))
@@ -214,7 +214,7 @@ class UserControllerIntegrationTest {
         String email = signUpAndVerify();
         String accessToken = accessTokenFor(email, PASSWORD);
 
-        MvcResult result = mvc.perform(post("/api/v1/users/me/password")
+        MvcResult result = mvc.perform(post("/api/v1/identity/users/me/password")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(
