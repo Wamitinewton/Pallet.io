@@ -43,7 +43,7 @@ Two channels ship in this foundation:
 - **Email** — fire-and-forget delivery through an SMTP relay (Mailpit locally). Nothing to query
   back; success means the message left the building.
 - **In-app** — there is no external inbox, so *delivery is persistence*. The row this service
-  writes on delivery is the same row a `GET /api/v1/notifications` call returns later, which is
+  writes on delivery is the same row a `GET /api/v1/notification/notifications` call returns later, which is
   why in-app is architected as a first-class channel now rather than bolted on when a dashboard
   needs it.
 
@@ -514,7 +514,7 @@ flowchart LR
   (bounded only by Kafka consumer throughput) from *delivery pacing* (bounded by each org's
   quota) — the two were conflated in a naive "rate-limit the listener" design and shouldn't be.
 - The same `OrgRateLimiter` registry can gate the read API too (a per-org or per-user request
-  cap on `GET /api/v1/notifications`) using Resilience4j's standard Spring MVC integration —
+  cap on `GET /api/v1/notification/notifications`) using Resilience4j's standard Spring MVC integration —
   worth adding once real traffic shows it's needed; the registry already exists either way.
 
 ## Processing pipeline
@@ -574,12 +574,18 @@ plumbing is shared, per `docs/workflows/platform-common/05-messaging.md`.
 
 ## Read API: in-app notifications
 
+Mounted under `/notification`, this service's per-service namespace segment
+([ADR-0013](../adr/0013-per-service-api-path-namespace.md)) — `api-gateway` routes every path under
+`/api/v1/notification/**` here with one route entry, rather than enumerating each endpoint group.
+The nested `/notifications` beneath it is this API's own resource name (matching the
+`notifications` table §Data model already describes), unrelated to the routing segment above it.
+
 ```
-GET   /api/v1/notifications?status=UNREAD&page=&size=&sort=
-GET   /api/v1/notifications/{deliveryId}
-PATCH /api/v1/notifications/{deliveryId}/read
-POST  /api/v1/notifications/read-all
-GET   /api/v1/notifications/unread-count
+GET   /api/v1/notification/notifications?status=UNREAD&page=&size=&sort=
+GET   /api/v1/notification/notifications/{deliveryId}
+PATCH /api/v1/notification/notifications/{deliveryId}/read
+POST  /api/v1/notification/notifications/read-all
+GET   /api/v1/notification/notifications/unread-count
 ```
 
 - Scoped to `IN_APP` deliveries only — email has nothing to list.
@@ -601,7 +607,7 @@ sequenceDiagram
     participant Svc as NotificationQueryService
     participant DDB as Postgres
 
-    FE->>GW: GET /notifications?status=UNREAD (JWT)
+    FE->>GW: GET /notification/notifications?status=UNREAD (JWT)
     GW->>Ctrl: forward + validated token
     Ctrl->>Svc: list(orgId, userId, pageQuery)
     Svc->>DDB: query notification_deliveries JOIN notifications
