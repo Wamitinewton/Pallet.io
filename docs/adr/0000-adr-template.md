@@ -5,7 +5,7 @@
 
 ## Context
 
-What forces are at play — technical, product, operational. Why this needs a decision now.
+What forces are at play: technical, product, operational. Why this needs a decision now.
 
 ## Decision
 

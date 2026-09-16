@@ -21,7 +21,7 @@ name constants.
 ## Consequences
 
 - No schema registry to run; fast to add and change an event.
-- Compatibility is by convention, not enforced — additive changes only, and
+- Compatibility is by convention, not enforced: additive changes only, and
   consumers must tolerate unknown fields.
 - Revisit (new ADR) when the catalog stabilises or a breaking change is needed:
   moving to Avro/Protobuf + a registry is the expected next step, and keeping

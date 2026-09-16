@@ -9,15 +9,15 @@
 over Kafka commands and events," owned by `deploy-orchestrator-service` (the deployment saga:
 queued → building → pushing → provisioning → routing → health checking → live/failed/rolled back)
 and `billing-service` (a payment and provisioning saga against Paystack). Neither service has been
-built yet — `deploy-orchestrator-service` starts in Build roadmap phase 5, `billing-service` in
-phase 7 — so this decision lands before any hand-rolled state machine exists to migrate away from,
+built yet (`deploy-orchestrator-service` starts in Build roadmap phase 5, `billing-service` in
+phase 7), so this decision lands before any hand-rolled state machine exists to migrate away from,
 at essentially zero implementation cost beyond documentation today.
 
 A hand-rolled saga over Kafka needs its own persistence for in-flight state, its own timer/timeout
 handling for a step that never completes, its own correlation logic to match an inbound event back
 to the saga instance waiting on it, and hand-written compensation ordering. That's exactly the kind
 of infrastructure `platform-common-messaging` and `platform-common-resilience` already generalize
-for simpler request/response and pub/sub cases — but saga orchestration is a distinct problem
+for simpler request/response and pub/sub cases, but saga orchestration is a distinct problem
 (long-running, stateful, needs exactly-once step execution and ordered compensation on failure),
 and hand-rolling it a second time inside `deploy-orchestrator-service` would duplicate that effort
 per-saga rather than solving it once, the same argument that justified building
@@ -34,27 +34,27 @@ Adopt Temporal as the orchestration engine for both named sagas, and as the defa
 future service that needs multi-step, long-running orchestration with compensation.
 
 **Scope.** `deploy-orchestrator-service` and `billing-service` each embed a Temporal Worker (Java
-SDK — `temporal-sdk` + `temporal-spring-boot-starter`) inside their own Spring Boot process, added
+SDK: `temporal-sdk` + `temporal-spring-boot-starter`) inside their own Spring Boot process, added
 as a dependency in that service's own `pom.xml`, not as a new `platform-common-*` module. Only
 these two of the twenty-four services need it; a shared module for two consumers repeats the
-mistake `platform-common` itself was designed to avoid — an abstraction built for a use case that
+mistake `platform-common` itself was designed to avoid: an abstraction built for a use case that
 doesn't exist yet. If a third saga-shaped service shows up later, that's the trigger to reconsider.
 
 **Where Temporal replaces the hand-rolled state machine, and where Kafka stays.** The deployment
-saga's actual steps are Kubernetes API calls (create/patch a `Deployment`, `Service`, `Ingress` —
+saga's actual steps are Kubernetes API calls (create/patch a `Deployment`, `Service`, `Ingress`;
 already a synchronous "third-party" call per `docs/PROJECT.md`'s architecture section, wrapped in
 `platform-common-resilience`) interleaved with waiting on other services' async reactions to that
 Kubernetes state (`dns.record.updated`, `tls.cert.issued`, `health.check.failed`). That shape
 doesn't change:
 
-- Activities wrap the calls that were already synchronous external edges — the Kubernetes API,
-  Paystack, GitHub, ACME, a DNS provider's API — the same edges `docs/PROJECT.md` already carves
+- Activities wrap the calls that were already synchronous external edges (the Kubernetes API,
+  Paystack, GitHub, ACME, a DNS provider's API), the same edges `docs/PROJECT.md` already carves
   out of the "no blocking calls between our own services" rule. Temporal's per-activity retry
   policy sits *alongside* `platform-common-resilience`'s circuit breaker inside the activity
   implementation, not instead of it: retry-on-schedule and stop-calling-a-known-dead-dependency
   are complementary, and Temporal has no circuit-breaker primitive of its own.
-- Cross-service coordination — waiting for `dns-service`, `tls-service`, or `health-check-service`
-  to react — stays event-driven over Kafka exactly as today. What changes is the destination:
+- Cross-service coordination (waiting for `dns-service`, `tls-service`, or `health-check-service`
+  to react) stays event-driven over Kafka exactly as today. What changes is the destination:
   instead of a hand-rolled table correlating an inbound event to a saga instance, a thin Kafka
   listener turns the matching event into a Temporal signal on the workflow keyed by the same
   `deploymentId`. The "no service makes a blocking call to another" rule is unchanged; nothing
@@ -63,30 +63,30 @@ doesn't change:
   event another service already emits), calling it directly from inside an activity is an accepted
   exception on the same footing as a third-party call: it runs on a Temporal worker thread, not a
   request-handling thread, so a slow response delays only that one workflow execution, never
-  another tenant's request. This is available, not mandated — most saga steps in this project are
+  another tenant's request. This is available, not mandated; most saga steps in this project are
   Kubernetes-API-or-third-party-call plus a Kafka wait, per the point above.
 
 **Compensation.** Each saga uses the Java SDK's `Saga` helper: a forward activity registers its
 compensating action (`saga.addCompensation(...)`) as it succeeds, and `saga.compensate()` runs
-them in LIFO order the moment any step fails — the literal replacement for "the orchestrator
+them in LIFO order the moment any step fails. That's the literal replacement for "the orchestrator
 issues compensating commands" in `docs/PROJECT.md`'s architecture section, and for
 `deploy-orchestrator-service`'s state list (`queued, building, pushing, provisioning, routing,
-health checking, live, failed, rolled back`) as a hand-maintained enum — the workflow's own
+health checking, live, failed, rolled back`) as a hand-maintained enum: the workflow's own
 execution history *is* that state machine.
 
 **Identity and idempotency.** Workflow ID is the domain id already at hand
 (`deployment-{deploymentId}` for the deploy saga, `billing-saga-{orgId}-{invoiceId}` for billing),
-with `WorkflowIdReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY` — a redelivered `build.succeeded` that
+with `WorkflowIdReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY`. A redelivered `build.succeeded` that
 tries to start the same saga twice attaches to the existing run, or is rejected once it's already
 succeeded, instead of needing a hand-rolled idempotency table the way `notification-service` needs
 one for its own event consumption.
 
 **Deployment topology.** One self-hosted Temporal server per environment (dev/staging/prod), not
 Temporal Cloud, running on the same Kubernetes cluster as Pallet's own control-plane services (not
-the tenant EKS/GKE clusters `scheduler-service` registers) — consistent with the project already
+the tenant EKS/GKE clusters `scheduler-service` registers), consistent with the project already
 running its own Postgres, Kafka, and Keycloak rather than managed equivalents, and with ADR-0002's
 split between "where the platform's own services run" and "where tenant workloads run."
-Persistence and, to start, visibility both back onto Postgres — the same database the rest of the
+Persistence and, to start, visibility both back onto Postgres, the same database the rest of the
 platform already operates, rather than introducing Elasticsearch for visibility on day one. One
 Temporal **Namespace** per environment, not per tenant, mirroring ADR-0003's one-realm-not-one-per-
 org choice: tenant isolation is a `deploymentId`/`orgId` field on the workflow, not a namespace
@@ -102,7 +102,7 @@ non-deterministic branching without `Workflow.getVersion`). Every change to a wo
 ships behind Temporal's Worker Build ID versioning, so an in-flight deployment saga keeps running
 under the code it started with while new sagas pick up the new build. CI gains a replay-test step
 (`WorkflowReplayer` against histories captured from the previous version) before a workflow-code
-change merges — the direct analog of `./mvnw clean verify` catching a regression before it ships
+change merges: the direct analog of `./mvnw clean verify` catching a regression before it ships
 (see `CONTRIBUTING.md`).
 
 **Observability.** The Temporal Java SDK's Micrometer metrics bridge feeds the same
@@ -112,7 +112,7 @@ through Jaeger, so a deployment still shows up as one trace end to end exactly a
 `docs/PROJECT.md`'s architecture section already promises. The Temporal Web UI becomes a local dev
 endpoint (`:8233`) the same way Kafka UI and Jaeger already are. Domain events
 (`deploy.state.changed`, `deploy.step.completed`, `audit.event.recorded`) are still published from
-inside the workflow/activities exactly as today — Temporal's own execution history is operational
+inside the workflow/activities exactly as today. Temporal's own execution history is operational
 debugging data, not a replacement for `audit-log-service`'s immutable record, and it's retained on
 a much shorter window (a default closed-workflow retention, e.g. 30 days) than ClickHouse's.
 
@@ -134,7 +134,7 @@ of bug a code reviewer expects to check for; workflow-code changes need a versio
 `docs/workflows/ROADMAP.md` Phase 1b already set with Mailpit (documented as needed "from the
 start," but actually wired into `docker-compose.yml` only right before `notification-service`
 needed it), the Temporal dev server lands in `docker-compose.yml` when
-`deploy-orchestrator-service`'s own phase starts (Build roadmap phase 5), not now — there's no
+`deploy-orchestrator-service`'s own phase starts (Build roadmap phase 5), not now: there's no
 consumer yet.
 
 ## Alternatives considered
@@ -148,7 +148,7 @@ consumer yet.
   Postgres, Kafka, and Keycloak rather than managed equivalents specifically to demonstrate
   operating this infrastructure, and self-hosting is a small addition once Kubernetes and Postgres
   are already in place (ADR-0002). Revisit if operating the Temporal server itself becomes a real
-  time sink — the same trigger that would justify revisiting any other piece of self-hosted infra
+  time sink, the same trigger that would justify revisiting any other piece of self-hosted infra
   here.
 - **A `platform-common-workflow` module wrapping Temporal.** Rejected: only two of twenty-four
   services need it, and every existing `platform-common` module exists because most or all

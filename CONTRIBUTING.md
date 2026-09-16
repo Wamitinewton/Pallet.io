@@ -1,23 +1,23 @@
 # Contributing to Pallet
 
-Pallet is a build-in-public learning project. The premise is that other people
-follow along and, once a service gets interesting, send pull requests. This
-document is how the build fits together.
+Pallet is a build-in-public learning project. The idea is that other people follow along and,
+once a service gets interesting, send pull requests. This document is how the build fits
+together.
 
 ## The build: one shared reactor, independent services
 
 Two different build shapes on purpose:
 
-- `platform-common/` is one Maven multi-module reactor, self-contained: `platform-common/pom.xml`
+- `platform-common/` is one Maven multi-module reactor, self-contained. `platform-common/pom.xml`
   is parented directly to `spring-boot-starter-parent` and pins Spring Boot, Spring Cloud,
-  Resilience4j, and every plugin version for the reactor beneath it. Eight modules:
+  Resilience4j, and every plugin version for the reactor beneath it. It has eight modules:
   `platform-common-api` (response envelope + pagination shapes), `platform-common-exception`
   (`AppException` hierarchy + global handler), `platform-common-events` (Kafka event contracts +
   topic catalog), `platform-common-security` (resource-server baseline + `org_id` check),
   `platform-common-observability` (metrics/tracing/logging dependencies),
   `platform-common-messaging` (Kafka wiring, retry, DLT), `platform-common-resilience`
-  (Resilience4j defaults), `platform-common-test` (composed Testcontainers test-slice
-  annotations, test-scope only). It's published as versioned artifacts to GitHub Packages — see
+  (Resilience4j defaults), and `platform-common-test` (composed Testcontainers test-slice
+  annotations, test-scope only). It's published as versioned artifacts to GitHub Packages, see
   `PACKAGES.md`.
 - Every service under `services/<name>/` is a **fully independent Maven project**: its own
   `pom.xml` (parented directly to `spring-boot-starter-parent`, not to anything in this repo),
@@ -25,10 +25,10 @@ Two different build shapes on purpose:
   files, its own `Makefile`. No service shares a parent POM with `platform-common` or with any
   other service. A service consumes `platform-common-*` the same way an external repo would: a
   real GitHub Packages dependency, version pinned by hand in that service's own `pom.xml`
-  (`<platform-common.version>`) — never a reactor sibling. The tradeoff this buys: a service
-  builds, tests, and releases with zero knowledge of any sibling service, at the cost of some
-  duplicated build config (compiler/Spotless/SpotBugs/OWASP plugin setup is copied into each
-  service's `pom.xml` rather than defined once) — see `PACKAGES.md` for the mechanics and why.
+  (`<platform-common.version>`), never a reactor sibling. The tradeoff: a service builds, tests,
+  and releases with zero knowledge of any sibling service, at the cost of some duplicated build
+  config (compiler/Spotless/SpotBugs/OWASP plugin setup is copied into each service's `pom.xml`
+  rather than defined once). See `PACKAGES.md` for the mechanics and the reasoning.
 
 Every service depends on `platform-common-observability` (which transitively brings Actuator, the
 Prometheus registry, and OTLP export) and, once it serves tenant data, on
@@ -44,22 +44,22 @@ cd services/config-server
 ./mvnw -P security verify                        # + SpotBugs / OWASP Dependency-Check
 ```
 
-CI never runs the plain `clean verify` above — see §CI: it passes `-DskipITs`, unit tests only.
+CI never runs the plain `clean verify` above (see §CI): it passes `-DskipITs`, unit tests only.
 `./mvnw clean verify`, integration tests included, is a gate you run yourself before opening a
 PR (see `Test.md`'s "CI vs. local").
 
 The root `Makefile` only wraps shared local infrastructure (`make up` / `make obs` /
-`make kind-up`, ...) and repo-wide formatting (`make format-check`) — `make help` at the repo
-root. `platform-common/` and each service directory carry their own `Makefile` with the same
-target names (`build`, `test`, `verify`, `security`, `format-check`, `format`, and `run` for
-services), scoped to that project: `make -C platform-common build`, `make -C services/config-server
-build`, or `cd platform-common && make help`.
+`make kind-up`, and so on) and repo-wide formatting (`make format-check`); run `make help` at the
+repo root to see it. `platform-common/` and each service directory carry their own `Makefile`
+with the same target names (`build`, `test`, `verify`, `security`, `format-check`, `format`, and
+`run` for services), scoped to that project: `make -C platform-common build`, `make -C
+services/config-server build`, or `cd platform-common && make help`.
 
 ### Adding a new service
 
 Copy an existing service directory (`pom.xml`, `mvnw`/`mvnw.cmd`/`.mvn/`, `Makefile`,
 `spotbugs-exclude.xml`, `owasp-suppressions.xml`) as the starting point rather than writing a
-`pom.xml` from scratch — it keeps the plugin versions and profile wiring consistent even though
+`pom.xml` from scratch. It keeps the plugin versions and profile wiring consistent, even though
 nothing enforces that automatically anymore. CI discovers new services from the directory listing
 under `services/` (see the `CI` section below), so no workflow change is needed there.
 
@@ -71,11 +71,11 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 - Starters are modular: `spring-boot-starter-webmvc` (not `-web`),
   `spring-boot-starter-security-oauth2-resource-server` (not
   `-oauth2-resource-server`), `spring-boot-starter-aspectj` (not `-aop`).
-- Test slices are separate starters (`spring-boot-starter-webmvc-test`, …), each
+- Test slices are separate starters (`spring-boot-starter-webmvc-test`, etc.), each
   pulling in `spring-boot-starter-test`.
 - Jackson 3: `ObjectMapper`/databind is `tools.jackson.*`; annotations stay under
   `com.fasterxml.jackson.annotation`.
-- Testcontainers 2.x: artifact ids are prefixed — `testcontainers-postgresql`,
+- Testcontainers 2.x: artifact ids are now prefixed, for example `testcontainers-postgresql`,
   `testcontainers-kafka`, `testcontainers-junit-jupiter`.
 
 ## Conventions
@@ -83,30 +83,30 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 - Base package `io.pallet`, then the service name (`io.pallet.configserver`).
 - Tests: unit tests are `*Test`, integration tests are `*IntegrationTest`.
   Surefire runs the first, Failsafe (`verify`) runs the second. Integration
-  tests use Testcontainers for Kafka, Postgres, ClickHouse, and Keycloak — never
+  tests use Testcontainers for Kafka, Postgres, ClickHouse, and Keycloak. Don't
   mock those; the failure modes they hide are the point of the project. CI only
-  runs Surefire (`-DskipITs`, see §CI) — Failsafe's integration tests are a
+  runs Surefire (`-DskipITs`, see §CI); Failsafe's integration tests are a
   required local gate before opening a PR, not something CI checks for you. See
   `Test.md` for the full testing guide.
-- Workflows (`deploy-orchestrator-service`, `billing-service` — the two services embedding a
-  Temporal worker, per [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md)): workflow and
-  activity unit tests are `*WorkflowTest`, using the Temporal Java SDK's
+- Workflows: `deploy-orchestrator-service` and `billing-service` are the two services embedding a
+  Temporal worker, per [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md). Their
+  workflow and activity unit tests are `*WorkflowTest`, using the Temporal Java SDK's
   `TestWorkflowEnvironment`. A change to a workflow's shape also needs a replay test
-  (`WorkflowReplayer` against a history captured from the previous version) before it merges —
-  the same non-negotiable gate `./mvnw clean verify` already is for everything else, since a
-  determinism break here surfaces as a stuck production saga, not a failed build.
+  (`WorkflowReplayer` against a history captured from the previous version) before it merges.
+  That's the same non-negotiable gate `./mvnw clean verify` already is for everything else,
+  because a determinism break here surfaces as a stuck production saga, not a failed build.
 - Events: add a flat record to `platform-common-events` implementing
   `PlatformEvent`, a `Topics` constant, past-tense `domain.fact` name.
 - Config: shared config is served by `config-server` from `config-repo/`.
   Service-specific config is `config-repo/<service-name>.yml`. Never commit a
-  real secret — see [`SECURITY.md`](SECURITY.md).
+  real secret; see [`SECURITY.md`](SECURITY.md).
 - Code style: no comments that restate the code; keep them for a genuine hidden
   constraint. Prefer editing an existing class over a new abstraction for a
   one-off.
 - Whitespace/EOL/charset style is defined once in `.editorconfig` and enforced
   by [`editorconfig-checker`](https://github.com/editorconfig-checker/editorconfig-checker)
   via a `pre-commit` hook. Indent *style* (tabs vs. spaces) is enforced, but
-  indent *size* is not — nested Markdown lists and XML/Java continuation-line
+  indent *size* is not: nested Markdown lists and XML/Java continuation-line
   alignment don't fit a strict "multiple of N spaces" rule, so `IndentSize` is
   disabled in `.editorconfig-checker.json`. Set up once per clone:
   ```bash
@@ -114,29 +114,29 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
   pre-commit install --hook-type pre-commit --hook-type pre-push
   ```
   Installing both hook types means a bad commit is caught at `git commit`,
-  and `git push` re-checks anything that slipped through (e.g. a commit made
+  and `git push` re-checks anything that slipped through (say, a commit made
   with `--no-verify`) before it reaches `origin`. `make format-check` runs
   the same checks on demand (`pre-commit run --all-files`). They also run in
   CI (`style` job) regardless of whether the local hooks are installed.
 - Java formatting (import order, unused imports, wrapping, brace placement)
   is [Palantir Java Format](https://github.com/palantir/palantir-java-format)
-  via the Spotless Maven plugin, not `.editorconfig` — editorconfig only
-  covers whitespace-level rules, not language formatting. `mvn spotless:check`
+  via the Spotless Maven plugin, not `.editorconfig`. Editorconfig only covers
+  whitespace-level rules, not language formatting. `mvn spotless:check`
   is bound to the `verify` phase, so it runs on every `./mvnw clean verify` /
   CI build without any extra flag, in `platform-common` and in every service
-  alike (each service's own `pom.xml` carries the same plugin config — see
+  alike (each service's own `pom.xml` carries the same plugin config, see
   "The build" above). `make -C platform-common format` or `make -C
   services/<name> format` (equivalently, `cd` into either and run `make
-  format`) fixes that project's own drift — there is no repo-wide `format`
+  format`) fixes that project's own drift. There is no repo-wide `format`
   target, since there's no repo-wide POM left to run it against. Locally,
   `.pre-commit-config.yaml` has one `spotless-check-*` hook per project
   (`platform-common`, `config-server`, `notification-service`), each scoped by
-  path so only a `.java` file under that project's own directory triggers it;
-  adding a new service needs a matching hook added by hand, same as the CI
-  `security-service`/`service` matrix jobs need no such addition but this file
+  path so only a `.java` file under that project's own directory triggers it.
+  Adding a new service needs a matching hook added by hand; the CI
+  `security-service`/`service` matrix jobs need no such addition, but this file
   does. CI's `style` job explicitly skips all of these
-  (`SKIP: spotless-check-...`) since each project's own `verify` already runs
-  `spotless:check` — the pre-commit hooks exist purely for fast local
+  (`SKIP: spotless-check-...`), because each project's own `verify` already runs
+  `spotless:check`. The pre-commit hooks exist purely for fast local
   feedback, not as CI's actual enforcement.
 
 ## CI
@@ -145,61 +145,61 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 `main`. Either is classified the same way by the `scope` job, diffing against
 the PR's base SHA or the push's previous SHA:
 
-- a change under `platform-common/<name>/` only — a matrix job builds each
+- A change under `platform-common/<name>/` only triggers a matrix job that builds each
   affected `platform-common` module, from inside `platform-common/` with its
   own wrapper (`./mvnw -pl <module> -am -amd clean verify -DskipITs`: also-make
   its dependencies so it compiles, also-make-dependents so the change is
-  verified against every `platform-common` module downstream of it), while
-  unrelated `platform-common` modules are skipped;
-- a change under `services/<name>/` — since every service is now a fully
-  independent Maven project, a matrix job builds *only* that service, from
-  inside its own directory with its own wrapper (`cd services/<name> &&
-  ./mvnw clean verify -DskipITs`) — there is no `-am`/`-amd` step and no other
-  service is touched, because none of them share anything to also-make;
-- a change to `platform-common/pom.xml`, `platform-common`'s own Maven
-  wrapper, its SpotBugs/OWASP files, or `build.yml` itself — falls back to a
+  verified against every `platform-common` module downstream of it). Unrelated
+  `platform-common` modules are skipped.
+- A change under `services/<name>/` triggers a matrix job that builds *only* that service,
+  since every service is now a fully independent Maven project. It runs
+  from inside its own directory with its own wrapper (`cd services/<name> &&
+  ./mvnw clean verify -DskipITs`). There is no `-am`/`-amd` step and no other
+  service is touched, because none of them share anything to also-make.
+- A change to `platform-common/pom.xml`, `platform-common`'s own Maven
+  wrapper, its SpotBugs/OWASP files, or `build.yml` itself falls back to a
   full `platform-common` reactor build plus every service. Nothing plays this
   role for services any more: there is no file left whose change can affect
-  more than one service's build;
-- no usable base commit to diff against (the push's previous SHA is unset,
-  the zero SHA, or unreachable — a new branch, first push, or force push) —
-  same full-build fallback, since there's nothing safe to diff.
+  more than one service's build.
+- If there's no usable base commit to diff against (the push's previous SHA is unset,
+  the zero SHA, or unreachable, as with a new branch, first push, or force push), the same
+  full-build fallback applies, since there's nothing safe to diff.
 
 Every `clean verify` invocation above carries `-DskipITs`: Surefire's `*Test`
-classes run, Failsafe's `*IntegrationTest` classes (Testcontainers — Postgres,
-Kafka, Keycloak) don't. That's deliberate, not an oversight — free GitHub
+classes run, Failsafe's `*IntegrationTest` classes (Testcontainers: Postgres,
+Kafka, Keycloak) don't. That's deliberate, not an oversight. Free GitHub
 Actions runners are 2 vCPU and can't reliably boot several real containers
 alongside the app under test without the same async assertions that pass
 locally timing out under load. Integration tests remain mandatory; they're
 just a local gate (`./mvnw clean verify`, no flag, Docker required) instead of
-a CI one — see `Test.md`'s "CI vs. local" section for the full reasoning and
+a CI one. See `Test.md`'s "CI vs. local" section for the full reasoning and
 what this expects of you as a contributor. `-DskipITs` is Maven Failsafe's own
 recognized property; nothing in `platform-common-test` or any service's `pom.xml`
 had to change to support it.
 
-Two separate `security` jobs mirror that scoping — SpotBugs + FindSecBugs, a
+Two separate `security` jobs mirror that scoping, SpotBugs plus FindSecBugs, a
 hard fail. `security-common` runs whenever any `platform-common` module (or
 the whole reactor) is in scope; `security-service` matrixes over just the
 affected services, since each now runs its own SpotBugs/OWASP profile against
 its own exclude/suppression files. Neither runs when nothing in its scope
 changed. OWASP Dependency-Check does not run in CI (see
-[SECURITY.md](SECURITY.md)) — run it locally before a dependency bump. The
-`build` job is the single stable status check to require in branch protection;
-it passes when every build path that actually ran succeeded, and a skipped
+[SECURITY.md](SECURITY.md)); run it locally before a dependency bump. The
+`build` job is the single stable status check to require in branch protection.
+It passes when every build path that actually ran succeeded, and a skipped
 job (nothing in its scope changed) counts as a pass.
 
-Adding a service or a `platform-common` module needs no CI change — the
+Adding a service or a `platform-common` module needs no CI change: the
 `scope` job discovers both from the directory listing and the diff.
 
 ## Pull requests
 
 - Branch off `main`. Keep a PR to one service or one shared change.
-- CI (green check on the PR) means unit tests pass — it does not run
+- CI (green check on the PR) means unit tests pass; it does not run
   integration tests (see §CI). Before opening the PR, run the full
-  `./mvnw clean verify` yourself — inside `platform-common/` for a
+  `./mvnw clean verify` yourself: inside `platform-common/` for a
   `platform-common` change, inside the service's own directory
-  (`cd services/<name> && ./mvnw clean verify`) for a service change — and
-  confirm it's green; Docker must be running. Don't disable a test, skip
+  (`cd services/<name> && ./mvnw clean verify`) for a service change, and
+  confirm it's green (Docker must be running). Don't disable a test, skip
   integration tests as a way to dodge a real failure, or use `--no-verify` to
-  get green — fix the cause.
+  get green. Fix the cause instead.
 - A decision that changes architecture gets an ADR in the same PR.

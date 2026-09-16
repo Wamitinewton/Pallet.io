@@ -6,7 +6,7 @@
 ## Context
 
 `PROJECT.md` is the design brief and will keep changing. Decisions that shaped
-the brief — and the ones its "open questions" section still has to settle — need
+the brief, and the ones its "open questions" section still has to settle, need
 a durable record that says *why*, not just *what*, so a choice is not silently
 reversed later or re-argued from scratch.
 

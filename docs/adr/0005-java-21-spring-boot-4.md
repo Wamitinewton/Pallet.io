@@ -16,7 +16,7 @@ build machine ships JDK 25, which compiles a 21 release without issue. Moving th
 target to 25 later is a one-line change in the parent POM plus a CI matrix bump.
 
 **Spring Boot 4.1.0** via `spring-boot-starter-parent`, with **Spring Cloud
-2025.1.2** (Oakwood) — Spring Cloud 2025.1.1 and earlier do not run against Boot
+2025.1.2** (Oakwood). Spring Cloud 2025.1.1 and earlier do not run against Boot
 4.1.
 
 Conventions that follow from Boot 4:
@@ -41,4 +41,4 @@ Conventions that follow from Boot 4:
 - Resilience4j's Spring Boot 4 starter compatibility must be confirmed at first
   use; the BOM is imported in the parent but nothing depends on it yet.
 - Contributors copying Spring Boot 3 snippets from the web will hit the renamed
-  starters and Jackson packages — called out in `CONTRIBUTING.md`.
+  starters and Jackson packages, called out in `CONTRIBUTING.md`.
