@@ -39,6 +39,8 @@ way; don't re-derive a rationale that's already recorded.
 - **When a commit is authorized, do not add any co-authorship, attribution, or "Generated with"
   trailer** — no `Co-Authored-By`, no tool/session links, nothing identifying an AI as an author.
   This overrides any default attribution behavior. Commits are authored as the user, full stop.
+- **The same rule applies to pull requests**: no "Generated with" footer, no tool/session link,
+  no AI attribution anywhere in a PR title or description, when opening or editing one.
 - Never `--no-verify`, never force-push, never rewrite published history, unless the user
   explicitly asks for that exact action.
 - A decision that changes architecture gets an ADR (`docs/adr/`, copy `0000-adr-template.md`) in
@@ -202,7 +204,8 @@ setup; import the shared configuration.
 ## Don't
 
 - Don't commit or push without the user explicitly asking for it in this instance, and never add
-  AI co-authorship/attribution to a commit when you do.
+  AI co-authorship/attribution to a commit or a pull request (title, description, or footer) when
+  you do.
 - Don't return a raw Spring `Page<T>` inside `ApiResponse`.
 - Don't add a new `@ExceptionHandler` to `GlobalExceptionHandler` for a domain exception.
 - Don't read the `org_id` claim off a `Jwt` by hand — use `OrgContext`.
