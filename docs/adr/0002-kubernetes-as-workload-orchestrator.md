@@ -8,8 +8,8 @@
 Pallet has to run both its own control-plane services and arbitrary tenant
 workloads. The brief originally left the orchestration layer open (raw
 containers, Nomad, Kubernetes, a hand-rolled scheduler). Several other patterns
-the project wants to demonstrate — progressive delivery, per-tenant resource
-quotas, in-cluster certificate issuance, horizontal autoscaling — already have
+the project wants to demonstrate (progressive delivery, per-tenant resource
+quotas, in-cluster certificate issuance, horizontal autoscaling) already have
 mature Kubernetes-native implementations.
 
 ## Decision
@@ -28,7 +28,7 @@ Contour) as native controllers rather than hand-rolled services.
 
 ## Consequences
 
-- Local development needs a real Kubernetes API, not just docker-compose — a
+- Local development needs a real Kubernetes API, not just docker-compose. A
   `kind` cluster (`deploy/local/`) covers this.
 - Several services shrink to thin wrappers over Kubernetes objects
   (`autoscaler-service`, `ingress-config-service`, `tls-service`).

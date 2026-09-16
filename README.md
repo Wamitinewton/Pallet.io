@@ -1,6 +1,6 @@
 # Pallet
 
-A self-built platform as a service, Connect a Git repo, push code, get back a live URL with TLS. Built in
+A self-built platform as a service. Connect a Git repo, push code, get back a live URL with TLS. Built in
 public, one service at a time.
 
 The full design brief is [`PROJECT.md`](PROJECT.md). Decisions and their
@@ -11,13 +11,13 @@ rationale are in [`docs/adr/`](docs/adr/README.md).
 - Java 21, Spring Boot 4.1. `platform-common/` is one self-contained Maven
   multi-module reactor (own POM, own Maven wrapper); every service under
   `services/<name>/` is its own fully independent Maven project (own POM, own
-  Maven wrapper) that consumes `platform-common-*` as a published dependency —
-  see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`PACKAGES.md`](PACKAGES.md)
+  Maven wrapper) that consumes `platform-common-*` as a published dependency.
+  See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`PACKAGES.md`](PACKAGES.md)
 - Apache Kafka event backbone (`spring-boot-starter-kafka`)
-- Temporal (Java SDK) for the deploy and billing sagas — durable workflow execution and
+- Temporal (Java SDK) for the deploy and billing sagas: durable workflow execution and
   compensation, embedded as a worker in `deploy-orchestrator-service` and `billing-service` only
   (see [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md))
-- Keycloak for identity — one realm, `org_id` claim on every token
+- Keycloak for identity: one realm, `org_id` claim on every token
 - PostgreSQL for most services; ClickHouse for `audit-log-service` and
   `usage-metering-service`; Redis, MinIO, Vault alongside
 - Micrometer + OpenTelemetry → Prometheus / Grafana / Jaeger
@@ -32,7 +32,7 @@ conventions (modular starters, Jackson 3, Testcontainers 2).
 - JDK 21+ (the repo builds a Java 21 release; JDK 25 is fine)
 - Docker + Docker Compose
 - `kind` + `kubectl` for the deploy path (later phases)
-- Maven is not required — every buildable directory (`platform-common/`, and
+- Maven is not required: every buildable directory (`platform-common/`, and
   each `services/<name>/`) bundles its own `./mvnw`
 
 ## Getting started
@@ -53,7 +53,7 @@ make obs   # from the repo root
 
 `make help` at the repo root lists infra targets only (docker-compose, kind, repo-wide format
 check). `make help` inside `platform-common/` or any `services/<name>/` directory lists that
-project's own build targets — each is independent of the others.
+project's own build targets, each independent of the others.
 
 ## Local endpoints
 
@@ -72,10 +72,10 @@ project's own build targets — each is independent of the others.
 ## API documentation
 
 Every service that has adopted `platform-common-openapi` publishes a live OpenAPI spec under its
-own `/api/v1/<service>/v3/api-docs`. `api-gateway` aggregates all of them into one page — start
+own `/api/v1/<service>/v3/api-docs`. `api-gateway` aggregates all of them into one page: start
 `api-gateway` plus whichever backends you want to browse, then open
 **http://localhost:8083/docs**. The page lists a tab per service currently registered in
-`config-repo/api-gateway.yml`'s `pallet.gateway.routes` — no separate docs registry, and no gateway
+`config-repo/api-gateway.yml`'s `pallet.gateway.routes`. There's no separate docs registry, and no gateway
 change needed when a new service adopts `platform-common-openapi`. See
 [ADR-0014](docs/adr/0014-openapi-docs-aggregation.md) for the design.
 
@@ -99,7 +99,7 @@ docs/adr/                     architecture decision records
 ```
 
 Every service under `services/` is a standalone Maven project with no parent POM shared with
-`platform-common` or with any other service — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+`platform-common` or with any other service. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Contributing
 

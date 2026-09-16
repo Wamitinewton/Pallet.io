@@ -6,7 +6,7 @@ are for collaborators you own, not for Postgres or Kafka, and a test's name tell
 Maven plugin runs it before you even open the file.
 
 If you're adding a new service, add `platform-common-test` as a `test`-scope dependency and
-read the annotation Javadoc — that's the source of truth this document is built from. This file
+read the annotation Javadoc, that's the source of truth this document is built from. This file
 is the map; the annotations are the territory.
 
 ## The four kinds of test
@@ -16,9 +16,9 @@ prove, not habit.
 
 | Annotation | What it boots | When to reach for it |
 |---|---|---|
-| `@UnitTest` | Nothing — no Spring context, no container. Mockito only. | Testing a single class's logic in isolation: a mapper, a validator, a service method with its collaborators mocked. |
+| `@UnitTest` | Nothing, no Spring context, no container. Mockito only. | Testing a single class's logic in isolation: a mapper, a validator, a service method with its collaborators mocked. |
 | `@ControllerTest` | A `@WebMvcTest` slice, no database, no broker. | Testing request/response shape, validation, and error rendering for one controller. |
-| `@RepositoryTest` | A `@DataJpaTest` slice against a real, singleton Postgres container. | Testing a repository method, a native query, JSONB mapping — anything where the database's actual behaviour matters. |
+| `@RepositoryTest` | A `@DataJpaTest` slice against a real, singleton Postgres container. | Testing a repository method, a native query, JSONB mapping, anything where the database's actual behaviour matters. |
 | `@IntegrationTest` | A full application context, random port, real Postgres *and* Kafka. | End-to-end: an event comes in, gets processed, lands in the database, and the read API reflects it. |
 | `@MessagingIntegrationTest` | A full context with real Kafka but no Postgres. | Proving a `@KafkaListener` consumes and dedupes correctly, without paying for a datasource the test doesn't need. |
 
@@ -30,7 +30,7 @@ the real thing.
 ## Naming decides who runs your test
 
 Surefire runs `*Test`. Failsafe runs `*IntegrationTest`, during `mvn verify`, after the
-`package` phase. This is not a style preference — it's wired into every buildable POM in this
+`package` phase. This isn't a style preference: it's wired into every buildable POM in this
 repo (`platform-common`'s and every service's own), and the naming is how the build tells the
 two plugins apart. Get it wrong and your test either doesn't run in CI, or runs at the wrong
 phase and blocks a build it shouldn't.
@@ -39,16 +39,16 @@ phase and blocks a build it shouldn't.
 - `@IntegrationTest`, `@MessagingIntegrationTest` classes are named `*IntegrationTest`.
 
 `./mvnw test` gives you fast feedback (unit + slice tests, no containers). `./mvnw verify` runs
-everything, containers included, and is the bar a PR has to clear locally before you open it —
-see §CI vs. local below for why "locally" is load-bearing.
+everything, containers included, and is the bar a PR has to clear locally before you open it.
+See §CI vs. local below for why "locally" is load-bearing.
 
 ## Don't mock what the container is there to test
 
-If a container exists for something — Postgres, Kafka, Redis, Keycloak — the point of the
+If a container exists for something (Postgres, Kafka, Redis, Keycloak), the point of the
 integration or repository test is to hit the real thing. Mocking a `Repository` in a
 `@RepositoryTest`, or a `KafkaTemplate` in a `@MessagingIntegrationTest`, defeats the reason
-that test exists. The failure modes that matter here — a JSONB column that doesn't round-trip,
-a unique constraint that doesn't fire, a listener that double-processes on redelivery — only
+that test exists. The failure modes that matter here, a JSONB column that doesn't round-trip,
+a unique constraint that doesn't fire, a listener that double-processes on redelivery, only
 show up against the real thing. This is called out in `CONTRIBUTING.md` for a reason: it's the
 whole value of paying the container startup cost.
 
@@ -59,9 +59,9 @@ is someone else's already-tested code.
 
 Every `@RepositoryTest` and `@IntegrationTest` in the same test run shares one Postgres
 container; every Kafka-touching test shares one Kafka container. They start lazily on first
-use and are never explicitly stopped — Ryuk cleans them up when the JVM exits. You don't start
+use and are never explicitly stopped. Ryuk cleans them up when the JVM exits. You don't start
 or stop anything yourself, and you shouldn't try to. If you find yourself reaching for
-`@Testcontainers` or a `@Container` field directly, stop — that's almost always a sign you
+`@Testcontainers` or a `@Container` field directly, stop, that's almost always a sign you
 should be using the shared configuration instead, not adding a second container of the same
 kind.
 
@@ -69,7 +69,7 @@ Two things follow from this:
 
 - **Don't rely on state from another test class.** Containers are shared, but each
   `@RepositoryTest` method still runs in its own rolled-back transaction. Integration tests
-  don't get that for free — write them so they clean up after themselves or use data that
+  don't get that for free, write them so they clean up after themselves or use data that
   won't collide with anything else running in the same fork.
 - **Image versions are overridable, not hardcoded into your test.** If you need a different
   Postgres or Kafka version for a one-off compatibility check, that's a system property
@@ -83,7 +83,7 @@ service touches them. If your service does, `@Import` the relevant configuration
 ## Asserting on the platform's response envelopes
 
 Every endpoint returns one of three shapes: `ApiResponse`, `PageResponse`, or `ErrorResponse`.
-Don't write `jsonPath` chains or manual field checks for these — use the assertions built for
+Don't write `jsonPath` chains or manual field checks for these, use the assertions built for
 them:
 
 ```java
@@ -94,7 +94,7 @@ assertThat(errorResponse).isFailure().hasErrorCode("NOT_FOUND").hasStatus(HttpSt
 assertThat(pageResponse).isFirstPage().content().hasSize(3);
 ```
 
-Static-import `assertThat` from `PalletAssertions` alongside AssertJ's own — overload
+Static-import `assertThat` from `PalletAssertions` alongside AssertJ's own. Overload
 resolution sorts out which one applies based on the argument type. If you're asserting on a
 raw MockMvc JSON body instead of a deserialized object, that's a sign to deserialize it first
 (`JsonTestSupport.fromJson`) rather than hand-writing `jsonPath` for a shape that already has
@@ -103,7 +103,7 @@ an assertion.
 ## Testing secured endpoints
 
 `@ControllerTest` disables servlet filters by default, Spring Security included. This is
-deliberate — it means a service where only *some* controllers are secured doesn't have every
+deliberate: it means a service where only *some* controllers are secured doesn't have every
 other controller test start 401ing the moment the security starter lands on the classpath.
 
 If you're specifically testing a secured controller's authorization rules, turn filters back
@@ -125,7 +125,7 @@ class SecuredControllerTest {
 `orgJwt` sets both the `org_id` claim and the matching `ROLE_*` granted authorities, so a
 `hasRole("admin")` check on the controller under test sees exactly what a real token would
 produce. This only makes sense for a service that already depends on
-`platform-common-security` — it's an optional piece of `platform-common-test`, not something
+`platform-common-security`, it's an optional piece of `platform-common-test`, not something
 every service pulls in.
 
 ## Writing the test itself
@@ -140,14 +140,14 @@ every service pulls in.
 - **Prefer the platform's own fixtures over new abstractions.** Before writing a test helper,
   check whether `platform-common-test` already has one. A second, slightly different way to
   stamp a mock JWT or assert on an `ErrorResponse` is a maintenance cost, not a convenience.
-- **A comment in a test earns its place the same way it does anywhere else** — only when it
+- **A comment in a test earns its place the same way it does anywhere else**, only when it
   explains a non-obvious constraint (why a value has to be exactly this, why a step is ordered
   this way), never to narrate what the assertion below it already says.
 
 ## Local setup
 
 Tests that touch a container need Docker (or a Testcontainers-compatible runtime) running
-locally. `./mvnw test` never needs it — that's unit and slice tests only. `./mvnw verify` does.
+locally. `./mvnw test` never needs it, that's unit and slice tests only. `./mvnw verify` does.
 
 ```bash
 ./mvnw test                              # fast: unit + slice tests, no containers
@@ -158,30 +158,30 @@ cd services/notification-service && ./mvnw verify
 ```
 
 If a container-backed test is slow to start locally, that's almost always Docker pulling an
-image for the first time — after that first pull, the singleton pattern means every test class
+image for the first time. After that first pull, the singleton pattern means every test class
 in the same run reuses the same running container.
 
 ## CI vs. local
 
-CI (`.github/workflows/build.yml`) runs `./mvnw clean verify -DskipITs` — Surefire's `*Test`
+CI (`.github/workflows/build.yml`) runs `./mvnw clean verify -DskipITs`, Surefire's `*Test`
 classes only. It does **not** boot Postgres, Kafka, or Keycloak. This isn't a statement that
 integration tests don't matter; it's a concession to free GitHub Actions runners (2 vCPU,
 shared, no self-hosted option here): booting several real containers alongside a full Spring
 context and asserting on eventually-consistent async behaviour (Kafka consumer catch-up, email
 delivery) needs headroom those runners don't reliably have, and a CI run that fails one time in
-five for timing reasons is worse than no CI signal at all — it trains everyone to ignore red.
+five for timing reasons is worse than no CI signal at all. It trains everyone to ignore red.
 
 What this means for you:
 
 - `*IntegrationTest` classes still exist, are still required, and are still the only correct way
-  to test anything that touches Postgres, Kafka, Keycloak, or ClickHouse — nothing in this
+  to test anything that touches Postgres, Kafka, Keycloak, or ClickHouse, nothing in this
   section changes `CONTRIBUTING.md`'s "never mock those" rule.
-- Running the full suite — `./mvnw clean verify`, no `-DskipITs` — is **your** job before you
+- Running the full suite, `./mvnw clean verify`, no `-DskipITs`, is **your** job before you
   open a PR, not CI's. A green CI check on a PR means "unit tests pass," not "this works." Say so
   in the PR description if you skipped this for some reason (you shouldn't).
 - A failing `*IntegrationTest` you can't get green locally is a blocker the same way a failing
-  unit test is — it just won't be a red X on the PR telling you that. Don't take CI's silence on
+  unit test is, it just won't be a red X on the PR telling you that. Don't take CI's silence on
   integration tests as permission to skip running them.
 - If you're touching Testcontainers config, container images, or anything under
   `platform-common-test`, run the full suite (`./mvnw verify`) more than once locally before
-  opening the PR — that's exactly the code CI is no longer checking for you.
+  opening the PR, that's exactly the code CI is no longer checking for you.

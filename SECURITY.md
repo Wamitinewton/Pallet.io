@@ -13,7 +13,7 @@ Two checks run under the `security` Maven profile:
 | Tool | What it covers | Command | Runs in CI |
 |---|---|---|---|
 | SpotBugs + FindSecBugs | SAST over compiled bytecode (injection, crypto misuse, hardcoded secrets) | `./mvnw -P security verify` (from `platform-common/` or a service's own directory) | yes, on every PR |
-| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` (from `platform-common/` or a service's own directory) | no — run it locally |
+| OWASP Dependency-Check | Known CVEs in Maven dependencies, checked against the NVD | `./mvnw -P security verify` (from `platform-common/` or a service's own directory) | no, run it locally |
 
 OWASP Dependency-Check does not run in CI: it depends on a rate-limited
 external NVD API key, which makes it a poor fit for a check that has to pass
@@ -46,5 +46,5 @@ Spring Boot upgrade.
 No real secret belongs in any tracked file. Local `docker-compose.yml`
 credentials only unlock the local stack and are not a precedent. Real secrets
 come from environment variables or git-ignored override files
-(`application-secrets.yaml`, `*-credentials.json`, `.env` — already ignored),
+(`application-secrets.yaml`, `*-credentials.json`, `.env`, already ignored),
 and in production from Vault / Kubernetes Secrets via `secrets-service`.

@@ -24,7 +24,7 @@ Build the wider foundation now, per `docs/notification-service/ARCHITECTURE.md`,
 shipping email-only and retrofitting in-app/broadcast later:
 
 - Two channels ship together: **email** (SMTP via Mailpit locally) and **in-app** (delivery row
-  = read-side record). Slack, tenant webhooks, and other channels stay deferred — they plug into
+  = read-side record). Slack, tenant webhooks, and other channels stay deferred; they plug into
   the same `NotificationChannel` interface later with no change to the consumer or read API.
 - The data model is the two-table `notifications` / `notification_deliveries` split (not the
   originally-sketched single `delivery_log`), plus an independent `org_members` local projection.
@@ -34,15 +34,15 @@ shipping email-only and retrofitting in-app/broadcast later:
   `platform-common-events` now, additively (absent/null stays `SINGLE`, so every existing
   producer keeps working unchanged).
 - Broadcast resolves against the local `org_members` projection, not a synchronous call to
-  `org-team-service` — consistent with the platform's "no service makes a blocking call to
+  `org-team-service`, consistent with the platform's "no service makes a blocking call to
   another" rule. Until `org-team-service` exists and publishes `org.member.added` /
   `org.member.removed`, an `ORG` broadcast resolves to zero recipients (visible via a
-  `notifications.broadcast_empty` counter) rather than failing — the seam is real, the upstream
+  `notifications.broadcast_empty` counter) rather than failing. The seam is real, the upstream
   producer isn't, yet.
 - Per-org rate limiting is a non-blocking permission check on the send path (Resilience4j
   `RateLimiter`, zero-wait), never a block on the Kafka poll loop; rejections become `THROTTLED`
   deliveries drained by an independent `@Scheduled` sweep.
-- Every notification and delivery row is retained in full — no TTL, no purge job.
+- Every notification and delivery row is retained in full, with no TTL and no purge job.
 
 `docs/workflows/notification-service/00-README.md` and its per-sprint files replace the old
 6-sprint Phase 1c table in `docs/workflows/ROADMAP.md` with this wider, still small-per-checkpoint
@@ -65,14 +65,14 @@ with no code change in this service.
 - Two new REST endpoint groups (list/read/unread-count) exist from the start, with the auth-scoping
   rules that come with exposing user-facing read state.
 - `org.member.added` / `org.member.removed` are reserved conceptually here but **not yet** added
-  to `platform-common-events`' `Topics` — that happens when `org-team-service`'s own workflow
+  to `platform-common-events`' `Topics`. That happens when `org-team-service`'s own workflow
   defines their exact payload. This service's `OrgMembershipEventListener` and the topic
   reservation are out of scope until then; tracked as a follow-up, not silently dropped.
 - `docs/workflows/ROADMAP.md` Phase 1c's checkpoint table needs to point at the new sprint list
   instead of the old email-only one (done in this same change).
 
 **Not done**: real-time push (WebSocket/SSE) for in-app, per-user notification preferences, a
-schema registry. See `ARCHITECTURE.md`'s Non-goals and Open questions sections — those remain
+schema registry. See `ARCHITECTURE.md`'s Non-goals and Open questions sections; those remain
 deferred, this ADR doesn't reopen them.
 
 ## Alternatives considered
@@ -81,6 +81,6 @@ deferred, this ADR doesn't reopen them.
   row *is* the read-side record, so bolting it on later means a migration and reshaping
   `notification_deliveries` after real data exists, whereas building it into the same table now
   costs nothing extra. Broadcast has the same shape of argument for `audience` and `org_members`.
-- **Resolve `ORG` broadcasts with a synchronous call to `org-team-service`.** Rejected outright —
+- **Resolve `ORG` broadcasts with a synchronous call to `org-team-service`.** Rejected outright:
   breaks the platform's no-blocking-cross-service-call rule and makes every broadcast's latency
   and availability depend on a second service being up.
