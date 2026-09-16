@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.pallet.common.api.PalletApiAutoConfiguration;
+import io.pallet.common.security.PublicApiPaths;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -23,14 +23,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * {@code PalletApiAutoConfiguration} is excluded so the fixture's own routes and springdoc's
- * {@code @RestController} endpoint both stay reachable at their literal, unprefixed paths — this
- * test isolates the OpenAPI module's behaviour, not the API path prefix.
- */
 @SpringBootTest(
         classes = PalletOpenApiAutoConfigurationIntegrationTest.TestApp.class,
-        properties = "spring.application.name=fixture-service")
+        properties = {
+            "spring.application.name=fixture-service",
+            "springdoc.api-docs.path=/v3/api-docs",
+            "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://example.invalid/jwks"
+        })
 @AutoConfigureMockMvc
 class PalletOpenApiAutoConfigurationIntegrationTest {
 
@@ -39,23 +38,27 @@ class PalletOpenApiAutoConfigurationIntegrationTest {
 
     @Test
     void apiDocsExposesTheBearerSchemeTheErrorSchemaAndStandardResponses() throws Exception {
-        mvc.perform(get("/v3/api-docs"))
+        mvc.perform(get("/api/v1/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(
                         jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")
                         .value("bearer"))
                 .andExpect(jsonPath("$.components.schemas.ErrorResponse").exists())
-                .andExpect(jsonPath("$.paths['/secured'].get.responses['401']").exists())
-                .andExpect(jsonPath("$.paths['/secured'].get.responses['500']").exists())
+                .andExpect(jsonPath("$.components.schemas.ErrorResponse.properties.meta.additionalProperties")
+                        .value(true))
+                .andExpect(jsonPath("$.paths['/api/v1/secured'].get.responses['401']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/v1/secured'].get.responses['500']")
+                        .exists())
                 .andExpect(jsonPath("$.security[0].bearerAuth").exists());
     }
 
     @Test
     void anExplicitSecurityRequirementsAnnotationOptsAnEndpointOutOfTheBearerRequirement() throws Exception {
-        mvc.perform(get("/v3/api-docs"))
+        mvc.perform(get("/api/v1/v3/api-docs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.paths['/public'].get.security").isEmpty());
+                .andExpect(jsonPath("$.paths['/api/v1/public'].get.security").isEmpty());
     }
 
     @Test
@@ -71,8 +74,27 @@ class PalletOpenApiAutoConfigurationIntegrationTest {
                 });
     }
 
+    @Test
+    void contributesAPublicApiPathForTheConfiguredDocsPathPrefixedLikeEveryOtherController() {
+        new WebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(PalletOpenApiAutoConfiguration.class))
+                .withPropertyValues(
+                        "spring.application.name=fixture-service", "springdoc.api-docs.path=/fixture/v3/api-docs")
+                .run(context -> assertThat(context.getBean(PublicApiPaths.class).patterns())
+                        .containsExactly("/api/v1/fixture/v3/api-docs"));
+    }
+
+    @Test
+    void contributesNoPublicApiPathWhenNoDocsPathIsConfigured() {
+        new WebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(PalletOpenApiAutoConfiguration.class))
+                .withPropertyValues("spring.application.name=fixture-service")
+                .run(context ->
+                        assertThat(context.getBeansOfType(PublicApiPaths.class)).isEmpty());
+    }
+
     @SpringBootConfiguration
-    @EnableAutoConfiguration(exclude = PalletApiAutoConfiguration.class)
+    @EnableAutoConfiguration
     static class TestApp {
 
         @RestController

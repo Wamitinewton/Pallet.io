@@ -1,9 +1,16 @@
 package io.pallet.common.test.containers;
 
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 
@@ -36,10 +43,22 @@ public class KeycloakTestContainerConfiguration {
 
     public static final String ADMIN_CLIENT_SECRET = "pallet-admin-client-secret";
 
+    /**
+     * Composes in whatever {@code OAuth2TokenValidator<Jwt>} beans the service under test
+     * contributes (e.g. {@code platform-common-security}'s session-revocation check) — the same
+     * beans Spring Boot's own {@code JwtDecoderConfiguration} would pick up, which never runs here
+     * since this bean itself is the {@code JwtDecoder} that configuration backs off from.
+     */
     @Bean
     @ConditionalOnMissingBean(JwtDecoder.class)
-    JwtDecoder keycloakJwtDecoder() {
-        return NimbusJwtDecoder.withIssuerLocation(issuerUri()).build();
+    JwtDecoder keycloakJwtDecoder(ObjectProvider<OAuth2TokenValidator<Jwt>> additionalValidators) {
+        NimbusJwtDecoder decoder =
+                NimbusJwtDecoder.withIssuerLocation(issuerUri()).build();
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        validators.add(new JwtIssuerValidator(issuerUri()));
+        additionalValidators.forEach(validators::add);
+        decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(validators));
+        return decoder;
     }
 
     @Bean

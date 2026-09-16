@@ -1,20 +1,25 @@
 package io.pallet.common.openapi;
 
+import io.pallet.common.api.ApiPathProperties;
 import io.pallet.common.error.ErrorResponse;
+import io.pallet.common.security.PublicApiPaths;
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
 
 /**
  * Registers the {@code bearerAuth} security scheme, a default {@link Info} block derived from
@@ -26,7 +31,7 @@ import org.springframework.context.annotation.Bean;
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass(OpenAPI.class)
-@EnableConfigurationProperties(OpenApiProperties.class)
+@EnableConfigurationProperties({OpenApiProperties.class, ApiPathProperties.class})
 public class PalletOpenApiAutoConfiguration {
 
     private static final String BEARER_SCHEME_NAME = "bearerAuth";
@@ -51,6 +56,7 @@ public class PalletOpenApiAutoConfiguration {
                 .resolveAsResolvedSchema(new AnnotatedType(ErrorResponse.class))
                 .referencedSchemas
                 .forEach(components::addSchemas);
+        disambiguateFreeFormMapSchema(components, "ErrorResponse", "meta");
 
         return new OpenAPI()
                 .info(new Info().title(title).description(description))
@@ -62,6 +68,25 @@ public class PalletOpenApiAutoConfiguration {
     @ConditionalOnMissingBean
     ErrorResponseOperationCustomizer errorResponseOperationCustomizer() {
         return new ErrorResponseOperationCustomizer();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "springdoc.api-docs", name = "path")
+    @ConditionalOnMissingBean(name = "openApiPublicApiPaths")
+    PublicApiPaths openApiPublicApiPaths(
+            ApiPathProperties apiPathProperties, @Value("${springdoc.api-docs.path}") String apiDocsPath) {
+        return new PublicApiPaths(HttpMethod.GET, apiPathProperties.prefix() + apiDocsPath);
+    }
+
+    private static void disambiguateFreeFormMapSchema(Components components, String schemaName, String propertyName) {
+        Schema<?> schema = components.getSchemas().get(schemaName);
+        if (schema == null || schema.getProperties() == null) {
+            return;
+        }
+        Schema<?> property = (Schema<?>) schema.getProperties().get(propertyName);
+        if (property != null) {
+            property.additionalProperties(Boolean.TRUE);
+        }
     }
 
     private static String humanize(String appName) {
