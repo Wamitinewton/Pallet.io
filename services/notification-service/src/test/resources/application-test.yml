@@ -22,6 +22,10 @@ spring:
           # KeycloakTestContainerConfiguration (@ConditionalOnMissingBean(JwtDecoder.class)).
           jwk-set-uri: http://localhost:1/not-used-in-tests
 
+springdoc:
+  api-docs:
+    path: /notification/v3/api-docs
+
 management:
   tracing:
     sampling:

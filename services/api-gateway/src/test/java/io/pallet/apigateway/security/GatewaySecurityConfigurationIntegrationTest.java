@@ -74,6 +74,11 @@ class GatewaySecurityConfigurationIntegrationTest {
         HttpResponse<String> response = send("GET", "/api/v1/identity/users/me", null);
 
         assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(response.headers().firstValue("WWW-Authenticate")).isPresent();
+        assertThat(response.body())
+                .contains("\"success\":false")
+                .contains("\"error\":\"AUTHENTICATION_REQUIRED\"")
+                .contains("\"statusCode\":401");
         IDENTITY_SERVICE.verify(0, getRequestedFor(urlEqualTo("/api/v1/identity/users/me")));
     }
 
