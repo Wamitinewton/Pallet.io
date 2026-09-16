@@ -54,17 +54,30 @@ every other `platform-common-*` module (`docs/workflows/README.md` §Conventions
 # config-repo/<service>.yml
 springdoc:
   api-docs:
-    path: /api/v1/<namespace>/v3/api-docs   # <namespace> = the service's ADR-0013 segment
+    path: /<namespace>/v3/api-docs   # <namespace> = the service's ADR-0013 segment, no /api/v1
   swagger-ui:
-    enabled: false                          # Scalar is the only UI; no service ships Swagger UI
+    enabled: false                   # Scalar is the only UI; no service ships Swagger UI
 ```
 
-The `api-docs.path` is placed **inside** the service's own ADR-0013 namespace on purpose, not
-derived automatically from it — `pallet.gateway.routes.<service>.path` is itself explicit
-per-service config, not derived from anything, and this follows the same convention rather than
-inventing a second derivation mechanism for one config line. Putting the path inside the namespace
-means it's already covered by the existing `/api/v1/<service>/**` gateway route
-(ADR-0013) — **no `api-gateway` routing change for a service's docs to become reachable.**
+The configured path is the **bare** namespace suffix, with no `/api/v1` prefix written into it —
+springdoc's own resource (`OpenApiWebMvcResource`) is itself a `@RestController` bean, so
+`platform-common-api`'s `PalletApiAutoConfiguration` (ADR-0010) already prefixes it with
+`pallet.api.prefix` exactly like every other controller in the service; writing the prefix into
+`api-docs.path` as well double-prefixes it (`/api/v1/api/v1/<namespace>/v3/api-docs`, unreachable).
+The path still lands **inside** the service's own ADR-0013 namespace once
+`PalletApiAutoConfiguration` is done with it, which is the point: no `api-gateway` routing change
+for a service's docs to become reachable, since it's already covered by the existing
+`/api/v1/<service>/**` gateway route (ADR-0013).
+
+`platform-common-openapi` also contributes a `platform-common-security` `PublicApiPaths` bean
+(`io.pallet.common.security.PublicApiPaths`) computed from the same `ApiPathProperties.prefix()` +
+`springdoc.api-docs.path`, so the docs endpoint reaches `PalletResourceServerAutoConfiguration`'s
+resource-server chain — or a service's own `SecurityFilterChain` override, if it injects
+`List<PublicApiPaths>` and applies them the same way `PalletResourceServerAutoConfiguration` does —
+as an unauthenticated route with **zero per-service security code**. Before this, a service had to
+hand-write a `SecurityFilterChain` override that re-derived the docs path itself just to make it
+public, which both duplicated the two config lines above as a third, code-level source of truth and
+broke the moment the two drifted (exactly the double-prefix bug this decision fixes).
 
 **3. `api-gateway` hosts the single aggregation point**, not a new aggregator service. A small
 controller builds a Scalar **multi-source** configuration (Scalar's API Reference natively

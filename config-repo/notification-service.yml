@@ -27,6 +27,6 @@ pallet:
 
 springdoc:
   api-docs:
-    path: /api/v1/notification/v3/api-docs
+    path: /notification/v3/api-docs
   swagger-ui:
     enabled: false

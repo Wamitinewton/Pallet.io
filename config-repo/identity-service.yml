@@ -3,6 +3,10 @@ spring:
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
     username: ${POSTGRES_USER:pallet}
     password: ${POSTGRES_PASSWORD:pallet}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 pallet:
   identity:
@@ -10,7 +14,7 @@ pallet:
       server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
       realm: ${KEYCLOAK_REALM:pallet}
       admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:identity-service}
-      admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+      admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:identity-service-dev-secret}
       token-client-id: ${KEYCLOAK_TOKEN_CLIENT_ID:pallet-dashboard}
     email-verification:
       code-ttl: PT15M
@@ -25,7 +29,7 @@ pallet:
     # Shared HMAC secret for signed action tokens (ARCHITECTURE.md §Signed action tokens).
     # org-team-service mints invite tokens with this same secret under the same env var name;
     # rotating it means rolling it in both services at once.
-    signing-key: ${PALLET_INVITES_SIGNING_KEY}
+    signing-key: ${PALLET_INVITES_SIGNING_KEY:caedd236b6a4d38e06869bb5d6d9a0ef17f631b786b805e9bcf31505711f93aa}
   resilience:
     policies:
       keycloak-admin:
@@ -37,6 +41,6 @@ pallet:
 
 springdoc:
   api-docs:
-    path: /api/v1/identity/v3/api-docs
+    path: /identity/v3/api-docs
   swagger-ui:
     enabled: false
