@@ -5,6 +5,7 @@ import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.observability.Monitored;
 import io.pallet.common.resilience.ExternalCall;
 import io.pallet.common.security.OrgContext;
+import io.pallet.common.security.RevokedSessionRegistry;
 import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.auth.KeycloakTokenClient;
 import io.pallet.identity.config.IdentityServiceProperties;
@@ -43,6 +44,7 @@ public class UserService {
     private final Keycloak keycloakAdminClient;
     private final ExternalCall externalCall;
     private final KeycloakTokenClient keycloakTokenClient;
+    private final RevokedSessionRegistry revokedSessionRegistry;
     private final PlatformEventPublisher platformEventPublisher;
     private final AuditPublisher auditPublisher;
     private final TransactionTemplate transactionTemplate;
@@ -54,6 +56,7 @@ public class UserService {
             Keycloak keycloakAdminClient,
             ExternalCall externalCall,
             KeycloakTokenClient keycloakTokenClient,
+            RevokedSessionRegistry revokedSessionRegistry,
             PlatformEventPublisher platformEventPublisher,
             AuditPublisher auditPublisher,
             PlatformTransactionManager transactionManager,
@@ -63,6 +66,7 @@ public class UserService {
         this.keycloakAdminClient = keycloakAdminClient;
         this.externalCall = externalCall;
         this.keycloakTokenClient = keycloakTokenClient;
+        this.revokedSessionRegistry = revokedSessionRegistry;
         this.platformEventPublisher = platformEventPublisher;
         this.auditPublisher = auditPublisher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -120,14 +124,26 @@ public class UserService {
                 .filter(candidate -> candidate.getId().equals(sessionId))
                 .findFirst()
                 .orElseThrow(() -> new SessionNotFoundException(sessionId));
-        deleteSession(session.getId());
+        revokeSessionEverywhere(session.getId());
     }
 
     public void revokeOtherSessions(Jwt jwt) {
         String currentSessionId = jwt.getClaimAsString(SESSION_ID_CLAIM);
         fetchSessions(jwt.getSubject()).stream()
                 .filter(session -> !session.getId().equals(currentSessionId))
-                .forEach(session -> deleteSession(session.getId()));
+                .forEach(session -> revokeSessionEverywhere(session.getId()));
+    }
+
+    /**
+     * Deleting the Keycloak session only stops new tokens from being issued under it — an access
+     * token minted before the delete stays otherwise-valid for its full lifetime, since it's a
+     * self-contained JWT no service round-trips to Keycloak to check. Recording the session id in
+     * {@link RevokedSessionRegistry} closes that gap: every service's {@code JwtDecoder} rejects a
+     * token whose {@code sid} shows up there, immediately and platform-wide.
+     */
+    private void revokeSessionEverywhere(String sessionId) {
+        deleteSession(sessionId);
+        revokedSessionRegistry.revoke(sessionId, properties.sessionRevocation().retention());
     }
 
     private List<UserSessionRepresentation> fetchSessions(String keycloakUserId) {

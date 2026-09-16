@@ -9,7 +9,8 @@ public record IdentityServiceProperties(
         @DefaultValue KeycloakAdmin keycloak,
         @DefaultValue EmailVerification emailVerification,
         @DefaultValue PasswordReset passwordReset,
-        @DefaultValue RateLimit rateLimit) {
+        @DefaultValue RateLimit rateLimit,
+        @DefaultValue SessionRevocation sessionRevocation) {
 
     public record KeycloakAdmin(
             String serverUrl,
@@ -34,4 +35,11 @@ public record IdentityServiceProperties(
     public record RateLimit(
             @DefaultValue("20") int permitsPerPeriod,
             @DefaultValue("PT1M") Duration period) {}
+
+    /**
+     * How long a revoked session's marker outlives the revocation call — must cover the realm's
+     * access token lifespan (see {@code infra/keycloak/pallet-realm.json}'s {@code accessTokenLifespan}),
+     * since a token minted moments before revocation stays otherwise-valid for its full lifetime.
+     */
+    public record SessionRevocation(@DefaultValue("PT15M") Duration retention) {}
 }

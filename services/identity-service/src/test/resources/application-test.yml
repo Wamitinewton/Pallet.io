@@ -28,6 +28,10 @@ pallet:
   invites:
     signing-key: test-only-signing-key-not-used-in-production
 
+springdoc:
+  api-docs:
+    path: /identity/v3/api-docs
+
 management:
   tracing:
     sampling:

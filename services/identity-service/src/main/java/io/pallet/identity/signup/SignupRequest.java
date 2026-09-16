@@ -8,10 +8,13 @@ import jakarta.validation.constraints.Size;
 public record SignupRequest(
         @NotBlank String organizationName,
 
-        @NotBlank @Pattern(regexp = "^[a-z0-9]+(-[a-z0-9]+)*$", message = "must be lowercase, alphanumeric, hyphen-separated")
-        String slug,
+        @NotBlank @Pattern(regexp = SLUG_PATTERN, message = SLUG_PATTERN_MESSAGE) String slug,
 
         @NotBlank @Email String email,
         @NotBlank String displayName,
 
-        @NotBlank @Size(min = 12, message = "must be at least 12 characters") String password) {}
+        @NotBlank @Size(min = 12, message = "must be at least 12 characters") String password) {
+
+    static final String SLUG_PATTERN = "^[a-z0-9]+(-[a-z0-9]+)*$";
+    static final String SLUG_PATTERN_MESSAGE = "must be lowercase, alphanumeric, hyphen-separated";
+}

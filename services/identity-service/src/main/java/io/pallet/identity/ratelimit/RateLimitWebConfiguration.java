@@ -27,6 +27,7 @@ class RateLimitWebConfiguration implements WebMvcConfigurer {
         registry.addInterceptor(new AuthRateLimitInterceptor(rateLimiter))
                 .addPathPatterns(
                         prefix + "/identity/signup",
+                        prefix + "/identity/signup/slugs/*/availability",
                         prefix + "/identity/auth/login",
                         prefix + "/identity/auth/email/verify",
                         prefix + "/identity/auth/email/resend-verification");

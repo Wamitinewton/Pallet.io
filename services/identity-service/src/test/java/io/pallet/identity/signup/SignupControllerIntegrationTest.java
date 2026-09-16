@@ -2,23 +2,31 @@ package io.pallet.identity.signup;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.pallet.common.error.ExternalServiceException;
 import io.pallet.common.events.Topics;
+import io.pallet.common.resilience.ExternalCall;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
 import io.pallet.common.test.json.JsonTestSupport;
 import io.pallet.identity.keycloak.KeycloakAdminTestConfiguration;
+import jakarta.ws.rs.core.Response;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
+import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -60,6 +68,9 @@ class SignupControllerIntegrationTest {
 
     @MockitoSpyBean
     private OrgBootstrapRepository orgBootstrapRepository;
+
+    @MockitoSpyBean
+    private ExternalCall externalCall;
 
     private static String unique() {
         return UUID.randomUUID().toString().substring(0, 8);
@@ -201,6 +212,86 @@ class SignupControllerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                         "select count(*) from identity.users where email = ?", Integer.class, email))
                 .isEqualTo(0);
+    }
+
+    @Test
+    void aRoleAssignmentFailureAfterUserCreationTriggersACompensatingDeleteWithoutRetryingUserCreation()
+            throws Exception {
+        String slug = "acme-" + unique();
+        String email = "owner-" + unique() + "@pallet-test.local";
+        // 1st invocation: real user-create call (succeeds). 2nd: simulated role-assignment
+        // failure. 3rd: real compensating-delete call — must not be masked by the 2nd stub, or
+        // the orphan this test exists to catch would never actually get cleaned up.
+        doCallRealMethod()
+                .doThrow(new ExternalServiceException(
+                        "Keycloak is temporarily unavailable",
+                        "simulated role-assignment failure",
+                        new RuntimeException("connection reset")))
+                .doCallRealMethod()
+                .when(externalCall)
+                .call(eq("keycloak-admin"), any());
+
+        performSignup(UUID.randomUUID().toString(), signupJson(slug, email)).andExpect(status().isBadGateway());
+
+        assertThat(keycloakUsersByEmail(email)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from identity.organizations where slug = ?", Integer.class, slug))
+                .isEqualTo(0);
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from identity.users where email = ?", Integer.class, email))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void aPreExistingKeycloakAccountUnderADifferentOrgIsRejectedAndLeftUntouched() throws Exception {
+        String email = "owner-" + unique() + "@pallet-test.local";
+        UserRepresentation foreignUser = new UserRepresentation();
+        foreignUser.setUsername(email);
+        foreignUser.setEmail(email);
+        foreignUser.setEnabled(true);
+        foreignUser.singleAttribute("org_id", UUID.randomUUID().toString());
+        String foreignUserId;
+        try (Response response = keycloakAdminClient
+                .realm(KeycloakTestContainerConfiguration.realm())
+                .users()
+                .create(foreignUser)) {
+            foreignUserId = CreatedResponseUtil.getCreatedId(response);
+        }
+
+        performSignup(UUID.randomUUID().toString(), signupJson("acme-" + unique(), email))
+                .andExpect(status().isConflict());
+
+        List<UserRepresentation> matches = keycloakUsersByEmail(email);
+        assertThat(matches).hasSize(1);
+        assertThat(matches.get(0).getId()).isEqualTo(foreignUserId);
+    }
+
+    @Test
+    void anUnusedSlugIsReportedAvailable() throws Exception {
+        String slug = "acme-" + unique();
+
+        mvc.perform(get("/api/v1/identity/signup/slugs/{slug}/availability", slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.slug").value(slug))
+                .andExpect(jsonPath("$.data.available").value(true));
+    }
+
+    @Test
+    void aTakenSlugIsReportedUnavailable() throws Exception {
+        String slug = "acme-" + unique();
+        performSignup(UUID.randomUUID().toString(), signupJson(slug, "owner-" + unique() + "@pallet-test.local"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/api/v1/identity/signup/slugs/{slug}/availability", slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.slug").value(slug))
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    void aMalformedSlugIsRejected() throws Exception {
+        mvc.perform(get("/api/v1/identity/signup/slugs/{slug}/availability", "Not A Slug!"))
+                .andExpect(status().isBadRequest());
     }
 
     @TestConfiguration(proxyBeanMethods = false)

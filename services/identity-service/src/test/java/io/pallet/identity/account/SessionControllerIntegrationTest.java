@@ -13,6 +13,7 @@ import io.pallet.common.error.ErrorResponse;
 import io.pallet.common.events.Topics;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
+import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.common.test.json.JsonTestSupport;
 import io.pallet.identity.auth.VerifyEmailRequest;
 import io.pallet.identity.keycloak.KeycloakAdminTestConfiguration;
@@ -43,6 +44,7 @@ import tools.jackson.databind.JsonNode;
 @Import({
     KeycloakTestContainerConfiguration.class,
     KeycloakAdminTestConfiguration.class,
+    RedisTestContainerConfiguration.class,
     SessionControllerIntegrationTest.EventCaptureConfiguration.class
 })
 class SessionControllerIntegrationTest {
@@ -156,6 +158,21 @@ class SessionControllerIntegrationTest {
 
         List<JsonNode> remaining = listSessions(secondAccessToken);
         assertThat(remaining).extracting(node -> node.get("id").asString()).doesNotContain(firstSessionId);
+    }
+
+    @Test
+    void aRevokedSessionsAccessTokenIsRejectedOnItsNextRequestEvenThoughItHasNotExpiredYet() throws Exception {
+        String email = signUpAndVerify();
+        String revokedAccessToken = accessTokenFor(email, PASSWORD);
+        String currentAccessToken = accessTokenFor(email, PASSWORD);
+        String revokedSessionId = jwtSessionId(revokedAccessToken);
+
+        mvc.perform(delete("/api/v1/identity/users/me/sessions/" + revokedSessionId)
+                        .header("Authorization", "Bearer " + currentAccessToken))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/identity/users/me").header("Authorization", "Bearer " + revokedAccessToken))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

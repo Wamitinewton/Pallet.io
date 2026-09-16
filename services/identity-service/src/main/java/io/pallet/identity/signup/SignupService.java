@@ -32,9 +32,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Orchestrates {@code POST /signup}: creates the Keycloak owner account before any local write,
- * then persists the local bootstrap record in one transaction. If the local transaction fails
- * after the Keycloak user already exists, a compensating delete removes the orphaned account — the
- * named, not-fully-closed dual-write gap {@code docs/identity-service/ARCHITECTURE.md} describes.
+ * then persists the local bootstrap record in one transaction. Creating the Keycloak user and
+ * assigning it the owner role are two independent {@code ExternalCall} boundaries — each retried
+ * on its own — so a transient failure in role assignment can never cause a retry to re-POST user
+ * creation against an account that already exists. If either step fails after the Keycloak user
+ * was created, or the local transaction fails after both steps succeed, a compensating delete
+ * removes the orphaned account — the named, not-fully-closed dual-write gap
+ * {@code docs/identity-service/ARCHITECTURE.md} describes.
  */
 @Service
 class SignupService {
@@ -43,6 +47,7 @@ class SignupService {
 
     private static final String KEYCLOAK_ADMIN_POLICY = "keycloak-admin";
     private static final String OWNER_ROLE = "owner";
+    private static final String ORG_ID_ATTRIBUTE = "org_id";
     private static final String VERIFY_EMAIL_REQUIRED_ACTION = "VERIFY_EMAIL";
     private static final String WELCOME_NOTIFICATION_TYPE = "WELCOME";
     private static final String SIGNUP_AUDIT_ACTION = "sign-up";
@@ -102,6 +107,10 @@ class SignupService {
         return new SignupResponse(orgId, request.organizationName(), request.slug());
     }
 
+    boolean isSlugAvailable(String slug) {
+        return !orgBootstrapRepository.existsBySlug(slug);
+    }
+
     private void ensureSlugAndEmailAreAvailable(SignupRequest request) {
         if (orgBootstrapRepository.existsBySlug(request.slug())) {
             throw new ConflictException("An organization with slug '" + request.slug() + "' already exists");
@@ -112,6 +121,17 @@ class SignupService {
     }
 
     private String createOwnerAccount(String orgId, SignupRequest request) {
+        String keycloakUserId = createKeycloakUser(orgId, request);
+        try {
+            assignOwnerRole(keycloakUserId);
+        } catch (RuntimeException e) {
+            compensateOrphanedKeycloakUser(keycloakUserId, e);
+            throw e;
+        }
+        return keycloakUserId;
+    }
+
+    private String createKeycloakUser(String orgId, SignupRequest request) {
         return externalCall.call(KEYCLOAK_ADMIN_POLICY, () -> {
             UserRepresentation user = new UserRepresentation();
             user.setUsername(request.email());
@@ -119,7 +139,7 @@ class SignupService {
             user.setEnabled(true);
             user.setEmailVerified(false);
             user.setRequiredActions(List.of(VERIFY_EMAIL_REQUIRED_ACTION));
-            user.singleAttribute("org_id", orgId);
+            user.singleAttribute(ORG_ID_ATTRIBUTE, orgId);
             user.setCredentials(List.of(ownerPasswordCredential(request.password())));
 
             try (Response response = keycloakAdminClient
@@ -127,13 +147,26 @@ class SignupService {
                     .users()
                     .create(user)) {
                 if (response.getStatus() == Response.Status.CONFLICT.getStatusCode()) {
-                    throw new ConflictException("An account with this email already exists");
+                    return recoverFromInDoubtCreate(orgId, request.email());
                 }
-                String keycloakUserId = CreatedResponseUtil.getCreatedId(response);
-                assignOwnerRole(keycloakUserId);
-                return keycloakUserId;
+                return CreatedResponseUtil.getCreatedId(response);
             }
         });
+    }
+
+    /**
+     * A retry of this same policy can land here after an earlier create attempt's response was
+     * lost even though Keycloak already applied it — retrying a non-idempotent POST is the
+     * tradeoff of retrying at all. {@code org_id} is a fresh random value per sign-up attempt, so a
+     * conflicting account carrying our own {@code orgId} is that earlier attempt, not a genuine
+     * duplicate email; anything else is a real conflict.
+     */
+    private String recoverFromInDoubtCreate(String orgId, String email) {
+        return keycloakAdminClient.realm(properties.keycloak().realm()).users().searchByEmail(email, true).stream()
+                .filter(existing -> orgId.equals(existing.firstAttribute(ORG_ID_ATTRIBUTE)))
+                .findFirst()
+                .map(UserRepresentation::getId)
+                .orElseThrow(() -> new ConflictException("An account with this email already exists"));
     }
 
     private CredentialRepresentation ownerPasswordCredential(String password) {
@@ -145,18 +178,20 @@ class SignupService {
     }
 
     private void assignOwnerRole(String keycloakUserId) {
-        RoleRepresentation ownerRole = keycloakAdminClient
-                .realm(properties.keycloak().realm())
-                .roles()
-                .get(OWNER_ROLE)
-                .toRepresentation();
-        keycloakAdminClient
-                .realm(properties.keycloak().realm())
-                .users()
-                .get(keycloakUserId)
-                .roles()
-                .realmLevel()
-                .add(List.of(ownerRole));
+        externalCall.run(KEYCLOAK_ADMIN_POLICY, () -> {
+            RoleRepresentation ownerRole = keycloakAdminClient
+                    .realm(properties.keycloak().realm())
+                    .roles()
+                    .get(OWNER_ROLE)
+                    .toRepresentation();
+            keycloakAdminClient
+                    .realm(properties.keycloak().realm())
+                    .users()
+                    .get(keycloakUserId)
+                    .roles()
+                    .realmLevel()
+                    .add(List.of(ownerRole));
+        });
     }
 
     private void persistLocally(String orgId, SignupRequest request, String keycloakUserId) {

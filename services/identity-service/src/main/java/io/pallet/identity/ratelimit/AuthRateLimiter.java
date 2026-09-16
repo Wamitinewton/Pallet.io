@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Non-blocking rate check guarding identity-service's unauthenticated, abuse-shaped endpoints
- * (sign-up, login, email verification). One Resilience4j {@code RateLimiter} per key, created
+ * (sign-up, slug availability, login, email verification). One Resilience4j {@code RateLimiter} per key, created
  * lazily by the registry on first use, so one caller exhausting its budget never touches
  * another's. {@code timeoutDuration} is {@code ZERO} so {@link #tryAcquire(String)} always
  * returns immediately.
