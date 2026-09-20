@@ -19,6 +19,9 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0011](0011-identity-org-team-service-boundary.md) | identity-service / org-team-service boundary, signed action tokens, single-org accounts | accepted |
 | [0012](0012-api-gateway-edge-architecture.md) | api-gateway: servlet-stack Gateway Server MVC, additive edge auth, no shared trust secret | accepted |
 | [0013](0013-per-service-api-path-namespace.md) | Per-service API path namespace (`/api/v1/<service>/**`), one gateway route per backend | accepted |
+| [0014](0014-openapi-docs-aggregation.md) | OpenAPI documentation via `platform-common-openapi` and a gateway docs hub | accepted |
+| [0015](0015-session-revocation.md) | Platform-wide session revocation via `RevokedSessionRegistry` | accepted |
+| [0016](0016-org-team-service-production-design.md) | org-team-service: transactional outbox and inbox, local-row authorization, invite-rejection compensation | accepted |
 
 ## Still open (from `PROJECT.md`)
 

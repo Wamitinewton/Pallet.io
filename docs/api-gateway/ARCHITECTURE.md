@@ -216,7 +216,7 @@ bare `localhost` ports). The day a service joins `docker-compose.yml` as its own
 route's env var default becomes that container's service name (`http://identity-service:8082`);
 in the cluster it becomes Kubernetes DNS (`http://identity-service.pallet.svc.cluster.local`).
 Nothing about `GatewayRoutingConfiguration` changes at either transition — only the env var value
-does. `org-team-service` gets its own `pallet.gateway.routes.org-team-service` entry (`path:
+does. `org-team-service` gets its own `pallet.gateway.routes.org-team-service` entry (added in `docs/workflows/org-team-service/15-openapi-and-gateway.md`; `path:
 /api/v1/org-team/**`, per the same ADR-0013 namespace convention) the day that service exists;
 until then, `/api/v1/org-team/**` simply isn't registered as a route and 404s at the gateway, which
 is the correct behavior for a route that doesn't exist yet rather than a gap to work around. An
