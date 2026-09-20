@@ -1,12 +1,20 @@
 # org-team-service — Architecture
 
-Status: proposed (pre-implementation design). Extends `PROJECT.md`'s one-paragraph sketch
-("`org-team-service` owns organizations, teams, projects, and membership, and maps Keycloak roles
-... to what a user can actually do inside a given org. It also stores which cloud provider and
-region an app is deployed to") into a full design. **Read `docs/identity-service/ARCHITECTURE.md`
-first** — the two documents share one boundary decision (identity-service owns authentication and
-the only Keycloak Admin credential; this service owns everything about organizational structure
-and membership) and this document assumes that split rather than re-deriving it.
+Status: accepted design, pre-implementation. Supersedes the first, proposed pass of this document.
+The decisions that changed between the two passes (transactional outbox and inbox, authorization
+against the local membership row instead of the token's roles, the `OrgInviteRejected`
+compensation event) are recorded in
+[ADR-0016](../adr/0016-org-team-service-production-design.md); read that first if you are
+comparing versions.
+
+`PROJECT.md` describes this service in one paragraph: it "owns organizations, teams, projects, and
+membership, and maps Keycloak roles to what a user can actually do inside a given org. It also
+stores which cloud provider and region an app is deployed to." This document is the full design.
+**Read `docs/identity-service/ARCHITECTURE.md` and
+[ADR-0011](../adr/0011-identity-org-team-service-boundary.md) first**: the two services share one
+boundary decision (identity-service owns authentication and the only Keycloak Admin credential;
+this service owns everything about organizational structure and membership) and this document
+assumes it rather than re-deriving it.
 
 ## Contents
 
@@ -17,34 +25,40 @@ and membership) and this document assumes that split rather than re-deriving it.
 - [Data model](#data-model)
 - [Event contracts](#event-contracts)
 - [API](#api)
-- [Processing pipelines](#processing-pipelines)
 - [Authorization model](#authorization-model)
+- [Processing pipelines](#processing-pipelines)
+- [Reliable messaging: outbox and inbox](#reliable-messaging-outbox-and-inbox)
 - [Distributed systems mechanisms](#distributed-systems-mechanisms)
-- [Failure modes](#failure-modes)
+- [Consistency and failure modes](#consistency-and-failure-modes)
+- [Security and threat model](#security-and-threat-model)
+- [Observability and operations](#observability-and-operations)
 - [Component view](#component-view)
 - [Deployment and scaling view](#deployment-and-scaling-view)
 - [Package layout and dependencies](#package-layout-and-dependencies)
+- [Configuration](#configuration)
 - [Extension points](#extension-points)
 - [Open questions / deferred](#open-questions--deferred)
 - [Relationship to existing planning docs](#relationship-to-existing-planning-docs)
 
 ## Purpose
 
-`org-team-service` owns the answer to "what does this organization look like, and who's in it":
-the organization's display name and settings, its teams, its apps (the cloud-provider/region
-choice `PROJECT.md` calls out specifically), and every membership beyond the founding owner
-(invites, roles, removals, ownership transfer). It has **no Keycloak Admin credential** — by
-design, that access is scoped to `identity-service` alone
-(`docs/identity-service/ARCHITECTURE.md`'s "The boundary problem"). Every action here that needs
-Keycloak state to change (a new member's account created, a role reflected in the token, an
-account disabled) happens through the same event-choreography pattern established there: publish
-a fact, let identity-service react to it.
+`org-team-service` answers "what does this organization look like, and who is in it": the
+organization's display data, its teams, its apps (including the cloud-provider and region choice
+`PROJECT.md` calls out), and every membership beyond the founding owner (invites, roles, removals,
+ownership transfer, leaving).
 
-This is also the service every other future consumer of "who's in this org" and "does this app
-belong to this org" is expected to build against — `scheduler-service` resolving an app's cloud
-provider, `deploy-orchestrator-service` checking an app exists, `audit-log-service` correlating
-actions to teams. None of those integrations are built yet; this document's job is to make sure
-the data model and event contracts don't need to change shape when they arrive.
+It holds **no Keycloak Admin credential**, by design. Every action here that needs Keycloak state
+to change (a role reflected in the token, an account disabled) happens through event
+choreography: this service commits a fact and publishes it, and `identity-service` reacts. That
+makes the reliability of the publish path a security property, not just a convenience: a lost
+`OrgMemberRemoved` leaves a removed person's account enabled. The
+[outbox](#reliable-messaging-outbox-and-inbox) exists for that reason.
+
+It is also the service every later consumer of "who is in this org" and "does this app belong to
+this org" builds against (`scheduler-service` resolving an app's cloud provider,
+`deploy-orchestrator-service` checking an app exists, `audit-log-service` correlating actions to
+teams). None of those exist yet; the data model and event contracts are shaped so they arrive
+without changing them.
 
 ## Position in the system
 
@@ -52,16 +66,18 @@ the data model and event contracts don't need to change shape when they arrive.
 flowchart LR
     subgraph Inbound
         FE[Tenant dashboard]
+        GW[api-gateway]
     end
 
     subgraph OTS["org-team-service"]
-        API[Org/team/member/app API]
-        L1["OrgProvisionedListener<br/>(@KafkaListener)"]
-        L2[OrgInviteAcceptedListener]
-        L3[UserProfileUpdatedListener]
+        API[REST API]
+        L1["OrgProvisionedListener"]
+        L2["OrgInviteAcceptedListener"]
+        L3["UserProfileUpdatedListener"]
+        OB[("outbox_events")]
+        RELAY[OutboxRelay]
+        DB[(Postgres<br/>schema: org_team)]
     end
-
-    DB[(Postgres<br/>schema: org_team)]
 
     subgraph Backbone["Event backbone"]
         T1[["org.provisioned"]]
@@ -71,75 +87,79 @@ flowchart LR
         T5[["org.member.removed"]]
         T6[["org.member.role.changed"]]
         T7[["org.deleted"]]
-        T8[["notification.requested"]]
-        T9[["audit.event.recorded"]]
+        T8[["org.invite.rejected"]]
+        T9[["app.created / app.deleted"]]
+        T10[["notification.requested"]]
+        T11[["audit.event.recorded"]]
     end
 
     subgraph IS["identity-service"]
-        ISApi[Auth + account API]
+        ISPub[Publishes org.provisioned,<br/>org.invite.accepted,<br/>user.profile.updated]
+        ISSub[Keycloak sync listeners]
     end
 
     subgraph NS["notification-service"]
-        NSListener[NotificationRequestedListener]
-        NSMembers[OrgMembershipEventListener]
+        NSL[Notification + membership listeners]
     end
 
-    ISApi -- publish --> T1
-    ISApi -- publish --> T2
-    ISApi -- publish --> T3
+    FE -- JWT --> GW --> API --> DB
+    API -- same tx --> OB
+    RELAY -- poll --> OB
+    RELAY --> T4 & T5 & T6 & T7 & T8 & T9 & T10 & T11
+
+    ISPub --> T1 & T2 & T3
     T1 --> L1 --> DB
     T2 --> L2 --> DB
     T3 --> L3 --> DB
+    L1 & L2 & L3 -- same tx --> OB
 
-    FE -- JWT --> API --> DB
-    API -- publish --> T4
-    API -- publish --> T5
-    API -- publish --> T6
-    API -- publish --> T7
-    API -- publish --> T8
-    API -- publish --> T9
-    T4 --> NSMembers
-    T5 --> NSMembers
-    T8 --> NSListener
-
-    API -. mints signed token, verified without a call .-> ISApi
+    T5 & T6 & T7 & T8 --> ISSub
+    T4 & T5 & T7 & T10 --> NSL
 ```
 
 Three inbound listeners build this service's entire view of "which organizations and users
-exist" — it never queries `identity-service` for that, the same no-synchronous-call rule applies
-symmetrically. Its own mutating API is the source of everything downstream of the founding owner:
-teams, additional members, apps.
+exist". It never queries `identity-service` for that; the no-synchronous-call rule applies in both
+directions. Its own mutating API is the source of everything downstream of the founding owner.
+Every state change and the events describing it are written in **one local transaction**; a relay
+moves the events to Kafka afterwards.
 
 ## Design goals and non-goals
 
 **Goals**
 
-- This service is the **single source of truth** for organization display data, teams,
-  memberships beyond the founding owner, and apps — no other service duplicates a mutable copy of
-  any of it.
-- Every membership change that Keycloak needs to know about (a new member exists, a role changed,
-  a member/org was removed) is a published fact, never a call this service makes to
-  `identity-service`.
-- Inviting someone never blocks on `identity-service` being reachable — an invite token is
-  minted and stored locally; verification and Keycloak account creation happen entirely inside
-  `identity-service`, asynchronously from this service's perspective.
-- An app's cloud-provider/region choice, once set at creation, is immutable —
-  `scheduler-service`'s eventual cluster resolution can trust it never moves under a running
-  deployment.
-- A business rule that must hold regardless of caller — "an org always has at least one owner" —
-  is enforced here, once, not left to every caller to remember.
+- **Single source of truth** for organization display data, teams, memberships, and apps. No
+  other service keeps a mutable copy; the ones that keep a read projection (notification-service's
+  `org_members`) do so from this service's events.
+- **No state change without its event, no event without its state change.** Achieved with a
+  transactional outbox, not with best-effort publishing after commit.
+- **A removed or demoted member loses access to this service immediately**, not after their access
+  token expires, because authorization reads the local membership row rather than the token's
+  role claims ([Authorization model](#authorization-model)).
+- **No synchronous call to any other Pallet service**, and no call to Keycloak at all.
+- **Inviting never blocks on `identity-service`.** The token is minted locally; account creation
+  happens entirely on the other side, asynchronously.
+- **Invariants enforced once, centrally, and again in the database**: "an org always has exactly
+  one owner", "an app's cloud provider and region never change", "a team member is a member of the
+  team's org". Application checks give good error messages; database constraints make a bug
+  unable to violate them.
+- **Every consumer is effectively-once**: the idempotency record commits atomically with the
+  effect it guards (inbox), so a crash can neither lose nor repeat an event's effect.
+- **Every mutating endpoint is safe to retry**: by natural key (unique slug, unique pending invite)
+  or by an explicit conflict response, never by silently double-applying.
+- **Bounded everything**: page sizes, pending invites per org, teams/apps per org, outbox batch
+  size, retry counts. No unbounded query or unbounded fan-out from a single request.
 
 **Non-goals (this design)**
 
-- Anything requiring a Keycloak Admin call — this service never gets that credential. If a future
-  requirement genuinely needs it, that's a boundary decision to revisit explicitly, not a
-  dependency to add quietly.
-- Multi-org-per-account — inherited from `identity-service`'s design; a `userId` in this schema
-  belongs to exactly one `org_id` for as long as that constraint holds there.
-- Billing/plan enforcement (`billing-service`'s eventual concern) — this service stores an org's
-  identity and structure, not its subscription state.
-- Real-time collaboration features (live presence, activity feed) — plain CRUD + events is enough
-  for what's asked here.
+- Anything requiring a Keycloak Admin call. If a future requirement genuinely needs it, that is a
+  boundary decision to reopen explicitly, not a dependency to add quietly.
+- Multi-org-per-account (ADR-0011). A `userId` belongs to exactly one `org_id`.
+- Reactivating a removed member's account, or moving an account between orgs (account recovery is
+  an `identity-service` open question).
+- Billing, plans, and quota tiers. This service enforces flat, config-driven safety limits;
+  plan-based limits are `billing-service`'s later concern.
+- Fine-grained permissions (custom roles, per-resource ACLs). Four fixed roles.
+- Real-time collaboration features. CRUD plus events is enough.
 
 ## Domain model
 
@@ -151,16 +171,16 @@ classDiagram
         String slug
         String ownerUserId
         OrgStatus status
+        long version
         Instant createdAt
         Instant updatedAt
+        Instant deletedAt
     }
-
     class OrgStatus {
         <<enumeration>>
         ACTIVE
         DELETED
     }
-
     class Membership {
         String orgId
         String userId
@@ -168,36 +188,35 @@ classDiagram
         String displayName
         Role role
         MembershipStatus status
+        long version
         Instant joinedAt
-        Instant updatedAt
+        Instant removedAt
+        Instant profileSyncedAt
     }
-
     class Role {
         <<enumeration>>
-        OWNER
-        ADMIN
-        DEVELOPER
         VIEWER
+        DEVELOPER
+        ADMIN
+        OWNER
     }
-
     class MembershipStatus {
         <<enumeration>>
         ACTIVE
         REMOVED
     }
-
     class Invite {
         UUID id
         String orgId
         String email
         Role role
         String invitedByUserId
-        String jti
         InviteStatus status
+        int sendCount
+        Instant lastSentAt
         Instant expiresAt
-        Instant createdAt
+        Instant respondedAt
     }
-
     class InviteStatus {
         <<enumeration>>
         PENDING
@@ -205,21 +224,19 @@ classDiagram
         REVOKED
         EXPIRED
     }
-
     class Team {
         UUID id
         String orgId
         String name
         String slug
-        Instant createdAt
+        long version
     }
-
-    class TeamMembership {
+    class TeamMember {
         UUID teamId
+        String orgId
         String userId
         Instant addedAt
     }
-
     class App {
         UUID id
         String orgId
@@ -228,46 +245,51 @@ classDiagram
         String slug
         CloudProvider cloudProvider
         String region
-        Instant createdAt
-        Instant updatedAt
+        AppStatus status
+        long version
     }
-
     class CloudProvider {
         <<enumeration>>
         AWS
         GCP
     }
 
-    Organization "1" --> "*" Membership : has
-    Organization "1" --> "*" Team : has
-    Organization "1" --> "*" App : has
-    Organization "1" --> "*" Invite : has
-    Membership --> Role
-    Membership --> MembershipStatus
-    Invite --> InviteStatus
-    Team "1" --> "*" TeamMembership : has
-    App --> CloudProvider
+    Organization "1" --> "*" Membership
+    Organization "1" --> "*" Invite
+    Organization "1" --> "*" Team
+    Organization "1" --> "*" App
+    Team "1" --> "*" TeamMember
+    Membership "1" --> "*" TeamMember
+    Team "0..1" --> "*" App
 ```
 
-Five aggregates, deliberately kept separate rather than nested, because each answers a different
-question and each has its own lifecycle: **Organization** (does this tenant exist, what's it
-called), **Membership** (who's in it and at what role — the read-model `notification-service`'s
-broadcast already depends on), **Invite** (who's been asked to join but hasn't yet — a
-time-bounded, revocable, distinct lifecycle from Membership), **Team** (a grouping *within* an
-org, orthogonal to role), **App** (the thing that eventually gets deployed, whose cloud/region
-choice other future services key off).
+Five aggregates, kept separate rather than nested, because each answers a different question and
+has its own lifecycle and its own consistency boundary:
 
-**Why `Invite` isn't just a `Membership` row in a `PENDING` state**: an invite has fields
-(`invitedByUserId`, `jti`, `expiresAt`) and a lifecycle (`REVOKED`, `EXPIRED`) that have no meaning
-for an actual member, and — critically — an invite's `userId` doesn't exist yet (the invited
-person has no account until they accept). Modeling them as the same table would mean a nullable
-`userId` and a pile of "is this a real member or a pending invite" conditionals everywhere the
-table is queried. Two tables, one clean handoff (`Invite` → consumed → `Membership` row created)
-is simpler.
+- **Organization**: does this tenant exist, what is it called, who owns it. It is also the **lock
+  root** for every membership-affecting operation (see [Membership change](#membership-change-role-change-removal-transfer)).
+- **Membership**: who is in it and at what role. The row that authorization reads and that
+  `notification-service`'s broadcast projection mirrors.
+- **Invite**: who has been asked but has not joined. A different lifecycle (`REVOKED`, `EXPIRED`,
+  resend counters) and no `userId` yet, which is why it is not a `PENDING` membership (a nullable
+  `userId` and "is this a real member" conditionals everywhere the table is queried).
+- **Team**: a grouping within an org, orthogonal to role.
+- **App**: the thing that eventually gets deployed.
+
+**Roles** are totally ordered `VIEWER < DEVELOPER < ADMIN < OWNER`; "ADMIN+" means "rank at least
+ADMIN". `Role` carries `keycloakName()` (`viewer`, `developer`, `admin`, `owner`), the realm-role
+name. **Every event and token claim uses the lowercase Keycloak name**, because
+`identity-service` passes it straight to `roles().get(name)`; the Java enum's `OWNER` never
+crosses a service boundary.
+
+**One owner, always.** `organizations.owner_user_id` and exactly one `ACTIVE` membership with
+`role = OWNER` are kept equal by construction and by a partial unique index. Ownership changes only
+through transfer.
 
 ## Data model
 
-One Postgres schema, `org_team` (shared cluster, schema-per-service, per ADR-0007).
+One Postgres schema, `org_team` (shared cluster, schema-per-service, ADR-0007). Flyway is the only
+schema authority; Hibernate is `validate`-only.
 
 ```mermaid
 erDiagram
@@ -276,29 +298,38 @@ erDiagram
         varchar name
         varchar slug UK
         varchar owner_user_id
-        varchar status "ACTIVE | DELETED"
+        varchar status
+        bigint version
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
+        varchar deleted_by
+        timestamptz purged_at
     }
     MEMBERSHIPS {
-        varchar org_id PK, FK
+        varchar org_id PK,FK
         varchar user_id PK
         varchar email
         varchar display_name
-        varchar role "OWNER | ADMIN | DEVELOPER | VIEWER"
-        varchar status "ACTIVE | REMOVED"
+        varchar role
+        varchar status
+        bigint version
         timestamptz joined_at
-        timestamptz updated_at
+        timestamptz removed_at
+        varchar removed_by
+        timestamptz profile_synced_at
     }
     INVITES {
-        uuid id PK
+        uuid id PK "also the token jti"
         varchar org_id FK
         varchar email
         varchar role
         varchar invited_by_user_id
-        varchar jti UK
-        varchar status "PENDING | ACCEPTED | REVOKED | EXPIRED"
+        varchar status
+        int send_count
+        timestamptz last_sent_at
         timestamptz expires_at
+        timestamptz responded_at
         timestamptz created_at
     }
     TEAMS {
@@ -306,161 +337,289 @@ erDiagram
         varchar org_id FK
         varchar name
         varchar slug
+        bigint version
         timestamptz created_at
     }
     TEAM_MEMBERS {
-        uuid team_id PK, FK
-        varchar org_id
+        uuid team_id PK,FK
         varchar user_id PK
+        varchar org_id FK
         timestamptz added_at
+        varchar added_by
     }
     APPS {
         uuid id PK
         varchar org_id FK
-        uuid team_id FK "nullable"
+        uuid team_id FK
         varchar name
         varchar slug
-        varchar cloud_provider "AWS | GCP, immutable"
+        varchar cloud_provider "immutable"
         varchar region "immutable"
+        varchar status
+        bigint version
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
+    }
+    OUTBOX_EVENTS {
+        bigint id PK
+        uuid event_id UK
+        varchar org_id
+        varchar event_type
+        jsonb payload
+        boolean sensitive
+        varchar traceparent
+        varchar status "PENDING | PUBLISHED | PARKED"
+        int attempts
+        timestamptz next_attempt_at
+        varchar last_error
+        timestamptz created_at
+        timestamptz published_at
+    }
+    PROCESSED_EVENTS {
+        uuid event_id PK
+        varchar consumer PK
+        timestamptz processed_at
     }
     ORGANIZATIONS ||--o{ MEMBERSHIPS : has
     ORGANIZATIONS ||--o{ INVITES : has
     ORGANIZATIONS ||--o{ TEAMS : has
     ORGANIZATIONS ||--o{ APPS : has
     TEAMS ||--o{ TEAM_MEMBERS : has
-    MEMBERSHIPS ||--o{ TEAM_MEMBERS : "user_id (app-level check, not a DB FK)"
+    MEMBERSHIPS ||--o{ TEAM_MEMBERS : "(org_id, user_id) composite FK"
 ```
 
-Indexes and constraints worth calling out:
+Constraints and indexes worth calling out (the full DDL is in
+[`workflows/org-team-service/02-service-scaffold.md`](../workflows/org-team-service/02-service-scaffold.md)):
 
-- `organizations.slug` **unique** — same DNS-1123-label constraint `identity-service`'s sign-up
-  validates, since this is the row that becomes the org's long-term canonical name/slug (the
-  `identity-service` bootstrap record's slug is a write-once snapshot of the same value at
-  creation time; this is the one that can actually change, subject to whatever re-slugging policy
-  a later `PATCH /orgs/{orgId}` decides — not designed further here).
-- `memberships(org_id, user_id)` **primary key** — one row per user per org, consistent with the
-  single-org-per-account constraint this whole design accepts from `identity-service`.
-- `invites.jti` **unique** — this is the claim embedded in the signed token
-  (`docs/identity-service/ARCHITECTURE.md`'s `SignedActionToken`); the uniqueness constraint here
-  is what makes `POST /orgs/{orgId}/invites` safe to call twice for the same email without minting
-  two live, independently-acceptable tokens for the same pending invite (the second call finds the
-  existing `PENDING` row for that `(org_id, email)` pair and either 409s or re-issues, a decision
-  left to the workflow file, not fixed here).
-- `invites(org_id, email)` unique **partial** index `WHERE status = 'PENDING'` — at most one live
-  invite per email per org at a time.
-- `invites(expires_at) WHERE status = 'PENDING'` — backs a sweep that flips stale invites to
-  `EXPIRED`, so a listing never has to compute "is this actually still valid" at read time.
-- `team_members(team_id, org_id, user_id)` carries `org_id` redundantly (not just `team_id,
-  user_id`) so the *application layer* can cheaply assert "this user's membership is in the same
-  org as this team" before insert — enforced in code, not as a cross-table DB constraint, since a
-  composite foreign key into `memberships(org_id, user_id)` from a table keyed by `(team_id,
-  user_id)` isn't expressible cleanly in a single FK. Noted as an app-level invariant rather than a
-  DB one deliberately, not an oversight.
-- `apps(org_id, slug)` unique — app names are unique per org, not globally.
-- `apps.cloud_provider` / `apps.region` are **never updated** after insert — enforced at the
-  service layer (the `PATCH /apps/{appId}` handler simply doesn't accept those fields), matching
-  `PROJECT.md`'s "a choice made once at app creation."
+- `organizations.slug` **unique across all statuses**: a deleted org's slug is never reissued, so a
+  later tenant cannot inherit a name (and eventually a hostname) that belonged to someone else.
+  Same DNS-1123 label rule `identity-service` sign-up validates. Never updated after insert.
+- `memberships(org_id, user_id)` primary key: one row per user per org (single-org accounts).
+- `memberships(org_id) WHERE role = 'OWNER' AND status = 'ACTIVE'` **unique partial**: the
+  database refuses a second active owner, whatever the application does.
+- `memberships(org_id, lower(email)) WHERE status = 'ACTIVE'` unique partial: an email is one
+  active member per org, and backs the "already a member" invite check.
+- `invites(org_id, lower(email)) WHERE status = 'PENDING'` unique partial: at most one live invite
+  per email per org; the concurrent-create race resolves to a `409`, not two live tokens.
+- `invites(expires_at) WHERE status = 'PENDING'`: backs the expiry sweep.
+- `invites.id` **is** the token's `jti` and the `inviteId` in `OrgInviteAccepted`. One identifier,
+  one meaning, no second unique column to keep in step.
+- `team_members` carries **composite foreign keys**: `(org_id, team_id) → teams(org_id, id)` and
+  `(org_id, user_id) → memberships(org_id, user_id)`. A team can never contain a user from another
+  org, enforced by the database. (The first pass of this document called that inexpressible; it is
+  not, given `teams` has a unique `(org_id, id)`.)
+- `apps(org_id, team_id) → teams(org_id, id) ON DELETE SET NULL (team_id)` (Postgres 15+; the local
+  stack runs 17): deleting a team detaches its apps, and an app can never point at another org's
+  team.
+- `apps(org_id, slug) WHERE status = 'ACTIVE'` unique partial: names are unique per org among live
+  apps.
+- `apps.cloud_provider` and `apps.region` are guarded by a `BEFORE UPDATE` trigger that raises if
+  either changes. The API has no field for them either; the trigger is the backstop for a future
+  code path that forgets.
+- `outbox_events(id) WHERE status = 'PENDING'` and `(org_id, id) WHERE status <> 'PUBLISHED'`: the relay's scan and its per-org "is anything ahead of this row blocked" check.
+- `processed_events(processed_at)`: backs the inbox retention sweep.
+- Every tenant table has `org_id` and every repository method on one takes it as a parameter
+  ([Security](#security-and-threat-model)).
 
-**Why `MEMBERSHIPS` denormalizes `email`/`display_name` rather than joining to a users table**:
-there is no users table here — that data lives in `identity-service`, which this service has no
-synchronous access to. `email`/`display_name` arrive via the `OrgProvisioned` and
-`OrgInviteAccepted` events and are kept current by consuming `UserProfileUpdated` — the same
-CQRS-style local-projection pattern `notification-service`'s `org_members` table already
-established for exactly this reason (ADR-0008).
+**`email` and `display_name` on `memberships` are a projection**, not the source. There is no users
+table here; that data lives in `identity-service`, to which this service has no synchronous
+access. They arrive with `OrgProvisioned`/`OrgInviteAccepted` and are kept current by
+`UserProfileUpdated`, the same local-projection pattern `notification-service`'s `org_members`
+established (ADR-0008).
 
 ## Event contracts
 
-Consumed (all specified in `docs/identity-service/ARCHITECTURE.md`'s
-[Event contracts](../identity-service/ARCHITECTURE.md#event-contracts) table — repeated here from
-this service's side for completeness):
+### Consumed
+
+Payloads are the records already in `platform-common-events`
+(`OrgProvisioned`, `OrgInviteAccepted`, `UserProfileUpdated`); the topic and field lists are in
+`docs/identity-service/ARCHITECTURE.md` §Event contracts.
 
 | Event | Effect here |
 |---|---|
-| `OrgProvisioned` | Insert `organizations` row; insert `memberships` row for the owner (`role = OWNER`, `status = ACTIVE`); publish `OrgMemberAdded` from the result. |
-| `OrgInviteAccepted` | Look up the `invites` row by `inviteId`; if `PENDING`, mark `ACCEPTED`, insert a `memberships` row using the invite's `role`, publish `OrgMemberAdded`. If the invite is missing or already terminal (accepted/revoked/expired), log and drop — the token's own `identity-service`-side validation already prevented a *second* account from being created for it; this side effect being unreachable is the narrow, named consequence of the no-sync-call design ([Failure modes](#failure-modes)). |
-| `UserProfileUpdated` | Update the matching `memberships` row's `email`/`display_name` — keeps this service's denormalized copy from drifting. |
+| `OrgProvisioned` | Insert `organizations` (`ACTIVE`) and the owner's `memberships` row (`OWNER`, `ACTIVE`); emit `OrgMemberAdded`. Natural-key idempotent (`org_id` primary key) on top of the inbox. |
+| `OrgInviteAccepted` | Resolve by `inviteId` (= `invites.id`). Accepted and org active: mark `ACCEPTED`, insert membership with **the invite row's role**, emit `OrgMemberAdded`. Anything else (revoked, expired, unknown, org deleted): emit `OrgInviteRejected` so `identity-service` disables the orphan account. See [the accept outcomes](#invite-acceptance). |
+| `UserProfileUpdated` | Update the membership's `display_name`/`email` if the event is newer than `profile_synced_at`. If no membership exists yet, **retry** (the accept event may be lagging on a different topic), then dead-letter. |
 
-Published (new types, added to `platform-common-events` alongside the ones
-`docs/identity-service/ARCHITECTURE.md` already specifies):
+### Published
 
-| Event | Topic | Trigger | Payload |
-|---|---|---|---|
-| `OrgMemberAdded` | `org.member.added` | Owner provisioned, or an invite accepted | `orgId, userId, email` — **unchanged from what `notification-service` already expects** (ADR-0008) |
-| `OrgMemberRemoved` | `org.member.removed` | `DELETE /orgs/{orgId}/members/{userId}` | `orgId, userId, email` — unchanged from `notification-service`'s expectation |
-| `OrgMemberRoleChanged` | `org.member.role.changed` | `PATCH /orgs/{orgId}/members/{userId}` | `orgId, userId, previousRole, newRole` |
-| `OrgDeleted` | `org.deleted` | `DELETE /orgs/{orgId}` | `orgId, deletedByUserId` |
+Every event is appended to the outbox in the same transaction as its state change; nothing is ever
+published inline from a request thread.
 
-This service also publishes `NotificationRequested` directly (reusing the existing
-`platform-common-events` contract, no new topic) when an invite is created — `notificationType:
-ORG_INVITE` (a new template `notification-service` needs, same "flagged here, built there"
-pattern as `WELCOME`), `recipient` = the invited email, `variables` = `{orgName, inviterName,
-acceptUrl}`. This was deliberately chosen over a dedicated `org.invite.created` topic: the only
-consumer of "someone was invited" is "send them an email," which `notification.requested` already
-exists to carry — a second topic with exactly one consumer that already has a general-purpose
-channel would be duplication, not a new capability.
+| Event | Topic | Trigger | Payload | Known consumers |
+|---|---|---|---|---|
+| `OrgMemberAdded` | `org.member.added` | Owner provisioned; invite accepted | `orgId, userId, email` (unchanged from what ADR-0008 assumed) | notification-service |
+| `OrgMemberRemoved` | `org.member.removed` | Member removed or left | `orgId, userId, email` | identity-service (disable account), notification-service |
+| `OrgMemberRoleChanged` | `org.member.role.changed` | Role change; both halves of an ownership transfer | `orgId, userId, previousRole, newRole` (lowercase Keycloak names) | identity-service |
+| `OrgDeleted` | `org.deleted` | Org deleted | `orgId, deletedByUserId` | identity-service, notification-service |
+| `OrgInviteRejected` | `org.invite.rejected` | Accept event for an invite that can no longer be honoured | `orgId, inviteId, userId, email, reason` (`REVOKED`\|`EXPIRED`\|`UNKNOWN_INVITE`\|`ORG_DELETED`) | identity-service (disable the account created for it) |
+| `AppCreated` | `app.created` | App created | `orgId, appId, slug, teamId, cloudProvider, region, createdByUserId` | none yet (reserved) |
+| `AppDeleted` | `app.deleted` | App deleted, or org deleted | `orgId, appId, slug, deletedByUserId` | none yet (reserved) |
+| `NotificationRequested` | `notification.requested` | Invite created or resent (`ORG_INVITE`) | Existing contract; `variables = {orgName, inviterName, role, acceptUrl}`, `dedupeKey = "invite:{id}:{sendCount}"` | notification-service |
+| `AuditEventRecorded` | `audit.event.recorded` | Every state change in the [API](#api) | Existing contract | audit-log-service (future) |
 
-`AuditEventRecorded` is published for every mutating action in the [API](#api) table below that
-changes organizational state (member added/removed/role-changed, org renamed/deleted, team/app
-created/deleted).
+`OrgMemberAdded`, `OrgInviteRejected`, `AppCreated`, `AppDeleted` are **new** and need adding to
+`platform-common-events` and its `Topics` catalog (checkpoint 01). `OrgMemberRemoved`,
+`OrgMemberRoleChanged`, `OrgDeleted` already exist there.
+
+Invites deliberately reuse `notification.requested` rather than adding an `org.invite.created`
+topic: the only consumer of "someone was invited" is "send them an email", which that topic
+already carries.
+
+**Ordering.** The producer keys every record by `orgId` (`PlatformEventPublisher` does), so all
+events for one org are totally ordered within a partition. The relay preserves the outbox's
+insertion order per org. Ordering across topics is **not** guaranteed and no consumer may depend on
+it; where a dependency exists (profile update before accept) the consumer retries instead
+([Consistency](#consistency-and-failure-modes)).
+
+**Schema evolution** (ADR-0006, plain JSON): fields are only ever added, never repurposed or
+removed; consumers ignore unknown fields.
 
 ## API
 
-Base path `/api/v1`. Every list endpoint returns `PageResponse<T>` wrapped in `ApiResponse<T>`.
-Every endpoint requires an authenticated token; role checks are `@PreAuthorize` against the
-realm-role authorities `platform-common-security`'s converter already produces (see
-[Authorization model](#authorization-model)).
+Base path `/api/v1/org-team` (ADR-0010's version prefix plus ADR-0013's per-service namespace). In
+the tables below, paths omit that base. Every response is `ApiResponse<T>`, lists are
+`PageResponse<T>` inside it, errors are `ErrorResponse` via `GlobalExceptionHandler`. Roles in the
+"Requires" column are the caller's **local membership role**
+([Authorization model](#authorization-model)), never a token claim. `{orgId}` must equal the token's
+`org_id` or the request is a `404`.
+
+Conventions:
+
+- **Pagination**: `page`, `size` (default 20, max 100), `sort=field,dir` restricted to a
+  per-endpoint whitelist (`PageQuery` accepts any property; an unlisted one is a `400`, never an
+  ORM error). Every list has a deterministic default sort with a unique tiebreaker.
+- **PATCH** is a partial update of the listed fields only; unknown fields are rejected (`400`),
+  which is what keeps `cloudProvider`/`region`/`slug`/`role` from ever being mass-assigned.
+- **Concurrency**: mutations on an aggregate use optimistic locking (`version`); a lost race is
+  `409 CONCURRENT_MODIFICATION` (already mapped by `PersistenceExceptionHandler`) and safe to
+  retry. Membership-affecting mutations additionally serialize on the org row.
+- **Retry safety**: creates conflict on their natural key with `409` rather than duplicating; the
+  response names the existing resource's id where that is useful.
 
 ### Organizations
 
-| Method | Path | Role required | Notes |
+| Method | Path | Requires | Notes |
 |---|---|---|---|
-| `GET` | `/orgs/{orgId}` | any member | Name, slug, status, member/team/app counts. |
-| `PATCH` | `/orgs/{orgId}` | `ADMIN`+ | Name and settings only — never `slug` (would break every existing invite/app URL keyed by it) and never `ownerUserId` (see ownership transfer, below). |
-| `DELETE` | `/orgs/{orgId}` | `OWNER` | Soft-deletes (`status = DELETED`), cascades membership/team/app rows to a terminal state, publishes `OrgDeleted`. |
+| `GET` | `/orgs/{orgId}` | any member | Name, slug, status, `ownerUserId`, live `COUNT` of members/teams/apps. |
+| `PATCH` | `/orgs/{orgId}` | ADMIN+ | `name` only. Never `slug`, never `ownerUserId`. |
+| `DELETE` | `/orgs/{orgId}` | OWNER | Requires header `X-Confirm-Slug: <slug>` and a [recent authentication](#authorization-model). Soft delete; see [org deletion](#org-deletion). `204`. |
 
 ### Members
 
-| Method | Path | Role required | Notes |
+| Method | Path | Requires | Notes |
 |---|---|---|---|
-| `GET` | `/orgs/{orgId}/members` | any member | Paginated. |
+| `GET` | `/orgs/{orgId}/members` | any member | `ACTIVE` only by default; `?status=REMOVED` for ADMIN+. Sort whitelist: `displayName`, `joinedAt`, `role`. Filter: `role`, `q` (prefix on email/name). |
+| `GET` | `/orgs/{orgId}/members/me` | any member | The caller's own row (role included), so a dashboard needs no token-claim parsing. |
 | `GET` | `/orgs/{orgId}/members/{userId}` | any member | |
-| `PATCH` | `/orgs/{orgId}/members/{userId}` | `OWNER` | Role change. Rejects (`409`) an attempt to change the sole `OWNER`'s own role away from `OWNER` — an org must always have one. Publishes `OrgMemberRoleChanged`. |
-| `DELETE` | `/orgs/{orgId}/members/{userId}` | `OWNER` or `ADMIN` (never targeting the `OWNER`) | Marks `REMOVED`, publishes `OrgMemberRemoved`. |
-| `POST` | `/orgs/{orgId}/members/{userId}/transfer-ownership` | `OWNER` | Atomically: caller's role becomes `ADMIN`, target's becomes `OWNER`. Two `OrgMemberRoleChanged` events, one local transaction. |
+| `PATCH` | `/orgs/{orgId}/members/{userId}` | OWNER | Body `{role}` ∈ `ADMIN`\|`DEVELOPER`\|`VIEWER`. Cannot target the owner or set `OWNER` (use transfer). Emits `OrgMemberRoleChanged`. No-op change is `200` with no event. |
+| `DELETE` | `/orgs/{orgId}/members/{userId}` | OWNER: anyone but self. ADMIN: `DEVELOPER`/`VIEWER` only. Any member: self. | The owner cannot be removed or leave; transfer first. Emits `OrgMemberRemoved`; deletes their `team_members` rows. `204`. Removing an already-removed member is `404`. |
+| `POST` | `/orgs/{orgId}/members/{userId}/transfer-ownership` | OWNER | Recent authentication required. Target must be an `ACTIVE` member. One transaction; emits two `OrgMemberRoleChanged` (target→`owner` first, then caller→`admin`). |
 
 ### Invites
 
-| Method | Path | Role required | Notes |
+| Method | Path | Requires | Notes |
 |---|---|---|---|
-| `POST` | `/orgs/{orgId}/invites` | `OWNER` or `ADMIN` | Body: `email`, `role`. Mints the signed token (`jti`, `orgId`, `email`, `role`, short TTL — days, not minutes), stores the `Invite` row, publishes `NotificationRequested` (`ORG_INVITE`). `409` if a `PENDING` invite already exists for that email. |
-| `GET` | `/orgs/{orgId}/invites` | `OWNER` or `ADMIN` | Pending/expired/revoked, paginated. |
-| `DELETE` | `/orgs/{orgId}/invites/{inviteId}` | `OWNER` or `ADMIN` | Marks `REVOKED`. Doesn't invalidate an already-signed token's cryptographic validity (it's stateless) — `identity-service`'s accept flow can't know it was revoked either, since that would need a sync call. The real backstop is the token's short TTL; revoke is "stop showing it as pending and stop reminding," not "guarantee it can never be accepted" — named honestly rather than oversold. |
-| `GET` | `/invites/{token}` | none (public) | Decodes (doesn't need to cryptographically verify — this is a preview, not the accept action) enough of the token to show "you've been invited to join Acme as Developer" before the dashboard sends the caller to `identity-service`'s accept endpoint. |
+| `POST` | `/orgs/{orgId}/invites` | ADMIN+ | Body `{email, role}`. OWNER may grant `ADMIN`/`DEVELOPER`/`VIEWER`; ADMIN only `DEVELOPER`/`VIEWER`; never `OWNER`. `201` with the `Invite` (never the token). `409` for: already an active member, previously removed, a pending invite exists, pending-invite quota reached. |
+| `GET` | `/orgs/{orgId}/invites` | ADMIN+ | Filter `status`; expiry is evaluated at read time (`PENDING` with `expiresAt` in the past reads as `EXPIRED`), so correctness never depends on the sweep. |
+| `POST` | `/orgs/{orgId}/invites/{inviteId}/resend` | ADMIN+ | `PENDING` only. Re-mints a token for the **same** `jti` with a fresh expiry and re-sends. Cooldown between sends and a max send count; `409`/`429` otherwise. |
+| `DELETE` | `/orgs/{orgId}/invites/{inviteId}` | ADMIN+ | `PENDING` → `REVOKED`. `204`. Advisory, not absolute: see [invite acceptance](#invite-acceptance). |
+| `GET` | `/invites/{token}` | **public** | Preview for the accept page. Verifies the signature and expiry **before** touching the database. Returns `{orgName, role, inviterName, maskedEmail, expiresAt}`; `400 INVALID_TOKEN` for a bad/expired token, `410 INVITE_NO_LONGER_VALID` when the row is revoked/accepted/expired. Needs a gateway `public-paths` entry. |
 
 ### Teams
 
-| Method | Path | Role required |
+| Method | Path | Requires |
 |---|---|---|
-| `POST` | `/orgs/{orgId}/teams` | `ADMIN`+ |
+| `POST` | `/orgs/{orgId}/teams` | ADMIN+ |
 | `GET` | `/orgs/{orgId}/teams` | any member |
 | `GET` | `/orgs/{orgId}/teams/{teamId}` | any member |
-| `PATCH` | `/orgs/{orgId}/teams/{teamId}` | `ADMIN`+ |
-| `DELETE` | `/orgs/{orgId}/teams/{teamId}` | `ADMIN`+ |
+| `PATCH` | `/orgs/{orgId}/teams/{teamId}` | ADMIN+ |
+| `DELETE` | `/orgs/{orgId}/teams/{teamId}` | ADMIN+ (detaches its apps; deletes its `team_members`) |
 | `GET` | `/orgs/{orgId}/teams/{teamId}/members` | any member |
-| `POST` | `/orgs/{orgId}/teams/{teamId}/members` | `ADMIN`+ | Body: `userId` — must already be an `ACTIVE` org member; this is team assignment, not org invitation. |
-| `DELETE` | `/orgs/{orgId}/teams/{teamId}/members/{userId}` | `ADMIN`+ |
+| `POST` | `/orgs/{orgId}/teams/{teamId}/members` | ADMIN+, body `{userId}`, must be an `ACTIVE` org member (team assignment, not invitation); already-in-team is `409` |
+| `DELETE` | `/orgs/{orgId}/teams/{teamId}/members/{userId}` | ADMIN+ |
 
 ### Apps
 
-| Method | Path | Role required | Notes |
+| Method | Path | Requires | Notes |
 |---|---|---|---|
-| `POST` | `/orgs/{orgId}/apps` | `DEVELOPER`+ | Body: `name`, `cloudProvider`, `region`, optional `teamId`. `cloudProvider`/`region` are set once, here, and never again. |
-| `GET` | `/orgs/{orgId}/apps` | any member | |
+| `POST` | `/orgs/{orgId}/apps` | DEVELOPER+ | `{name, slug?, cloudProvider, region, teamId?}`. `region` must be on the configured allow-list for the provider. Set once, never changed. Emits `AppCreated`. |
+| `GET` | `/orgs/{orgId}/apps` | any member | Filter `teamId`, `cloudProvider`. |
 | `GET` | `/orgs/{orgId}/apps/{appId}` | any member | |
-| `PATCH` | `/orgs/{orgId}/apps/{appId}` | `DEVELOPER`+ | Name, team reassignment only — the handler doesn't accept `cloudProvider`/`region` fields at all, so there's no code path that could mutate them, not just a validation check that might be bypassed. |
-| `DELETE` | `/orgs/{orgId}/apps/{appId}` | `ADMIN`+ | Removes the registry row; publishes `app.deleted` (a new topic, consumed by nothing yet — `deploy-orchestrator-service`/`scheduler-service` don't exist. Reserved the same way `org.member.added`/`removed` were reserved for this service before it existed — see [Extension points](#extension-points)). |
+| `PATCH` | `/orgs/{orgId}/apps/{appId}` | DEVELOPER+ | `name`, `teamId` only. The request DTO has no provider/region field. |
+| `DELETE` | `/orgs/{orgId}/apps/{appId}` | ADMIN+ | Soft delete; emits `AppDeleted`. `204`. |
+
+### Error catalog
+
+All extend `AppException` and are rendered by the shared handler; none needs an `@ExceptionHandler`.
+
+| Code | Status | When |
+|---|---|---|
+| `ORG_NOT_FOUND` | 404 | Path `orgId` differs from the token's, or the org is unknown/deleted. One answer for both, so existence is not leaked. |
+| `NOT_A_MEMBER` | 403 | Caller's membership is missing or `REMOVED`. |
+| `INSUFFICIENT_ROLE` | 403 | Caller's local role is below the endpoint's requirement. |
+| `REAUTHENTICATION_REQUIRED` | 403 | Sensitive operation with a stale `auth_time`. |
+| `LAST_OWNER` | 409 | An operation would leave the org without its owner. |
+| `INVALID_ROLE_TRANSITION` | 409 | Targeting the owner, or setting `OWNER` outside transfer. |
+| `ALREADY_A_MEMBER` / `MEMBER_PREVIOUSLY_REMOVED` / `INVITE_ALREADY_PENDING` / `QUOTA_EXCEEDED` | 409 | Invite creation guards. |
+| `INVITE_NO_LONGER_VALID` | 410 | Preview of a non-pending invite. |
+| `INVALID_TOKEN` | 400 | Bad signature, expired, wrong purpose. |
+| `CONCURRENT_MODIFICATION` | 409 | Optimistic-lock loss. |
+| `MEMBER_NOT_FOUND`, `TEAM_NOT_FOUND`, `APP_NOT_FOUND`, `INVITE_NOT_FOUND` | 404 | Scoped to the caller's org. |
+| `SLUG_TAKEN` | 409 | Team or app slug already in use. |
+| `INVALID_REGION` | 400 | Region not on the provider's allow-list. |
+
+## Authorization model
+
+Two gates on every `/orgs/{orgId}/...` request, both local and neither a network call:
+
+1. **Tenant gate.** `OrgContext.requireOrgId()` must equal the path `orgId`. If not, `404
+   ORG_NOT_FOUND`. This is what stops a caller in org A probing org B's ids (IDOR); it also means
+   a valid token can never address any org but its own.
+2. **Membership gate.** One primary-key read of `(org_id, user_id = token.sub)` joined to the
+   org's status returns the caller's **current local role**, their membership status, and whether
+   the org is live. A missing or `REMOVED` membership is `403 NOT_A_MEMBER`; a deleted org is
+   `404`. The endpoint's requirement (`@PreAuthorize("@access.atLeast(#orgId, 'ADMIN')")`, backed
+   by a request-scoped `AccessContext`) is then checked against **that role**.
+
+**The token's `realm_access.roles` are not used for this service's decisions.** This reverses the
+first pass of this document, which read roles from the token and accepted a staleness window of up
+to the 900-second access-token lifetime. That was a poor trade *for this service specifically*:
+it is the system of record for roles, so a demoted admin could keep administering, and a removed
+member keep reading, for up to fifteen minutes, against data this service owns and can check for
+the price of one indexed read. Reading the local row closes the window for everything served here.
+Token roles remain authoritative for *other* services (which have no local row), and the
+membership-sync listeners in `identity-service` are what eventually bring the token into line. A
+metric (`orgteam.authz.token_role_drift`) counts requests where the token's highest role differs
+from the local role, which makes propagation lag visible instead of silent.
+
+Cost: one extra PK lookup per request against a small hot table. It is not cached; a cache would
+reintroduce the staleness this exists to remove.
+
+**Rules the endpoints enforce beyond the role floor** (centralized in `MembershipPolicy`, unit
+tested as a table):
+
+| Actor | May grant / remove | May not |
+|---|---|---|
+| OWNER | Invite any role except `OWNER`; change any non-owner's role; remove anyone but self | Leave, be demoted, or be removed without transferring first |
+| ADMIN | Invite `DEVELOPER`/`VIEWER`; remove `DEVELOPER`/`VIEWER` | Touch another `ADMIN` or the owner; change any role |
+| DEVELOPER / VIEWER | Remove themselves | Anything on members/invites |
+
+An `ADMIN` cannot mint or remove another `ADMIN`: role assignment is an owner power, which keeps a
+single compromised admin account from entrenching itself.
+
+**Recent authentication.** `DELETE /orgs/{orgId}` and `transfer-ownership` require the token's
+`auth_time` to be within `pallet.orgteam.security.recent-auth-window` (default 10 minutes), else
+`403 REAUTHENTICATION_REQUIRED` and the dashboard re-prompts for a password. `auth_time` is already
+mapped into tokens by the realm. A stolen, still-valid access token cannot delete the org.
+
+**Session revocation** (ADR-0015) applies unchanged: `platform-common-security` validates every
+token against the `RevokedSessionRegistry`. This service therefore depends on `spring-data-redis`,
+because without it the Redis-backed registry never activates and the in-memory fallback cannot see
+a revocation another instance wrote. ADR-0015 names exactly this gap.
+
+**Public surface** is one endpoint, `GET /invites/{token}`, plus actuator probes.
 
 ## Processing pipelines
 
@@ -470,99 +629,292 @@ realm-role authorities `platform-common-security`'s converter already produces (
 sequenceDiagram
     participant K as Kafka
     participant L as OrgProvisionedListener
-    participant G as EventIdempotencyGuard
     participant DB as Postgres (org_team)
-    participant Pub as PlatformEventPublisher
+    participant OB as outbox_events
 
     K->>L: OrgProvisioned
-    L->>G: markProcessed(eventId)
-    alt already processed
-        G-->>L: false
+    Note over L,DB: one transaction
+    L->>DB: INSERT processed_events (event_id, consumer) ON CONFLICT DO NOTHING
+    alt 0 rows: duplicate delivery
         L-->>K: ack, no-op
     else first delivery
-        G-->>L: true
-        L->>DB: insert organizations; insert memberships(role=OWNER)
-        L-->>Pub: AFTER_COMMIT: publish OrgMemberAdded
-        L-->>K: ack
+        L->>DB: INSERT organizations ON CONFLICT (org_id) DO NOTHING
+        L->>DB: INSERT memberships (OWNER, ACTIVE)
+        L->>OB: INSERT OrgMemberAdded, AuditEventRecorded
+        L-->>K: commit, then ack
     end
+```
+
+### Membership change (role change, removal, transfer)
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant Ctl as MemberController
+    participant Svc as MemberService
+    participant DB as Postgres
+    participant OB as outbox_events
+
+    C->>Ctl: PATCH /orgs/{orgId}/members/{userId}
+    Ctl->>Ctl: tenant gate + membership gate (local role)
+    Ctl->>Svc: changeRole(...)
+    Note over Svc,DB: one transaction
+    Svc->>DB: SELECT organizations FOR UPDATE (lock root)
+    Svc->>DB: load target, apply MembershipPolicy
+    Svc->>DB: UPDATE memberships SET role
+    Svc->>OB: INSERT OrgMemberRoleChanged, AuditEventRecorded
+    Svc-->>Ctl: commit
+    Ctl-->>C: 200
+    Note over OB: relay publishes shortly after commit
 ```
 
 ### Invite lifecycle
 
 ```mermaid
 sequenceDiagram
-    participant Owner as Owner/Admin (caller)
-    participant Ctl as InviteController
-    participant Tok as SignedActionToken (mint)
-    participant DB as Postgres (org_team)
-    participant Pub as PlatformEventPublisher
+    participant A as Admin
+    participant Svc as InviteService
+    participant Tok as SignedActionToken
+    participant DB as Postgres
+    participant OB as outbox_events
     participant K as Kafka
+    participant NS as notification-service
+    participant I as invitee
+    participant IS as identity-service
     participant L as OrgInviteAcceptedListener
 
-    Owner->>Ctl: POST /orgs/{orgId}/invites
-    Ctl->>Tok: issue("invite", claims, ttl, sharedSecret)
-    Tok-->>Ctl: signed token
-    Ctl->>DB: insert invites(PENDING, jti)
-    Ctl-->>Pub: AFTER_COMMIT: publish NotificationRequested(ORG_INVITE)
-    Ctl-->>Owner: 201 (invite id — not the raw token; the token only ever leaves this service inside the notification email identity-service's WELCOME-style flow doesn't need to see)
-
-    Note over Owner,L: ... time passes, invitee clicks the emailed link, calls identity-service's accept endpoint ...
-
+    A->>Svc: POST /orgs/{orgId}/invites {email, role}
+    Svc->>DB: guards (member? removed? pending? quota?)
+    Svc->>Tok: issue(purpose=invite, jti=invite.id, orgId, email, role, ttl)
+    Note over Svc,DB: one transaction
+    Svc->>DB: INSERT invites (PENDING)
+    Svc->>OB: INSERT NotificationRequested(ORG_INVITE, acceptUrl with token) [sensitive], Audit
+    Svc-->>A: 201 Invite (no token)
+    OB-->>K: relay publishes
+    K->>NS: email with acceptUrl
+    I->>IS: POST /identity/invites/{token}/accept (with password)
+    IS-->>K: OrgInviteAccepted (inviteId = jti)
     K->>L: OrgInviteAccepted
-    L->>DB: find invites by inviteId; mark ACCEPTED; insert memberships
-    L-->>Pub: AFTER_COMMIT: publish OrgMemberAdded
+    L->>DB: (see accept outcomes)
 ```
 
-**Where the raw token lives**: minted here, embedded in the accept URL that goes out via
-`notification.requested`'s `variables.acceptUrl`, rendered by `notification-service`'s template —
-this service never hands the raw token back over its own REST API (`201`'s body carries the
-`Invite`'s id for listing/revocation purposes, not the secret). The only two places the raw,
-unsigned-for-transport token value exists are this service's outbound event payload and
-`identity-service`'s accept-endpoint input.
+### Invite acceptance
 
-## Authorization model
+The invited person's account exists in Keycloak the moment `identity-service` accepts, before this
+service hears about it. This service cannot stop that (no synchronous call, by design); it decides,
+on receiving the event, whether the account is honoured or repudiated:
 
-Every endpoint's role check reads directly off the token's `realm_access.roles` — the composite
-chain `docs/workflows/identity-service/01-keycloak-realm.md` already establishes (`owner ⊇ admin ⊇
-developer ⊇ viewer`) via `hasAnyRole(...)`/`hasRole(...)` checks, exactly the mechanism
-`platform-common-security`'s `PalletResourceServerAutoConfiguration` was built for. **This service
-makes no separate authorization call to anywhere** — the roles are already in the token by the
-time a request reaches here, which is the entire point of ADR-0003 putting them there. Role
-*changes* (this service's own `PATCH /members/{userId}`) take effect the next time the affected
-user gets a fresh token (login or refresh) — there is a real, bounded staleness window where a
-just-demoted user's *existing* access token still carries the old role until it expires
-(`accessTokenLifespan`, 900s per the realm config) or they refresh. This is a standard, accepted
-tradeoff of stateless JWT authorization (the alternative — a token-revocation list checked on
-every request — reintroduces exactly the per-request synchronous dependency the whole platform is
-built to avoid) and is named here rather than silently assumed fixed.
+| State when `OrgInviteAccepted` is processed | Outcome |
+|---|---|
+| Invite `PENDING`, org `ACTIVE` | `ACCEPTED`; insert membership with the **invite row's** role (not the event's); emit `OrgMemberAdded`. |
+| Invite `PENDING` but `expires_at` passed | Judged on the event's `occurredAt`, not processing time: accepted if `occurredAt ≤ expires_at + grace`, so consumer lag never rejects a legitimate accept. Otherwise treated as expired. |
+| Invite already `ACCEPTED` | No-op (a redelivery under a different event id cannot occur; identity's `jti` replay guard prevents a second account). |
+| Invite `REVOKED` / `EXPIRED` / unknown, or org `DELETED` | **Reject**: no membership; emit `OrgInviteRejected{reason}`; identity-service disables the account it just created. |
+| A membership for that `userId` already exists | No-op. |
+
+The first pass of this document dropped the rejected cases and accepted the consequence: a live
+Keycloak account carrying an `org_id` and a role for an org that had refused it. That is a
+tenant-isolation hole for every *other* service, which trusts the token, not this service's
+tables. `OrgInviteRejected` closes it by choreography, still asynchronously. The remaining window
+is the delay between the accept and the rejection being applied, bounded by outbox + consumer
+latency (seconds), and this service's own API denies the account throughout (no membership row).
+Revocation is therefore **bounded-advisory**: it cannot prevent the account being *created*, but it
+reliably causes it to be *disabled*.
+
+### Org deletion
+
+One transaction, org row locked: `organizations.status = DELETED` (`deleted_at`, `deleted_by`);
+every `ACTIVE` membership → `REMOVED`; every `PENDING` invite → `REVOKED`; every `team_members`
+row deleted; every `ACTIVE` app → `DELETED`. Outbox: one `AppDeleted` per app (bounded by the
+per-org app quota), then `OrgDeleted` last, plus audit. No per-member `OrgMemberRemoved`:
+`identity-service` disables every account under the org from `OrgDeleted` alone, and fanning out N
+member events would only be noise. After commit, every path under the org is `404`. A retention job
+later purges the PII (see [Retention](#retention-and-purge)).
+
+## Reliable messaging: outbox and inbox
+
+This is the piece that turns "publish after commit" (a dual write that can lose the event) into a
+guarantee.
+
+### Outbox (publishing)
+
+```mermaid
+flowchart LR
+    subgraph Tx["request or listener transaction"]
+        S[state change] --- O[INSERT outbox_events]
+    end
+    Tx -->|commit| R[OutboxRelay]
+    R -->|"PlatformEventPublisher.publish (blocks for ack)"| K[(Kafka)]
+    R -->|mark PUBLISHED| DB[(outbox_events)]
+```
+
+- Writers call `OutboxWriter.append(PlatformEvent)`; it serializes the record with its stable
+  `eventId` into `outbox_events` **inside the caller's transaction**. If the transaction rolls
+  back, the event never existed. If it commits, the event is durable.
+- `OutboxRelay` is a `@Scheduled` poller (`pallet.orgteam.outbox.poll-interval`, default 250 ms).
+  It holds a Postgres **session advisory lock** (`pg_try_advisory_lock`), so exactly one instance
+  relays at a time and no event is reordered by two relays racing. Standby instances poll the lock
+  and take over within one interval if the holder dies (the lock is released with its session).
+- Each cycle reads a bounded batch (`batch-size`, default 100) in `id` order and publishes each
+  row through `PlatformEventPublisher` (idempotent producer, `acks=all`, keyed by `orgId`),
+  marking it `PUBLISHED` on ack.
+- **Ordering.** A failed row stops **that org's** remaining rows in the batch (so a later event
+  for the org is never published ahead of an earlier one) while other orgs continue: one org's
+  poison row does not stall the platform. After `max-attempts` the row is `PARKED` and the org's
+  later rows stay queued behind it, deliberately: publishing them would reorder that org's history.
+  Parked rows raise an alert; an operator fixes and re-queues (a runbook step, checkpoint 14).
+- **Delivery is at-least-once**: a crash between ack and `PUBLISHED` republishes the same
+  `eventId`. Every consumer is idempotent on `eventId` ([inbox](#inbox-consuming)).
+- **Sensitive payloads.** The invite's `NotificationRequested` carries a bearer capability (the raw
+  token in `acceptUrl`). Rows flagged `sensitive` have `payload` nulled on publish, so the token
+  lives in Postgres only for the seconds before delivery. It still transits `notification.requested`
+  until that topic's retention expires; that residual risk is bounded by the token's TTL and
+  single-use, and named in [Security](#security-and-threat-model).
+- **Retention.** `PUBLISHED` rows are deleted after `outbox.retention` (default 7 days).
+- **Debezium later.** `OutboxWriter` is the only seam writers know. Replacing the poller with a
+  Debezium outbox connector (`docs/PROJECT.md`'s other option) changes the relay, not one writer.
+
+The relay is service-local, not a `platform-common` module: no second service needs it yet
+(`AGENTS.md`: no new shared module ahead of the feature that needs it). It is written to extract
+cleanly when `billing-service` or another does.
+
+### Inbox (consuming)
+
+Listeners are `@Transactional`, and the first statement calls `TransactionalInbox.firstDelivery(consumer,
+eventId)`, which inserts `(event_id, consumer)` into `processed_events` with `ON CONFLICT DO NOTHING`.
+Zero rows means "already handled": acknowledge and stop. One row means proceed. The claim and every
+effect commit or roll back **together**, so a crash can neither lose an event's effect (claim
+without effect) nor repeat it (effect without claim). The inbox is `MANDATORY`-propagation, so
+calling it outside a transaction fails loudly. This service does **not** use the messaging module's
+Redis `EventIdempotencyGuard` (a build-time architecture test forbids referencing it): Redis marks
+*before* the effect, so a crash between mark and commit drops the event permanently, which is
+acceptable for an email and not for a membership row. `processed_events` is swept after
+`inbox.retention` (default 14 days, above Kafka's retention so a redelivery always finds its claim).
+
+Listeners run on `platform-common-messaging`'s container factory, so retry with backoff and
+dead-lettering to `<topic>.DLT` are inherited, not rewritten. A non-retryable failure (a malformed
+payload) goes straight to the DLT.
 
 ## Distributed systems mechanisms
 
 | Concern | Mechanism | Where |
 |---|---|---|
-| Cross-service handoff with no synchronous call | Mint a signed token here, verified without a call in `identity-service` | Invites |
-| At-least-once → effectively-once (consumer side) | `EventIdempotencyGuard` on every listener | `OrgProvisioned`/`OrgInviteAccepted`/`UserProfileUpdated` listeners |
-| Eventually-consistent local read-model for cross-service data | `memberships.email`/`display_name` sourced from consumed events, never queried live from `identity-service` | Same pattern `notification-service`'s `org_members` already uses |
-| Publish-after-commit | `@TransactionalEventListener(AFTER_COMMIT)` | Every mutating endpoint and listener that also publishes |
-| One invariant enforced centrally rather than per-caller | "An org always has ≥1 owner" checked in the role-change and removal handlers, not left to the caller | `PATCH`/`DELETE /members/{userId}` |
-| Immutability where a downstream system needs to trust a value never moves | `cloudProvider`/`region` accepted only at creation; the update handler's DTO doesn't have the fields | Apps |
-| Stateless authorization, bounded staleness accepted explicitly | Role checks read the token only, never a live lookup; staleness bounded by `accessTokenLifespan` | [Authorization model](#authorization-model) |
-| Tracing | One trace per HTTP request; one per consumed event | `platform-common-observability` |
-| Multi-tenancy isolation | `org_id` on every row; every path is `/orgs/{orgId}/...`, checked against the token's own `org_id` claim, never trusted from the path alone | `platform-common-security`'s `OrgContext` |
-| Consistency model | Eventual with `identity-service` in both directions: an owner's `OrgProvisioned` fact may lag their sign-up response; a revoked invite may still be acceptable until its token's TTL lapses | Named in [Failure modes](#failure-modes), not hidden |
+| Atomic state change + event | Transactional outbox, poller relay, advisory-lock single relay | Every mutation and listener |
+| Effectively-once consumption | Transactional inbox (`processed_events` claimed in the effect's transaction) | The three listeners |
+| At-least-once publication tolerated downstream | Stable `eventId` stored in the outbox; consumers dedupe on it | Relay, all consumers |
+| Per-org ordering | Kafka key = `orgId`; relay preserves per-org insertion order and blocks an org behind its own failed row | Relay |
+| Sync-free cross-service handoff | Signed HS256 token minted here, verified without a call in `identity-service` | Invites |
+| Compensation without a synchronous call | `OrgInviteRejected` makes `identity-service` undo the account it created | Invite acceptance |
+| Serialized membership changes | `SELECT … FOR UPDATE` on the org row (lock root) plus optimistic `version` on aggregates | Members, transfer, delete |
+| Invariants twice | Application policy for messages; partial unique indexes, composite FKs, trigger for correctness | One owner, immutable provider/region, tenant-consistent team members |
+| Stateless-token staleness eliminated locally | Authorization reads the local membership row | Every endpoint |
+| Bounded staleness accepted elsewhere | Token roles reach other services within `accessTokenLifespan` of the sync completing | ADR-0003 |
+| Multi-tenant isolation | Tenant gate + `org_id` on every row/repository method + composite FKs | All |
+| Bounded work | Page cap, per-org quotas, batch sizes, retry ceilings | All |
+| Time-driven state | Expiry evaluated at read time; sweep only tidies | Invites |
+| Observability | One trace per request and per consumed event, the outbox hop included; RED metrics plus outbox lag | [Operations](#observability-and-operations) |
 
-## Failure modes
+## Consistency and failure modes
+
+Consistency model: **strongly consistent within this service** (one Postgres, one transaction per
+operation); **eventually consistent with every other service**, in both directions, with the lag
+bounded by outbox poll interval plus consumer-group lag (sub-second to seconds in normal
+operation) and made observable rather than assumed.
 
 | Scenario | Behavior |
 |---|---|
-| `OrgProvisioned` arrives before this service has ever seen the org (normal case, always true on org creation) | Handled — this is simply the first event, not a special case; the listener inserts fresh rows. |
-| A caller hits `GET /orgs/{orgId}` before `OrgProvisioned` has been consumed | `404` — the dashboard's post-sign-up screen should render from `identity-service`'s own inline sign-up response instead, per that document's Failure modes entry, and poll or retry here rather than treat this as a hard error. |
-| `OrgInviteAccepted` arrives for an invite that was already `REVOKED` before acceptance | Logged and dropped — a real account now exists in `identity-service` with no corresponding membership here. Same narrow, named consequence as identity-service's "org deleted between invite and accept" case; both stem from the same design tradeoff and are two faces of one accepted risk, not two separate bugs. |
-| Attempt to demote or remove the sole `OWNER` | `409 CONFLICT` — checked here, before any event is published, so Keycloak's role assignment is never asked to do something that would leave the org without an owner. |
-| `DELETE /orgs/{orgId}` by a non-owner | `403` — enforced by `@PreAuthorize`. |
-| Two concurrent `POST /orgs/{orgId}/invites` for the same email | The second hits the partial unique index (`(org_id, email) WHERE status = 'PENDING'`) and returns `409` rather than silently minting a second live token for the same invite. |
-| An app's `DELETE` is called while `deploy-orchestrator-service` (future) has running deployments for it | Not handled here — this service only owns the registry row. The `app.deleted` event exists precisely so a future consumer can refuse or clean up; until one exists, deletion always succeeds at this service's own level, which is the correct, honest behavior for "the seam is real, the upstream consumer isn't built yet" — same framing `notification-service`'s `ORG` broadcast used for `org-team-service` itself before this document existed. |
-| Token TTL vs. revoke race: an invite is revoked one second before the invitee's accept call lands | Accept still succeeds (the token is still cryptographically valid and unexpired) — [Authorization model](#authorization-model)'s note on stateless verification's bounded imprecision applies here too. Mitigated by keeping invite TTLs short, not eliminated. |
+| Postgres unavailable | Requests fail `503` via the existing persistence mapping; the relay cannot poll and consumers retry then dead-letter; nothing is acknowledged that was not committed. |
+| Kafka unavailable | Requests **still succeed** (they only write the outbox); the outbox backs up, `orgteam.outbox.oldest_pending_age` climbs and alerts; the relay drains it on recovery, in order. |
+| Crash after commit, before relay | The row is in the outbox; the relay publishes it after restart. Nothing lost. |
+| Crash after Kafka ack, before `PUBLISHED` | Republished with the same `eventId`; consumers dedupe. |
+| Relay instance dies holding the lock | Session ends, lock releases, a standby takes over within one poll interval. |
+| Poison outbox row | Retried to `max-attempts`, then `PARKED`; its org's later events wait behind it; other orgs unaffected; alert on parked count > 0. |
+| Consumer crash mid-handler | Transaction rolls back including the inbox claim; redelivery reprocesses. |
+| Duplicate `OrgProvisioned` | Inbox claim fails, and `org_id` is a primary key. No-op. |
+| `UserProfileUpdated` arrives before its membership exists | Retryable error: backoff retries (the accept event is usually seconds behind), then the DLT. `profile_synced_at` makes a late, older update a no-op. |
+| A caller reads an org before `OrgProvisioned` is consumed | `404 ORG_NOT_FOUND`. The dashboard renders the post-sign-up screen from `identity-service`'s sign-up response and retries here rather than treating it as an error. |
+| Newly invited member's first request before `OrgInviteAccepted` is consumed | `403 NOT_A_MEMBER` for the same brief window; the client retries. |
+| Invite revoked, then accepted anyway | Account created, then disabled via `OrgInviteRejected`; this service never grants membership. |
+| Two concurrent invites for one email | Partial unique index: one wins, one `409`. |
+| Two concurrent role changes / a demote racing a transfer | Serialized by the org row lock; the second sees the first's result and is re-validated (`LAST_OWNER`/`INVALID_ROLE_TRANSITION` as applicable). |
+| Removing the owner, demoting the owner, transferring to a non-member | Rejected before any event exists. |
+| `OrgMemberRemoved` published but `identity-service` is down | Kafka retains it; the account is disabled when the consumer returns. Meanwhile this service already denies the person (local check); other services honour their token until it expires or its session is revoked. |
+| Someone invited whose email already has a Pallet account elsewhere | Accept fails at `identity-service` with `409` (email uniqueness); nothing here changes. The invite stays `PENDING` until it expires or is revoked. |
+| App deleted while a future deploy is running | Not handled here; `AppDeleted` exists for the consumer that will. Deletion always succeeds locally. |
+| Clock skew between instances | Expiry compares database time (`now()`), not JVM time, for stored deadlines. |
+| Deployment with old and new versions running | Migrations are expand/contract; a new column is nullable or defaulted first, then used, then constrained. Event changes are additive. |
+
+## Security and threat model
+
+| Threat | Mitigation |
+|---|---|
+| Caller reads/writes another org's data (IDOR) | Tenant gate (`404` when path org ≠ token org); every repository method takes `orgId`; composite FKs; an ArchUnit test fails the build on a tenant-table repository method without an `orgId` parameter. |
+| Privilege escalation (admin grants themselves owner) | Role matrix in `MembershipPolicy`; `OWNER` never assignable outside transfer; ADMIN cannot touch ADMIN/OWNER; DB unique-owner index. |
+| Stale token keeps working after removal/demotion | Authorization on the local row; ADR-0015 revocation for session-level kills; identity sync for other services. |
+| Stolen access token used for destructive action | `auth_time` recency on org delete and ownership transfer; `X-Confirm-Slug` on delete. |
+| Invite token forged | HMAC-SHA256 with a ≥32-byte key, verified before any DB read; startup fails on a weak key. |
+| Invite token leaks | Never returned by the REST API; only in the outbound notification; nulled in Postgres on publish; short TTL; single-use at identity's replay guard; invite revoke → `OrgInviteRejected` compensation. Residual: the token sits in `notification.requested` until retention. |
+| Invite as an email-spam vector | Per-org pending-invite quota, resend cooldown and cap, ADMIN+ only, gateway rate limit on top. |
+| Enumeration via public preview | Bad tokens are indistinguishable (`INVALID_TOKEN`); a valid token is by definition held by its owner; masked email in the response. |
+| Public endpoint DoS | HMAC check before any DB access; gateway per-IP rate limit; no unbounded work per request. |
+| Mass assignment | PATCH DTOs are explicit and reject unknown properties; provider/region/slug/role/owner are not on any update DTO. |
+| Injection | JPA parameterized queries only; sort fields whitelisted. |
+| Secrets in logs | The invite token path segment is redacted in access logs and span attributes; PII (email) logged only at DEBUG and never for the public endpoint; `sensitive` outbox payloads never logged. |
+| Replay of a consumed event | Inbox. |
+| Poisoned event from the bus | Payload validated (required fields, role enum, id formats) before any effect; malformed goes to the DLT, never half-applied. |
+| Key compromise / rotation | Symmetric key shared with `identity-service` (ADR-0011). Rotation needs a dual-key verify window on the identity side; see [Open questions](#open-questions--deferred). TTL bounds the exposure of tokens minted under an old key. |
+| CSRF | Not applicable: bearer-token API, no cookies, CSRF disabled as in every other service. |
+
+PII held: member and invitee emails and display names. Purged on the [retention schedule](#retention-and-purge); never copied to logs or metrics labels.
+
+## Observability and operations
+
+**Metrics** (Micrometer → Prometheus, `orgteam.*`): `outbox.pending`, `outbox.oldest_pending_age_seconds`,
+`outbox.parked`, `outbox.published`, `outbox.publish_failures`; `inbox.duplicates`; per-listener
+`events.processed`/`events.dropped{reason}`/`events.failed`; `invites.{created,resent,revoked,accepted,rejected,expired}`;
+`members.{added,removed,role_changed}`; `authz.denied{reason}`, `authz.token_role_drift`;
+`apps.created`, `orgs.deleted`. Standard HTTP RED metrics come from `platform-common-observability`.
+
+**Tracing**: one trace per HTTP request; one per consumed event; the relay's publish is its own
+span linked to the originating request through the stored `traceparent` (stored on the outbox row
+so the request → outbox → Kafka → consumer path reads as one causal chain in Jaeger).
+
+**Logging**: structured, correlation id and `orgId`/`userId` in MDC; no bodies, no tokens.
+
+**Alerts** (the set worth paging on):
+
+| Alert | Condition | Meaning |
+|---|---|---|
+| Outbox stalled | `oldest_pending_age > 60s` warn, `> 300s` page | Events not reaching Kafka: access revocations are delayed. |
+| Outbox parked | `parked > 0` | A poison event is holding an org's history; needs an operator. |
+| DLT non-empty | any of the three consumer DLTs has messages | An inbound event failed all retries. |
+| Consumer lag | lag > threshold for N minutes | Memberships are stale. |
+| Token role drift sustained | `authz.token_role_drift` rate high | Identity sync is behind or broken. |
+| Invite rejections | any `OrgInviteRejected` | Someone accepted a revoked/expired invite; investigate abuse or a UX gap. |
+| 5xx rate / p99 | SLO burn | Ordinary service health. |
+
+**SLOs** (targets, revisit with real traffic): API availability 99.9%; reads p99 < 300 ms and
+writes p99 < 500 ms at the service; **event publication lag p99 < 2 s** (commit → on Kafka).
+
+**Health**: liveness is process-only. Readiness requires Postgres and a Kafka producer metadata
+check; it does **not** depend on outbox lag (a lagging outbox must alert, not restart the pod).
+
+**Runbooks** (checkpoint 14 writes them): re-queue a parked outbox row; replay a DLT message;
+verify identity has applied a removal; rotate the invite signing key.
+
+### Retention and purge
+
+| Data | Retention | Mechanism |
+|---|---|---|
+| `outbox_events` `PUBLISHED` | 7 days | sweep |
+| `processed_events` | 14 days | sweep |
+| Terminal invites (`ACCEPTED`/`REVOKED`/`EXPIRED`) | 90 days | sweep (email is PII) |
+| `REMOVED` memberships | 365 days (kept that long so "previously removed" stays detectable) | sweep |
+| Deleted org's memberships/invites/teams/apps | 30 days after `deleted_at` | purge job hard-deletes the rows, keeps the tombstone (`org_id`, `slug`, `status`, `purged_at`) so the slug stays reserved |
+
+All windows are `pallet.orgteam.retention.*`. Sweeps are batched and idempotent, run under the same
+advisory-lock discipline so multiple replicas do not duplicate work, and report their deletes as
+metrics. Audit history is `audit-log-service`'s concern, not this service's tables.
 
 ## Component view
 
@@ -570,42 +922,71 @@ built to avoid) and is named here rather than silently assumed fixed.
 flowchart TB
     subgraph OrgTeamSvc["org-team-service"]
         direction TB
-        OrgCtl[OrgController]
-        MemberCtl[MemberController]
-        InviteCtl[InviteController]
-        TeamCtl[TeamController]
-        AppCtl[AppController]
-        L1[OrgProvisionedListener]
-        L2[OrgInviteAcceptedListener]
-        L3[UserProfileUpdatedListener]
-        Tok[SignedActionToken - issue only]
-        Repo1[OrganizationRepository]
-        Repo2[MembershipRepository]
-        Repo3[InviteRepository]
-        Repo4[TeamRepository]
-        Repo5[AppRepository]
-        Pub[PlatformEventPublisher]
+        subgraph Web
+            OrgCtl[OrgController]
+            MemberCtl[MemberController]
+            InviteCtl[InviteController]
+            PreviewCtl[InvitePreviewController]
+            TeamCtl[TeamController]
+            AppCtl[AppController]
+        end
+        subgraph Sec["security"]
+            Gate[TenantGate + AccessContext]
+            Pol[MembershipPolicy]
+        end
+        subgraph Dom["services"]
+            OrgSvc[OrgService]
+            MemberSvc[MemberService]
+            InviteSvc[InviteService]
+            TeamSvc[TeamService]
+            AppSvc[AppService]
+        end
+        subgraph Msg["messaging"]
+            L1[OrgProvisionedListener]
+            L2[OrgInviteAcceptedListener]
+            L3[UserProfileUpdatedListener]
+            Inbox[TransactionalInbox guard]
+            Writer[OutboxWriter]
+            Relay[OutboxRelay]
+        end
+        Tok[SignedActionToken]
+        Sweeps[Retention and expiry sweeps]
+        Repos[(Repositories)]
     end
-
-    OrgCtl --> Repo1 --> Pub
-    MemberCtl --> Repo2 --> Pub
-    InviteCtl --> Tok
-    InviteCtl --> Repo3 --> Pub
-    TeamCtl --> Repo4
-    AppCtl --> Repo5 --> Pub
-    L1 --> Repo1
-    L1 --> Repo2
-    L2 --> Repo3
-    L2 --> Repo2
-    L3 --> Repo2
+    Web --> Gate --> Pol
+    Web --> Dom --> Repos
+    Dom --> Writer --> Repos
+    InviteSvc --> Tok
+    PreviewCtl --> Tok
+    L1 & L2 & L3 --> Inbox --> Repos
+    L1 & L2 & L3 --> Dom
+    Relay --> Repos
+    Sweeps --> Repos
 ```
 
 ## Deployment and scaling view
 
-Stateless HTTP + one Kafka consumer group (`org-team-service`, three topics). Same shape as
-`identity-service` and `notification-service`: one deployable, scaled by instance count, no
-partition-count pressure at this event volume (org/membership changes are orders of magnitude
-rarer than notification delivery).
+One deployable, stateless HTTP plus one Kafka consumer group (`org-team-service`, three topics)
+plus the relay and sweeps, all in the same process. Scale by instance count:
+
+- **HTTP and consumers** scale horizontally. Topic partition count bounds consumer parallelism;
+  the org-keyed traffic here is low-volume, so a small partition count and `concurrency` of 1–3 per
+  instance is ample, and per-org ordering is preserved by the key.
+- **The relay is single-active** by advisory lock. Its throughput is one instance's poll loop,
+  thousands of events per second at batch 100 / 250 ms, orders of magnitude above this service's
+  write rate. If that ever binds, shard the lock by `hash(org_id) % N`; ordering only needs per-org.
+- **Postgres** is the shared-cluster schema `org_team` locally (ADR-0007); deployed, a managed
+  instance is the expected home, an ADR-0007 follow-up. Connection pool sized to instances × threads.
+- **Graceful shutdown**: stop consuming, stop the relay (release the lock), drain in-flight
+  requests, then close the pool. Kubernetes `terminationGracePeriodSeconds` ≥ the longest request
+  timeout plus one relay batch.
+- **Replicas ≥ 2** in any real environment (the relay standby is free); rolling updates are safe
+  because migrations are expand/contract and events are additive.
+- **Port** `8084` locally (`8081` notification, `8082` identity, `8083` gateway).
+- **Capacity sketch**: order of 10⁴–10⁵ orgs, 10⁵–10⁶ memberships, a few hundred thousand events a
+  day at the outside. Every hot query is a primary-key or covered-index lookup; the largest scans
+  (list members/invites) are paginated and index-backed; org counts are live `COUNT(*)` on indexed
+  columns and get denormalized only if they show up as hot.
 
 ## Package layout and dependencies
 
@@ -613,73 +994,101 @@ rarer than notification delivery).
 services/org-team-service/
 └── src/main/java/io/pallet/orgteam/
     ├── OrgTeamServiceApplication.java
-    ├── org/                OrgController, Organization (entity), OrganizationRepository, OrgProvisionedListener
-    ├── member/              MemberController, Membership (entity), MembershipRepository, UserProfileUpdatedListener
-    ├── invite/               InviteController, Invite (entity), InviteRepository, OrgInviteAcceptedListener
-    ├── team/                 TeamController, Team, TeamMembership, TeamRepository
-    ├── app/                  AppController, App (entity), AppRepository
-    └── token/                 SignedActionToken (issue-only usage here — verify lives in identity-service)
+    ├── config/        OrgTeamProperties (@ConfigurationProperties pallet.orgteam.*), Clock bean
+    ├── security/      TenantGate, AccessContext, AccessEvaluator (@access), MembershipPolicy,
+    │                  RecentAuthentication, SecurityConfiguration (public-paths)
+    ├── org/           OrgController, OrgService, Organization, OrganizationRepository,
+    │                  OrgProvisionedListener, OrgDeletionService
+    ├── member/        MemberController, MemberService, Membership, MembershipRepository,
+    │                  Role, UserProfileUpdatedListener
+    ├── invite/        InviteController, InvitePreviewController, InviteService, Invite,
+    │                  InviteRepository, OrgInviteAcceptedListener, InviteExpirySweep
+    ├── team/          TeamController, TeamService, Team, TeamMember, repositories
+    ├── app/           AppController, AppService, App, AppRepository, RegionCatalog
+    ├── token/         SignedActionToken (issue + verify), InvalidTokenException
+    ├── outbox/        OutboxWriter, OutboxEvent, OutboxRepository, OutboxRelay,
+    │                  EventTypeRegistry, OutboxMetrics
+    ├── inbox/         ProcessedEvent, TransactionalInbox
+    └── retention/     RetentionSweeps, OrgPurgeJob
 ```
 
-POM additions beyond the reactor-independent parent: `platform-common-api`, `-exception`,
-`-events`, `-observability`, `-messaging`, `-security`; `spring-boot-starter-webmvc` +
-`-validation`; `spring-boot-starter-data-jpa` + `postgresql` + `flyway-database-postgresql`.
-**No `platform-common-resilience`** — this service makes no external/third-party calls in this
-design (its only "external" relationship, the signed-token handoff, needs no network call at
-all); add it the day a real external call shows up (a cloud provider API, eventually), not before.
+POM (independent project per `CONTRIBUTING.md`/`PACKAGES.md`: own wrapper, parented directly on
+`spring-boot-starter-parent`, `platform-common-*` as pinned published dependencies):
+`platform-common-api`, `-exception`, `-events`, `-observability`, `-messaging`, `-security`,
+`-openapi`; `spring-boot-starter-webmvc`, `-validation`, `-data-jpa`, `-data-redis` (for ADR-0015),
+`-actuator`; `postgresql`; `flyway-database-postgresql`; test: `platform-common-test`, Testcontainers
+Postgres/Kafka/Redis, ArchUnit.
+**No `platform-common-resilience`**: no external/third-party call exists here. The relay's Kafka
+publish goes through `PlatformEventPublisher`, which already wraps the send. Add it the day a real
+external call appears.
+
+## Configuration
+
+`pallet.orgteam.*`, bound by one `@ConfigurationProperties` record, served from
+`config-repo/org-team-service.yml`, every secret an environment variable.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `pallet.invites.signing-key` | `${PALLET_INVITES_SIGNING_KEY}` | HMAC secret shared with identity-service. ≥32 bytes or startup fails. |
+| `pallet.orgteam.invites.ttl` | `PT72H` | Token lifetime. |
+| `pallet.orgteam.invites.max-pending-per-org` | `50` | Spam/abuse cap. |
+| `pallet.orgteam.invites.resend-cooldown` / `max-sends` | `PT5M` / `4` | Resend limits. |
+| `pallet.orgteam.invites.accept-grace` | `PT2M` | Clock/lag grace for expiry on accept. |
+| `pallet.orgteam.invites.accept-url-template` | `${DASHBOARD_BASE_URL}/invites/{token}` | Link in the email. |
+| `pallet.orgteam.limits.max-teams-per-org` / `max-apps-per-org` | `100` / `200` | Flat safety limits. |
+| `pallet.orgteam.apps.regions.aws` / `.gcp` | provider lists | Region allow-lists. |
+| `pallet.orgteam.security.recent-auth-window` | `PT10M` | Sensitive-operation recency. |
+| `pallet.orgteam.outbox.poll-interval` / `batch-size` / `max-attempts` / `retention` | `PT0.25S` / `100` / `10` / `P7D` | Relay. |
+| `pallet.orgteam.inbox.retention` | `P14D` | Inbox sweep. |
+| `pallet.orgteam.retention.*` | see [Retention](#retention-and-purge) | Sweeps. |
+| `spring.datasource.*`, `spring.kafka.*`, `spring.data.redis.*` | env-backed | Infrastructure. |
 
 ## Extension points
 
-- **`app.deleted` / `app.created` consumed by `deploy-orchestrator-service` and
-  `scheduler-service`**: reserved topics, no consumer yet — same seam-before-producer pattern this
-  whole design already uses twice (invites needing identity-service, broadcast needing this
-  service from notification-service's side).
-- **Role beyond the fixed four**: if a finer-grained permission model is ever needed (custom
-  per-team roles, resource-level ACLs), `Role` stops being an enum and this service's
-  authorization model grows a real policy engine — a significant redesign, not sketched further
-  here since nothing today needs it.
-- **Org settings as a real resource** (billing contact, notification preferences, branding): folded
-  into `PATCH /orgs/{orgId}` today as a settings blob; if it grows complex enough to need its own
-  validation/versioning, it becomes a sibling `GET/PATCH /orgs/{orgId}/settings` endpoint without
-  touching the `Organization` aggregate itself.
-- **Asymmetric invite-token signing**, removing the shared-secret coupling with `identity-service`
-  — see that document's own Open questions; this service would switch `SignedActionToken.issue` to
-  a private-key sign with no other change to this design.
+- **`app.created` / `app.deleted`** consumed by `scheduler-service` and `deploy-orchestrator-service`:
+  reserved topics with no consumer yet, the same seam-before-consumer pattern as `org.member.*` was
+  for this service.
+- **Debezium outbox** replacing the poller: swap the relay, keep `OutboxWriter`.
+- **Extracting the outbox** into a `platform-common` module when a second service needs it.
+- **Row-level security** in Postgres (`SET LOCAL app.org_id` per transaction) as defense in depth
+  under the application-level tenant checks, if a compliance requirement asks for it.
+- **Finer-grained roles**: `Role` stops being an enum and the policy becomes a real engine; a
+  significant redesign, not sketched, since nothing needs it.
+- **Org settings** (billing contact, branding, notification preferences): a sibling
+  `GET/PATCH /orgs/{orgId}/settings`, without touching the `Organization` aggregate.
+- **Asymmetric invite signing** removing the shared secret, once a third service needs to mint or
+  verify (ADR-0011).
+- **Plan-based quotas**: the flat config limits become a projection of `billing-service` events.
 
 ## Open questions / deferred
 
-- **Invite token revocation is advisory, not absolute** — named plainly in [Invites](#invites) and
-  [Failure modes](#failure-modes). Closing this gap for real means either a short-lived token plus
-  a fast-expiring cache identity-service checks (reintroducing a shared-state dependency between
-  the two services) or accepting the current tradeoff permanently. Worth revisiting only if a real
-  incident (a revoked invite still being accepted) actually happens.
-- **`invites` growing unboundedly with `EXPIRED`/`REVOKED` rows** — no retention policy specified
-  here, unlike `notification-service`'s deliberate "retain everything" decision for its own data;
-  this table is operational bookkeeping, not a tenant's record, so a TTL/cleanup job is more
-  clearly appropriate here than it was there — sized and built when it's actually needed, not now.
-- **Whether `GET /orgs/{orgId}` should expose member/team/app *counts* computed live (a query) or
-  maintained as denormalized counters** — a performance decision that depends on real usage
-  patterns this design can't predict yet; start with a live `COUNT(*)` query, revisit if it shows
-  up as a hot path.
+- **Invite-signing key rotation.** Needs `identity-service` to verify against a current and a
+  previous key during a window (`kid` header). Not built; the 72-hour TTL bounds exposure until it is.
+- **Reactivating a removed member / account recovery.** A removed member's email stays bound to a
+  disabled Keycloak account, so re-inviting them fails at accept. v1 rejects the re-invite up front
+  (`MEMBER_PREVIOUSLY_REMOVED`). Solving it is an `identity-service` flow, not a change here.
+- **Slug quarantine for deleted apps.** Deleted apps free their slug immediately. Once networking
+  ties a hostname to a slug, a quarantine period may be needed to prevent takeover; decide with the
+  networking design.
+- **Counts on `GET /orgs/{orgId}`** are live `COUNT(*)`. Denormalize only if measured hot.
+- **Whether `OrgUpdated` is worth an event** (a rename): today only audit is emitted, since no
+  consumer needs it. `identity-service`'s bootstrap slug/name snapshot never changes name.
+- **Outbox extraction timing** (see extension points).
 
 ## Relationship to existing planning docs
 
-`PROJECT.md`'s sketch and `docs/workflows/ROADMAP.md` (which doesn't yet have an org-team-service
-table at all — Phase 1d's table covers only Keycloak and `identity-service`; `org-team-service`
-opens Phase 2) describe this service in one paragraph with no detail on the identity-service
-boundary, the invite mechanism, or the event contracts above. This document — together with
-`docs/identity-service/ARCHITECTURE.md` — is the first real design pass and should get a shared
-ADR before either service's workflow files are written, covering the same three points that
-document's own closing section names (the AuthN/AuthZ split, signed action tokens, single-org-per-
-account) plus this service's own additions:
+`PROJECT.md`'s paragraph and the ADRs listed at the top are the parents of this document.
+[ADR-0016](../adr/0016-org-team-service-production-design.md) records the four decisions that
+depart from the first draft and from the "accepted, no outbox" position `identity-service` took
+in its checkpoint 12 (which still stands for that service: it has a compensating action, this one
+does not). The build plan is
+[`docs/workflows/org-team-service/`](../workflows/org-team-service/00-README.md), sequenced in
+[`docs/workflows/ROADMAP.md`](../workflows/ROADMAP.md) Phase 2.
 
-- `platform-common-events` needs `OrgMemberRoleChanged` and `OrgDeleted` added to `Topics`
-  (`OrgMemberAdded`/`OrgMemberRemoved` were already conceptually reserved by ADR-0008; this
-  document is what finally defines their exact payload, confirmed unchanged from what
-  `notification-service` already assumes).
-- `notification-service` needs a new `ORG_INVITE` template — flagged the same way `WELCOME`
-  already exists and `PASSWORD_RESET`/`EMAIL_VERIFICATION` are flagged in
-  `docs/identity-service/ARCHITECTURE.md`.
-- `docs/workflows/ROADMAP.md` needs an actual Phase-2 (or pulled-forward Phase-1d) table for this
-  service once workflow files are written, the same way ADR-0008 required updating Phase 1c's
-  table for notification-service's expanded scope.
+Two things elsewhere need to follow this document, both scheduled as checkpoint 16 rather than
+left implicit:
+
+- `notification-service` needs the `ORG_INVITE` template and its `OrgMembershipEventListener`
+  (ADR-0008 reserved the seam but never built the listener; the code confirms it is absent).
+- `identity-service` needs an `OrgInviteRejectedListener`, the same shape as its existing
+  `OrgMemberRemovedListener`.
