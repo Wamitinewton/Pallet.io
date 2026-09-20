@@ -1,5 +1,9 @@
 server:
   port: ${SERVER_PORT:8082}
+  # api-gateway is the only thing exposed to callers, so the socket peer is always the gateway.
+  # "native" lets Tomcat's RemoteIpValve resolve the real client from X-Forwarded-For - honored
+  # only when the peer is an internal proxy - which the auth rate limiter keys on.
+  forward-headers-strategy: native
 
 spring:
   application:

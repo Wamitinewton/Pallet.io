@@ -19,8 +19,11 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Exercises {@link KeycloakTokenClient}'s response classification against a real, if minimal, HTTP
@@ -34,6 +37,7 @@ class KeycloakTokenClientTest {
     private static final String REALM = "test-realm";
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final AtomicInteger requestCount = new AtomicInteger();
     private HttpServer server;
 
     @AfterEach
@@ -85,12 +89,82 @@ class KeycloakTokenClientTest {
                 .isInstanceOf(ExternalServiceException.class);
     }
 
+    @Test
+    void aBadCredentialResponseIsNeverRetried() throws IOException {
+        startTokenServer(401, "{\"error\":\"invalid_grant\",\"error_description\":\"Invalid user credentials\"}");
+
+        assertThatThrownBy(() -> clientFor(server).passwordGrant("user@example.test", "wrong"))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(requestCount).hasValue(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {429, 500, 502, 503})
+    void anUnexpectedStatusIsAnInfraFailureRetriedThenSurfacedAsExternalServiceException(int status)
+            throws IOException {
+        startTokenServer(status, "<html>upstream error</html>");
+
+        assertThatThrownBy(() -> clientFor(server).passwordGrant("user@example.test", "pw"))
+                .isInstanceOf(ExternalServiceException.class);
+
+        assertThat(requestCount).hasValue(3);
+    }
+
+    @Test
+    void aServerErrorOnRefreshIsAnInfraFailureNotAnExpiredToken() throws IOException {
+        startTokenServer(503, "");
+
+        assertThatThrownBy(() -> clientFor(server).refreshGrant("some-refresh-token"))
+                .isInstanceOf(ExternalServiceException.class);
+
+        assertThat(requestCount).hasValue(3);
+    }
+
+    @Test
+    void aSuccessfulLogoutCompletesQuietly() throws IOException {
+        startLogoutServer(204, "");
+
+        clientFor(server).revokeSession("some-refresh-token");
+
+        assertThat(requestCount).hasValue(1);
+    }
+
+    @Test
+    void aRejectedLogoutIsInvalidCredentialsAndNeverRetried() throws IOException {
+        startLogoutServer(400, "{\"error\":\"invalid_grant\"}");
+
+        assertThatThrownBy(() -> clientFor(server).revokeSession("stale-refresh-token"))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(requestCount).hasValue(1);
+    }
+
+    @Test
+    void aServerErrorOnLogoutIsAnInfraFailureRetriedThenSurfaced() throws IOException {
+        startLogoutServer(502, "");
+
+        assertThatThrownBy(() -> clientFor(server).revokeSession("some-refresh-token"))
+                .isInstanceOf(ExternalServiceException.class);
+
+        assertThat(requestCount).hasValue(3);
+    }
+
     private void startTokenServer(int status, String body) throws IOException {
+        startServer("token", status, body);
+    }
+
+    private void startLogoutServer(int status, String body) throws IOException {
+        startServer("logout", status, body);
+    }
+
+    private void startServer(String endpoint, int status, String body) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/realms/" + REALM + "/protocol/openid-connect/token", exchange -> {
+        server.createContext("/realms/" + REALM + "/protocol/openid-connect/" + endpoint, exchange -> {
+            requestCount.incrementAndGet();
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(status, bytes.length);
+            exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
             try (OutputStream responseBody = exchange.getResponseBody()) {
                 responseBody.write(bytes);
             }

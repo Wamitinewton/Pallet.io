@@ -78,7 +78,9 @@ class GatewayRoutingConfigurationIntegrationTest {
                 "/api/v1/identity/auth/login",
                 "/api/v1/identity/auth/refresh",
                 "/api/v1/identity/auth/email/verify",
-                "/api/v1/identity/auth/email/resend-verification"
+                "/api/v1/identity/auth/email/resend-verification",
+                "/api/v1/identity/auth/password/forgot",
+                "/api/v1/identity/auth/password/reset"
             })
     void proxiesEachPublicPathToIdentityServiceWithPathAndMethodUnchanged(String path) throws Exception {
         HttpResponse<String> response = send("POST", path);

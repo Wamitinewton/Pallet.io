@@ -169,20 +169,20 @@ pallet:
           - /api/v1/identity/auth/refresh
           - /api/v1/identity/auth/email/verify
           - /api/v1/identity/auth/email/resend-verification
+          - /api/v1/identity/auth/password/forgot
+          - /api/v1/identity/auth/password/reset
+          - /api/v1/identity/signup/slugs/*/availability
+          - /api/v1/identity/v3/api-docs
         resilience-policy: identity-service
 ```
 
-`public-paths` here is the **exact** permitAll list `identity-service`'s own
-`SecurityConfiguration` already codes — six paths, not the seven or eight a first read of
-`docs/identity-service/ARCHITECTURE.md`'s API table might suggest: that table's own "Auth actions
-(public)" heading currently covers `/auth/logout`, `/auth/password/forgot`, and
-`/auth/password/reset` too, but `identity-service`'s actual `SecurityConfiguration` only permits
-signup, invite-accept, login, refresh, and the two email-verification actions — logout and password
-reset currently fall under that service's own `anyRequest().authenticated()` catch-all. This
-gateway's allowlist mirrors the **real, running** backend configuration, not the architecture
-table — a real, pre-existing discrepancy between that table and `identity-service`'s own code,
-named here rather than silently perpetuated by copying the table instead of the code; reconciling
-which one is actually correct is `identity-service`'s own follow-up, not this document's to decide.
+`public-paths` here mirrors the permitAll list `identity-service`'s own `SecurityConfiguration`
+codes (plus its OpenAPI docs path): signup, slug availability, invite-accept, login, refresh, the
+two email-verification actions, and the two password-reset actions. `/auth/logout` is deliberately
+absent: it revokes the caller's own session, so it stays behind both the edge check and
+`identity-service`'s own `anyRequest().authenticated()`. The two lists must move together —
+adding a path to one and not the other yields a 401 at whichever layer was missed, which is exactly
+how password reset was unreachable until both were reconciled.
 
 `GatewayRoutingConfiguration` turns each entry into one `RouterFunction<ServerResponse>` bean via
 Gateway Server MVC's functional `GatewayRouterFunctions.route(name)`, matching on `path` **and**

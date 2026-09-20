@@ -2,6 +2,11 @@ package io.pallet.identity.invite;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,7 +16,10 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.pallet.common.error.ExternalServiceException;
 import io.pallet.common.events.Topics;
+import io.pallet.common.resilience.ExternalCall;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
 import io.pallet.common.test.json.JsonTestSupport;
@@ -22,6 +30,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -32,6 +43,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.sql.DataSource;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.Keycloak;
@@ -41,9 +53,11 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
@@ -75,6 +89,18 @@ class InviteAcceptControllerIntegrationTest {
 
     @Autowired
     private EventCaptureConfiguration.CapturedEvents capturedEvents;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @MockitoSpyBean
+    private ExternalCall externalCall;
+
+    @MockitoSpyBean
+    private ConsumedInviteTokenRepository consumedInviteTokenRepository;
 
     private static String unique() {
         return UUID.randomUUID().toString().substring(0, 8);
@@ -275,6 +301,86 @@ class InviteAcceptControllerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                         "select count(*) from identity.users where email = ?", Integer.class, email))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void aRoleAssignmentFailureAfterUserCreationRemovesTheAccountWithoutRetryingUserCreation() throws Exception {
+        String orgId = "org-" + unique();
+        String email = "invitee-" + unique() + "@pallet-test.local";
+        // 1st call: real user create. 2nd: simulated role-assignment failure. 3rd: the real
+        // compensating delete - must not be masked by the 2nd stub or the orphan would survive.
+        doCallRealMethod()
+                .doThrow(new ExternalServiceException(
+                        "Keycloak is temporarily unavailable",
+                        "simulated role-assignment failure",
+                        new RuntimeException("connection reset")))
+                .doCallRealMethod()
+                .when(externalCall)
+                .call(eq("keycloak-admin"), any());
+
+        performAccept(inviteToken(orgId, email)).andExpect(status().isBadGateway());
+
+        assertThat(keycloakUsersByEmail(email)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from identity.users where email = ?", Integer.class, email))
+                .isEqualTo(0);
+    }
+
+    @Test
+    void aTokenMissingARequiredClaimIsRejectedAsInvalidWithoutCreatingAKeycloakUser() throws Exception {
+        String orgId = "org-" + unique();
+        String email = "invitee-" + unique() + "@pallet-test.local";
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .claim("purpose", "invite")
+                .claim("orgId", orgId)
+                .claim("email", email)
+                .jwtID(UUID.randomUUID().toString())
+                .expirationTime(Date.from(Instant.now().plus(Duration.ofMinutes(15))))
+                .build();
+        SignedJWT signedJwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        signedJwt.sign(new MACSigner(inviteProperties.signingKey().getBytes(StandardCharsets.UTF_8)));
+
+        performAccept(signedJwt.serialize())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_TOKEN"));
+
+        assertThat(keycloakUsersByEmail(email)).isEmpty();
+    }
+
+    @Test
+    void aPrimaryKeyRaceLossCountsAsAReplayAndRemovesTheLosersAccount() throws Exception {
+        String orgId = "org-" + unique();
+        String email = "invitee-" + unique() + "@pallet-test.local";
+        String jti = UUID.randomUUID().toString();
+        String token = inviteToken(orgId, email, ROLE, jti, Duration.ofMinutes(15), inviteProperties.signingKey());
+        // The winner commits its row after this request's pre-check but before this request's own
+        // insert, so this request's insert hits the primary-key constraint.
+        doAnswer(invocation -> {
+                    commitWinnersRowOnItsOwnConnection(jti);
+                    throw new DataIntegrityViolationException("simulated primary-key race");
+                })
+                .when(consumedInviteTokenRepository)
+                .save(argThat((ConsumedInviteToken consumed) -> jti.equals(consumed.getJti())));
+        double replayedBefore =
+                meterRegistry.counter("identity.invites.replayed").count();
+
+        performAccept(token).andExpect(status().isConflict());
+
+        assertThat(meterRegistry.counter("identity.invites.replayed").count()).isEqualTo(replayedBefore + 1);
+        assertThat(keycloakUsersByEmail(email)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from identity.users where email = ?", Integer.class, email))
+                .isEqualTo(0);
+    }
+
+    /** A separate autocommit connection, so the row survives the loser's own rollback. */
+    private void commitWinnersRowOnItsOwnConnection(String jti) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement insert =
+                        connection.prepareStatement("insert into identity.consumed_invite_tokens (jti) values (?)")) {
+            insert.setString(1, jti);
+            insert.executeUpdate();
+        }
     }
 
     private int raceAccept(String token, CountDownLatch startLatch) {

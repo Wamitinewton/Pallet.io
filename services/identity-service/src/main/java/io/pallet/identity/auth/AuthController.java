@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,8 +52,9 @@ class AuthController {
 
     @PostMapping("/auth/logout")
     @Operation(summary = "Revoke the caller's current refresh token")
-    ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
-        authService.logout(request.refreshToken());
+    ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LogoutRequest request) {
+        authService.logout(jwt, request.refreshToken());
         return ResponseEntity.ok(ApiResponse.ok("Logged out"));
     }
 
@@ -73,6 +76,7 @@ class AuthController {
 
     @PostMapping("/auth/password/forgot")
     @Operation(summary = "Request a password-reset token by email")
+    @SecurityRequirements
     ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         passwordResetService.requestReset(request.email());
         return ResponseEntity.status(ACCEPTED)
@@ -81,6 +85,7 @@ class AuthController {
 
     @PostMapping("/auth/password/reset")
     @Operation(summary = "Complete a password reset with a single-use token")
+    @SecurityRequirements
     ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.completeReset(request.token(), request.newPassword());
         return ResponseEntity.ok(ApiResponse.ok("Password reset"));

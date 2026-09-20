@@ -5,7 +5,7 @@
 #
 #   docker compose --profile core up -d           # postgres, redis, kafka, keycloak, clickhouse
 #   docker compose --profile observability up -d   # otel-collector, prometheus, grafana, jaeger, loki
-#   docker compose --profile data up -d            # minio, vault
+#   docker compose --profile data up -d            # vault
 #   docker compose --profile ui up -d              # kafka-ui
 #
 # The Makefile wraps these (make up / make up-all / make obs / make down).
@@ -153,22 +153,6 @@ services:
       - "8025:8025"
     networks: [pallet]
 
-  minio:
-    image: minio/minio:latest
-    container_name: pallet-minio
-    profiles: ["data"]
-    restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: pallet
-      MINIO_ROOT_PASSWORD: pallet-minio
-    ports:
-      - "9002:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks: [pallet]
-
   vault:
     image: hashicorp/vault:1.18
     container_name: pallet-vault
@@ -259,5 +243,4 @@ volumes:
   postgres_data:
   kafka_data:
   clickhouse_data:
-  minio_data:
   grafana_data:

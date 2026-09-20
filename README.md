@@ -19,7 +19,7 @@ rationale are in [`docs/adr/`](docs/adr/README.md).
   (see [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md))
 - Keycloak for identity: one realm, `org_id` claim on every token
 - PostgreSQL for most services; ClickHouse for `audit-log-service` and
-  `usage-metering-service`; Redis, MinIO, Vault alongside
+  `usage-metering-service`; Redis, Vault alongside
 - Micrometer + OpenTelemetry → Prometheus / Grafana / Jaeger
 - Kubernetes for tenant workloads and the control plane; Resilience4j for every
   external call
@@ -67,7 +67,7 @@ project's own build targets, each independent of the others.
 | Kafka | localhost:29092 |
 | Kafka UI | http://localhost:8090 (`make up-all` or `--profile ui`) |
 | Prometheus / Grafana / Jaeger | :9090 / :3000 / :16686 (`make obs`) |
-| MinIO / Vault | :9001 / :8200 (`make data`) |
+| Vault | :8200 (`make data`) |
 
 ## API documentation
 

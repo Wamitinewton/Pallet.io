@@ -1,4 +1,10 @@
 spring:
+  datasource:
+    hikari:
+      # Every distinct test context is cached for the whole run and all of them share one
+      # singleton Postgres; the default pool of 10 per context exhausts its max_connections.
+      maximum-pool-size: 4
+      minimum-idle: 1
   cloud:
     config:
       enabled: false

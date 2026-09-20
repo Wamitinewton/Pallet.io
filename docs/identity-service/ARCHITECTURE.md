@@ -520,13 +520,13 @@ means `POST /api/v1/identity/signup`).
 | `POST` | `/identity/signup` | `Idempotency-Key` header, required | Creates the Keycloak owner (`emailVerified: false`, `VERIFY_EMAIL` required action pending) + `OrgBootstrapRecord`; publishes `OrgProvisioned`, `NotificationRequested` (`WELCOME`), `NotificationRequested` (`EMAIL_VERIFICATION`), `AuditEventRecorded`. Response includes `orgId`/`orgName`/`slug` so the dashboard's first screen doesn't need to wait on `org-team-service`'s async projection — but the account **cannot authenticate yet**; see [Mandatory email verification](#mandatory-email-verification). |
 | `POST` | `/identity/invites/{token}/accept` | One-time-use `jti` (see `ConsumedInviteToken`), not a header | Verifies the signed token locally, creates a Keycloak user scoped to the token's `orgId`/`role`, **`emailVerified: true`, no required action** (see [Mandatory email verification](#mandatory-email-verification) for why), publishes `OrgInviteAccepted`, `AuditEventRecorded`. A token whose `jti` is already consumed returns `409 CONFLICT` (not `200`) — replaying an accept is not safely idempotent the way sign-up is, because a second accept would try to create a second Keycloak user for an email that (by definition) now already has one. |
 
-### Auth actions (public)
+### Auth actions (public, except logout)
 
 | Method | Path | Notes |
 |---|---|---|
 | `POST` | `/identity/auth/login` | Password-grant proxy. Returns `401` (not a retried `ExternalServiceException`) for bad credentials, or `403 EMAIL_NOT_VERIFIED` if the account's `VERIFY_EMAIL` required action is still pending — see `07-auth-login-refresh-logout.md`'s design for the exact classification mechanism. |
 | `POST` | `/identity/auth/refresh` | Refresh-grant proxy — exchanges a refresh token for a new access/refresh pair. Same bad-token-vs-infra-failure split as login. |
-| `POST` | `/identity/auth/logout` | Revokes the caller's current refresh token / Keycloak session (Keycloak's own revoke endpoint, `ExternalCall`-wrapped). |
+| `POST` | `/identity/auth/logout` | **Authenticated** (the one non-public row in this table). Body: `refreshToken`. Rejects with `403` a refresh token whose `sub` isn't the caller's, revokes it through Keycloak's own logout endpoint (`ExternalCall`-wrapped), then records the session's `sid` in `RevokedSessionRegistry` so the caller's still-unexpired access token stops working immediately. |
 | `POST` | `/identity/auth/password/forgot` | Always returns `202`, whether or not the email exists — enumeration-safe by construction, the same reasoning `notification-service`'s recipient-scoping already applies. Issues a `PASSWORD_RESET` one-time token and a `NotificationRequested` (new type — see [Extension points](#extension-points)) only when the email *does* match a user; the caller can't tell the difference from the response. |
 | `POST` | `/identity/auth/password/reset` | Body: token + new password. Single-use, checked against `one_time_action_tokens.used_at`; a reused or expired token is `400 INVALID_TOKEN`. |
 | `POST` | `/identity/auth/email/resend-verification` | Body: `email`. Same enumeration-safe `202` pattern as forgot-password. Invalidates any existing unconsumed code for that user and issues a fresh 8-character OTP via `NotificationRequested` (`EMAIL_VERIFICATION`). |
@@ -716,6 +716,7 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 |---|---|
 | Keycloak unreachable during sign-up | `ExternalCall`'s `keycloak-admin` policy retries, then circuit-breaks; sign-up returns `502`-mapped `ExternalServiceException` — no local row is written (Keycloak call happens before the local transaction). |
 | Local commit fails after Keycloak user already created | Named, not hidden — same compensating-delete mitigation as the existing checkpoint 3 design. **Checkpoint 12 decision: accepted as sufficient for Phase 1, no outbox built** — see below. |
+| Invite-accept creates the Keycloak user but assigning its role fails | User creation and role assignment are separate `ExternalCall` boundaries, so a role-assignment retry never re-POSTs the create. The just-created account is removed by the same compensating delete as sign-up — an invited user is never left in Keycloak without their role. A token missing `jti`/`orgId`/`email`/`role` is rejected `400 INVALID_TOKEN` before any Keycloak call. |
 | Dashboard reads `org-team-service` immediately after a `201` from `/identity/signup` | May briefly 404 or return a partial projection — `org.provisioned`'s consumer hasn't necessarily run yet. The dashboard should treat "org not found yet" right after a fresh sign-up as "still provisioning," not an error; the sign-up response itself carries enough (`orgId`/`orgName`/`slug`) to render an immediate first screen without needing `org-team-service` at all. |
 | Invite token replayed after first successful accept | `409 CONFLICT` — `consumed_invite_tokens(jti)` already has a row. |
 | Invite token expired | `400 INVALID_TOKEN` — `SignedActionToken.verify` checks `exp` before this service ever looks at a database. |
@@ -757,6 +758,10 @@ own per-code attempt budget. Deliberately simple, per this checkpoint's own guid
 in-memory Resilience4j registry per instance, no distributed rate limiting, no CAPTCHA — proportionate
 because no gateway/WAF layer exists yet (`api-gateway` is Phase 2). Configurable via
 `pallet.identity.rate-limit.*` (default: 20 requests per client per endpoint per minute).
+"Client address" is resolved by Tomcat's own forwarded-header handling
+(`server.forward-headers-strategy: native`, honoring `X-Forwarded-For` only from an internal
+proxy): behind `api-gateway` the socket peer is always the gateway, so without it every caller
+would share one budget per endpoint.
 
 **Observability.** `identity.signups`, `identity.signups.compensating_delete`,
 `identity.invites.accepted`, `identity.invites.replayed`, `identity.logins.{success,failed,unverified}`,

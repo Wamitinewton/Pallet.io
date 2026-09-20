@@ -3,6 +3,7 @@ package io.pallet.identity.auth;
 import static io.pallet.common.test.assertions.PalletAssertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -265,6 +266,157 @@ class AuthControllerIntegrationTest {
         mvc.perform(post("/api/v1/identity/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(JsonTestSupport.toJson(new LogoutRequest("irrelevant"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private String awaitAndExtractResetToken(String email) {
+        await().atMost(AWAIT_TIMEOUT)
+                .untilAsserted(
+                        () -> assertThat(passwordResetNotificationsFor(email)).isNotEmpty());
+        String resetUrl = passwordResetNotificationsFor(email)
+                .getLast()
+                .value()
+                .get("variables")
+                .get("resetUrl")
+                .asString();
+        return resetUrl.substring(resetUrl.indexOf("token=") + "token=".length());
+    }
+
+    private List<ConsumerRecord<String, JsonNode>> passwordResetNotificationsFor(String email) {
+        return capturedEvents.notificationRequested.stream()
+                .filter(record -> "PASSWORD_RESET"
+                                .equals(record.value().get("notificationType").asString())
+                        && email.equals(record.value().get("recipient").asString()))
+                .toList();
+    }
+
+    @Test
+    void forgotPasswordIsPublicAndReturnsTheSame202ForARealAndAFakeEmail() throws Exception {
+        String email = signUp();
+
+        MvcResult realEmailResult = mvc.perform(post("/api/v1/identity/auth/password/forgot")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new ForgotPasswordRequest(email))))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        MvcResult fakeEmailResult = mvc.perform(post("/api/v1/identity/auth/password/forgot")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(
+                                new ForgotPasswordRequest("nobody-" + unique() + "@pallet-test.local"))))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        assertThat(realEmailResult.getResponse().getContentAsString())
+                .isEqualTo(fakeEmailResult.getResponse().getContentAsString());
+    }
+
+    @Test
+    void resetPasswordIsPublicAndRejectsAnUnknownTokenAsInvalidTokenNotUnauthorized() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/identity/auth/password/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(
+                                new ResetPasswordRequest("not-a-real-token", "anotherlongpassword"))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        ErrorResponse errorResponse =
+                JsonTestSupport.fromJson(result.getResponse().getContentAsString(), ErrorResponse.class);
+        assertThat(errorResponse).isFailure().hasErrorCode("INVALID_TOKEN");
+    }
+
+    @Test
+    void aPasswordResetCompletedOverHttpWithNoBearerTokenChangesTheLoginPassword() throws Exception {
+        String email = signUp();
+        verifyEmail(email);
+        String newPassword = "a-brand-new-password";
+
+        mvc.perform(post("/api/v1/identity/auth/password/forgot")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new ForgotPasswordRequest(email))))
+                .andExpect(status().isAccepted());
+        String resetToken = awaitAndExtractResetToken(email);
+
+        mvc.perform(post("/api/v1/identity/auth/password/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new ResetPasswordRequest(resetToken, newPassword))))
+                .andExpect(status().isOk());
+
+        login(email, newPassword);
+        mvc.perform(post("/api/v1/identity/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new LoginRequest(email, PASSWORD))))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/identity/auth/password/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new ResetPasswordRequest(resetToken, newPassword))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void anUnknownRefreshTokenIsUnauthorizedWithoutRetry() throws Exception {
+        long before = failedCallsWithoutRetryAttempt();
+        long beforeRetried = failedCallsWithRetryAttempt();
+
+        mvc.perform(post("/api/v1/identity/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new RefreshRequest("not-a-real-refresh-token"))))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(failedCallsWithoutRetryAttempt()).isEqualTo(before + 1);
+        assertThat(failedCallsWithRetryAttempt()).isEqualTo(beforeRetried);
+    }
+
+    @Test
+    void logoutAlsoRejectsTheCallersOwnAccessTokenImmediately() throws Exception {
+        String email = signUp();
+        verifyEmail(email);
+        JsonNode tokens = login(email, PASSWORD);
+        String accessToken = tokens.get("accessToken").asString();
+
+        mvc.perform(post("/api/v1/identity/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(
+                                new LogoutRequest(tokens.get("refreshToken").asString()))))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/identity/users/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutWithAnotherUsersRefreshTokenIsForbiddenAndLeavesThatSessionActive() throws Exception {
+        String callerEmail = signUp();
+        verifyEmail(callerEmail);
+        String callerAccessToken =
+                login(callerEmail, PASSWORD).get("accessToken").asString();
+        String victimEmail = signUp();
+        verifyEmail(victimEmail);
+        String victimRefreshToken =
+                login(victimEmail, PASSWORD).get("refreshToken").asString();
+
+        mvc.perform(post("/api/v1/identity/auth/logout")
+                        .header("Authorization", "Bearer " + callerAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new LogoutRequest(victimRefreshToken))))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/api/v1/identity/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new RefreshRequest(victimRefreshToken))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void logoutWithAMalformedRefreshTokenIsUnauthorized() throws Exception {
+        String email = signUp();
+        verifyEmail(email);
+        String accessToken = login(email, PASSWORD).get("accessToken").asString();
+
+        mvc.perform(post("/api/v1/identity/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JsonTestSupport.toJson(new LogoutRequest("not-a-jwt"))))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -34,6 +34,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -56,6 +57,9 @@ class UserControllerIntegrationTest {
 
     @Autowired
     private EventCaptureConfiguration.CapturedEvents capturedEvents;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static String unique() {
         return UUID.randomUUID().toString().substring(0, 8);
@@ -136,6 +140,26 @@ class UserControllerIntegrationTest {
                         jsonPath("$.data.displayName").value("Newton Kurunduuu"),
                         jsonPath("$.data.status").value("ACTIVE"),
                         jsonPath("$.data.roles").isArray());
+    }
+
+    @Test
+    void meForAValidTokenWithNoLocalRowIsNotFoundRatherThanAServerError() throws Exception {
+        String email = signUpAndVerify();
+        String accessToken = accessTokenFor(email, PASSWORD);
+        jdbcTemplate.update(
+                "delete from identity.email_verification_codes where user_id in"
+                        + " (select id from identity.users where email = ?)",
+                email);
+        jdbcTemplate.update("delete from identity.users where email = ?", email);
+
+        MvcResult result = mvc.perform(
+                        get("/api/v1/identity/users/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNotFound())
+                .andReturn();
+
+        ErrorResponse errorResponse =
+                JsonTestSupport.fromJson(result.getResponse().getContentAsString(), ErrorResponse.class);
+        assertThat(errorResponse).isFailure().hasErrorCode("NOT_FOUND");
     }
 
     @Test

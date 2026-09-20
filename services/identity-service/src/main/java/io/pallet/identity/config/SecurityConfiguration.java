@@ -15,9 +15,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
- * Overrides {@code platform-common-security}'s authenticate-everything default: sign-up is the
- * platform's account-bootstrap entry point and, by definition, has no token to authenticate with
- * yet. Every other route stays behind a valid Keycloak JWT.
+ * Overrides {@code platform-common-security}'s authenticate-everything default: sign-up, login,
+ * email verification and password reset are the account-bootstrap and recovery entry points and,
+ * by definition, have no token to authenticate with. Every other route stays behind a valid Keycloak JWT.
  */
 @Configuration
 class SecurityConfiguration {
@@ -42,6 +42,8 @@ class SecurityConfiguration {
         String inviteAcceptPath = apiPathProperties.prefix() + "/identity/invites/*/accept";
         String loginPath = apiPathProperties.prefix() + "/identity/auth/login";
         String refreshPath = apiPathProperties.prefix() + "/identity/auth/refresh";
+        String forgotPasswordPath = apiPathProperties.prefix() + "/identity/auth/password/forgot";
+        String resetPasswordPath = apiPathProperties.prefix() + "/identity/auth/password/reset";
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
@@ -53,7 +55,9 @@ class SecurityConfiguration {
                                     verifyEmailPath,
                                     inviteAcceptPath,
                                     loginPath,
-                                    refreshPath)
+                                    refreshPath,
+                                    forgotPasswordPath,
+                                    resetPasswordPath)
                             .permitAll();
                     auth.requestMatchers(HttpMethod.GET, slugAvailabilityPath).permitAll();
                     publicApiPaths.forEach(paths -> auth.requestMatchers(paths.method(), paths.patterns())

@@ -19,7 +19,7 @@ obs: ## Start the observability stack (otel-collector, prometheus, grafana, jaeg
 	docker compose --profile observability up -d
 
 .PHONY: data
-data: ## Start minio + vault
+data: ## Start vault
 	docker compose --profile data up -d
 
 .PHONY: up-all
