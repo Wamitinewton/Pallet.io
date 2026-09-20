@@ -183,6 +183,22 @@ class SignupControllerIntegrationTest {
     }
 
     @Test
+    void aMissingIdempotencyKeyIsBadRequestAndCreatesNothing() throws Exception {
+        String slug = "acme-" + unique();
+        String email = "owner-" + unique() + "@pallet-test.local";
+
+        mvc.perform(post("/api/v1/identity/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(slug, email)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(keycloakUsersByEmail(email)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                        "select count(*) from identity.organizations where slug = ?", Integer.class, slug))
+                .isEqualTo(0);
+    }
+
+    @Test
     void aTakenSlugIsRejectedWithoutCreatingAKeycloakUser() throws Exception {
         String slug = "acme-" + unique();
         performSignup(UUID.randomUUID().toString(), signupJson(slug, "owner-" + unique() + "@pallet-test.local"))

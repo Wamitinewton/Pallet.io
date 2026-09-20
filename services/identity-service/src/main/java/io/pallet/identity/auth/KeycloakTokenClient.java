@@ -66,9 +66,13 @@ public class KeycloakTokenClient {
         externalCall.run(KEYCLOAK_TOKEN_POLICY, () -> {
             HttpResponse<String> response =
                     post(logoutEndpoint(), "client_id=%s&refresh_token=%s".formatted(clientId(), encode(refreshToken)));
-            if (!isSuccess(response.statusCode())) {
+            if (isSuccess(response.statusCode())) {
+                return;
+            }
+            if (isClientError(response.statusCode())) {
                 throw new InvalidCredentialsException("Keycloak rejected the logout: " + response.statusCode());
             }
+            throw unexpectedStatus(response.statusCode());
         });
     }
 
@@ -78,8 +82,20 @@ public class KeycloakTokenClient {
             if (response.statusCode() == 200) {
                 return jsonMapper.readValue(response.body(), TokenResponse.class);
             }
-            throw classify(response.body());
+            if (isClientError(response.statusCode())) {
+                throw classify(response.body());
+            }
+            throw unexpectedStatus(response.statusCode());
         });
+    }
+
+    /**
+     * A non-2xx that isn't Keycloak's 400/401 OAuth error contract (5xx, 429, a proxy's error page)
+     * is an infra failure: thrown as a plain runtime exception so {@link ExternalCall} retries it
+     * and, once exhausted, surfaces {@code ExternalServiceException}.
+     */
+    private static IllegalStateException unexpectedStatus(int statusCode) {
+        return new IllegalStateException("Keycloak responded with unexpected status " + statusCode);
     }
 
     private AppException classify(String errorBody) {
@@ -125,6 +141,10 @@ public class KeycloakTokenClient {
 
     private String clientId() {
         return properties.keycloak().tokenClientId();
+    }
+
+    private static boolean isClientError(int statusCode) {
+        return statusCode == 400 || statusCode == 401;
     }
 
     private static boolean isSuccess(int statusCode) {

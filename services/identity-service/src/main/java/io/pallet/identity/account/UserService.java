@@ -1,5 +1,6 @@
 package io.pallet.identity.account;
 
+import io.pallet.common.error.NotFoundException;
 import io.pallet.common.events.UserProfileUpdated;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.observability.Monitored;
@@ -183,7 +184,7 @@ public class UserService {
     private IdentityUser findByKeycloakUserId(String keycloakUserId) {
         return identityUserRepository
                 .findByKeycloakUserId(keycloakUserId)
-                .orElseThrow(() -> new IllegalStateException("No local user row for Keycloak user " + keycloakUserId));
+                .orElseThrow(() -> new NotFoundException("Account", keycloakUserId));
     }
 
     private static Set<String> realmRoles(Jwt jwt) {

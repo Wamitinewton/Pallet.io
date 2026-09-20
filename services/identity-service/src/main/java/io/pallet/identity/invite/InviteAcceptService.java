@@ -11,6 +11,7 @@ import io.pallet.identity.account.IdentityUserRepository;
 import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.config.IdentityServiceProperties;
 import io.pallet.identity.config.InviteProperties;
+import io.pallet.identity.token.InvalidTokenException;
 import io.pallet.identity.token.SignedActionToken;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
@@ -88,10 +89,10 @@ class InviteAcceptService {
     void accept(String token, String password) {
         Map<String, String> claims =
                 SignedActionToken.verify(INVITE_TOKEN_PURPOSE, token, inviteProperties.signingKey());
-        String jti = claims.get("jti");
-        String orgId = claims.get("orgId");
-        String email = claims.get("email");
-        String role = claims.get("role");
+        String jti = requiredClaim(claims, "jti");
+        String orgId = requiredClaim(claims, "orgId");
+        String email = requiredClaim(claims, "email");
+        String role = requiredClaim(claims, "role");
         String displayName = displayNameFrom(claims, email);
 
         if (consumedInviteTokenRepository.existsById(jti)) {
@@ -110,12 +111,32 @@ class InviteAcceptService {
             // Keycloak user, and the loser hits consumed_invite_tokens' primary-key constraint
             // here instead. PersistenceExceptionHandler renders that as 409, same as the pre-check
             // hit; the compensating delete below removes the loser's now-orphaned Keycloak account.
+            if (consumedInviteTokenRepository.existsById(jti)) {
+                meterRegistry.counter(REPLAYED_METRIC).increment();
+            }
             compensateOrphanedKeycloakUser(keycloakUserId, e);
             throw e;
         }
     }
 
+    /**
+     * User creation and role assignment are separate {@code ExternalCall} boundaries, each retried
+     * on its own: a transient failure assigning the role must never retry the create POST against
+     * an account that already exists. A role-assignment failure removes the just-created account
+     * rather than leaving a role-less user behind.
+     */
     private String createInvitedAccount(String orgId, String email, String role, String password) {
+        String keycloakUserId = createKeycloakUser(orgId, email, password);
+        try {
+            externalCall.run(KEYCLOAK_ADMIN_POLICY, () -> assignRole(keycloakUserId, role));
+        } catch (RuntimeException e) {
+            compensateOrphanedKeycloakUser(keycloakUserId, e);
+            throw e;
+        }
+        return keycloakUserId;
+    }
+
+    private String createKeycloakUser(String orgId, String email, String password) {
         return externalCall.call(KEYCLOAK_ADMIN_POLICY, () -> {
             UserRepresentation user = new UserRepresentation();
             user.setUsername(email);
@@ -133,9 +154,7 @@ class InviteAcceptService {
                 if (response.getStatus() == Response.Status.CONFLICT.getStatusCode()) {
                     throw new ConflictException("An account with this email already exists");
                 }
-                String keycloakUserId = CreatedResponseUtil.getCreatedId(response);
-                assignRole(keycloakUserId, role);
-                return keycloakUserId;
+                return CreatedResponseUtil.getCreatedId(response);
             }
         });
     }
@@ -202,12 +221,21 @@ class InviteAcceptService {
         }
     }
 
+    private static String requiredClaim(Map<String, String> claims, String name) {
+        String value = claims.get(name);
+        if (value == null || value.isBlank()) {
+            throw new InvalidTokenException("Invite token is missing required claim '" + name + "'");
+        }
+        return value;
+    }
+
     private static String displayNameFrom(Map<String, String> claims, String email) {
         String claimed = claims.get("displayName");
         if (claimed != null && !claimed.isBlank()) {
             return claimed;
         }
-        return humanize(email.substring(0, email.indexOf('@')));
+        int at = email.indexOf('@');
+        return humanize(at > 0 ? email.substring(0, at) : email);
     }
 
     private static String humanize(String localPart) {
