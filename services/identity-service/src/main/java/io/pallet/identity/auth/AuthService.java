@@ -83,7 +83,8 @@ class AuthService {
         } catch (ParseException e) {
             throw new InvalidCredentialsException("Malformed refresh token on logout");
         }
-        if (!caller.getSubject().equals(claims.getSubject())) {
+        String callerSubject = caller.getSubject();
+        if (callerSubject == null || !callerSubject.equals(claims.getSubject())) {
             throw new ForbiddenException("This refresh token does not belong to the caller");
         }
         String sessionId = claims.getClaim("sid") instanceof String sid ? sid : null;

@@ -22,7 +22,7 @@ built a certain way, and don't re-derive a rationale that's already recorded.
   (`deploy-orchestrator-service`, `billing-service`, see `docs/adr/0009-temporal-for-saga-orchestration.md`)
 - Keycloak for identity, one realm, `org_id` claim on every token (`docs/adr/0003-single-keycloak-realm-multi-tenancy.md`)
 - PostgreSQL for most services; ClickHouse for `audit-log-service` / `usage-metering-service`;
-  Redis, MinIO, Vault alongside
+  Redis, Vault alongside
 - Micrometer + OpenTelemetry → Prometheus / Grafana / Jaeger
 - Resilience4j for every external call, Testcontainers 2.x for anything that touches a real
   dependency in tests
@@ -58,7 +58,7 @@ pinned, published GitHub Packages dependency, never a reactor sibling. Full reas
 # Local infra (postgres, redis, kafka, keycloak, clickhouse, mailpit)
 make up                        # from repo root
 make obs                       # observability stack: prometheus, grafana, jaeger, otel-collector
-make data                      # minio + vault
+make data                      # vault
 make help                      # repo-root Makefile: infra + repo-wide format-check only
 
 # platform-common: its own reactor, its own wrapper
@@ -91,7 +91,7 @@ Don't treat a green CI check as "this works"; it means "unit tests pass."
 | Kafka | localhost:29092 |
 | Kafka UI | http://localhost:8090 (`make up-all` or `--profile ui`) |
 | Prometheus / Grafana / Jaeger | :9090 / :3000 / :16686 (`make obs`) |
-| MinIO / Vault | :9001 / :8200 (`make data`) |
+| Vault | :8200 (`make data`) |
 
 ## Configuration
 
