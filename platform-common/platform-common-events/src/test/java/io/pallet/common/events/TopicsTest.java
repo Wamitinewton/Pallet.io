@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,6 +37,15 @@ class TopicsTest {
     @Test
     void deadLetterAppendsTheSuffix() {
         assertThat(Topics.deadLetter("build.started")).isEqualTo("build.started.DLT");
+    }
+
+    @Test
+    void orgTeamTopicsAreCataloguedWithDeadLetters() {
+        assertThat(List.of(Topics.ORG_MEMBER_ADDED, Topics.ORG_INVITE_REJECTED, Topics.APP_CREATED, Topics.APP_DELETED))
+                .allSatisfy(topic -> {
+                    assertThat(Topics.all()).contains(topic);
+                    assertThat(Topics.deadLetter(topic)).isEqualTo(topic + ".DLT");
+                });
     }
 
     @Test

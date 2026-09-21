@@ -38,7 +38,7 @@ import tools.jackson.databind.ObjectMapper;
  * that needs a different rule set defines its own {@link SecurityFilterChain}
  * bean and this configuration backs off.
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration")
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableWebSecurity
 public class PalletResourceServerAutoConfiguration {
