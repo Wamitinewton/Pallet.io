@@ -14,7 +14,7 @@ goes through retries/timeouts/circuit breakers. Full design brief: `PROJECT.md`.
 their rationale live in `docs/adr/`: read the relevant ADR before assuming *why* something is
 built a certain way, and don't re-derive a rationale that's already recorded.
 
-- Java 21, Spring Boot 4.1.0 / Spring Cloud 2025.1.2 (Oakwood): modular starters (e.g.
+- Java 21, Spring Boot 4.1.1 / Spring Cloud 2025.1.3 (Oakwood): modular starters (e.g.
   `spring-boot-starter-webmvc`, not `-web`), Jackson 3 (`tools.jackson.databind.*` for
   ObjectMapper/databind, `com.fasterxml.jackson.annotation` stays put). See
   `docs/adr/0005-java-21-spring-boot-4.md`.

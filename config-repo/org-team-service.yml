@@ -1,0 +1,60 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
+    username: ${POSTGRES_USER:pallet}
+    password: ${POSTGRES_PASSWORD:pallet}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    consumer:
+      group-id: org-team-service
+
+pallet:
+  invites:
+    signing-key: ${PALLET_INVITES_SIGNING_KEY:caedd236b6a4d38e06869bb5d6d9a0ef17f631b786b805e9bcf31505711f93aa}
+  orgteam:
+    invites:
+      ttl: PT72H
+      max-pending-per-org: 50
+      resend-cooldown: PT5M
+      max-sends: 4
+      accept-grace: PT2M
+      accept-url-template: ${DASHBOARD_BASE_URL:http://localhost:5173}/invites/{token}
+    limits:
+      max-teams-per-org: 100
+      max-apps-per-org: 200
+    apps:
+      regions:
+        aws: [us-east-1, us-west-2, eu-west-1, eu-central-1, ap-southeast-1, af-south-1]
+        gcp: [us-central1, us-east1, europe-west1, europe-west4, asia-southeast1, africa-south1]
+    security:
+      recent-auth-window: PT10M
+    outbox:
+      poll-interval: PT0.25S
+      batch-size: 100
+      max-attempts: 10
+      retention: P7D
+      advisory-lock-key: 7305121408
+      broker-backoff-initial: PT1S
+      broker-backoff-max: PT30S
+      row-backoff-max: PT60S
+    inbox:
+      retention: P14D
+    retention:
+      enabled: true
+      terminal-invites: P90D
+      removed-memberships: P365D
+      deleted-orgs: P30D
+      invite-expiry-interval: PT1M
+      sweep-interval: PT1H
+      daily-sweep-interval: P1D
+      sweep-batch-size: 500
+      org-purge-batch-size: 25
+
+springdoc:
+  api-docs:
+    path: /org-team/v3/api-docs
+  swagger-ui:
+    enabled: false

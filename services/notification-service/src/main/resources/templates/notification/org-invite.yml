@@ -1,0 +1,3 @@
+notificationType: ORG_INVITE
+defaultChannels: [EMAIL]
+subjectTemplate: "{{inviterName}} invited you to join {{orgName}} on Pallet"

@@ -37,9 +37,13 @@ public final class Topics {
     public static final String ORG_PROVISIONED = "org.provisioned";
     public static final String ORG_INVITE_ACCEPTED = "org.invite.accepted";
     public static final String USER_PROFILE_UPDATED = "user.profile.updated";
+    public static final String ORG_MEMBER_ADDED = "org.member.added";
     public static final String ORG_MEMBER_REMOVED = "org.member.removed";
     public static final String ORG_MEMBER_ROLE_CHANGED = "org.member.role.changed";
     public static final String ORG_DELETED = "org.deleted";
+    public static final String ORG_INVITE_REJECTED = "org.invite.rejected";
+    public static final String APP_CREATED = "app.created";
+    public static final String APP_DELETED = "app.deleted";
     private static final Set<String> ALL = Set.of(
             NOTIFICATION_REQUESTED,
             DEPLOY_ROLLBACK_TRIGGERED,
@@ -58,9 +62,13 @@ public final class Topics {
             ORG_PROVISIONED,
             ORG_INVITE_ACCEPTED,
             USER_PROFILE_UPDATED,
+            ORG_MEMBER_ADDED,
             ORG_MEMBER_REMOVED,
             ORG_MEMBER_ROLE_CHANGED,
-            ORG_DELETED);
+            ORG_DELETED,
+            ORG_INVITE_REJECTED,
+            APP_CREATED,
+            APP_DELETED);
 
     private Topics() {}
 

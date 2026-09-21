@@ -1,0 +1,850 @@
+{
+  "uid": "org-team-service",
+  "title": "org-team-service",
+  "tags": [
+    "pallet",
+    "org-team-service"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "HTTP",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Request rate by status",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "5xx ratio",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"org-team-service\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "5xx"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latency p50 / p99",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"org-team-service\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"org-team-service\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Outbox",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Pending rows",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(orgteam_outbox_pending{job=\"org-team-service\"})",
+          "legendFormat": "pending"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Oldest pending age",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(orgteam_outbox_oldest_pending_age_seconds{job=\"org-team-service\"})",
+          "legendFormat": "oldest"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Warn above 60 s, page above 300 s."
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Parked rows",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(orgteam_outbox_parked{job=\"org-team-service\"})",
+          "legendFormat": "parked"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Relay lock attempts that succeeded",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 10,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "orgteam_outbox_relay_active{job=\"org-team-service\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "Result of each instance's latest lock attempt; the lock is transaction-scoped, so more than one instance can read 1 between polls."
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Published per second by event type",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (eventType) (rate(orgteam_outbox_published_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "{{eventType}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Publish failures per second",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (kind) (rate(orgteam_outbox_publish_failures_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Consumers",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Events processed per second",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (listener) (rate(orgteam_events_processed_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "{{listener}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Failed deliveries, dropped events, duplicates",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (listener) (rate(orgteam_events_failed_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "failed {{listener}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (listener, reason) (rate(orgteam_events_dropped_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "dropped {{listener}} {{reason}}"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (listener) (rate(orgteam_inbox_duplicates_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "duplicate {{listener}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Consumer lag",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max by (client_id) (kafka_consumer_fetch_manager_records_lag_max{job=\"org-team-service\"})",
+          "legendFormat": "{{client_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "Micrometer Kafka client metric; client ids identify the three listeners."
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Dead-lettered records (15 m)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (topic) (increase(messaging_dead_letter_total{topic=~\"org.provisioned.DLT|org.invite.accepted.DLT|user.profile.updated.DLT\"}[15m]))",
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Profile updates ahead of their membership",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 35,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(orgteam_profile_not_yet_projected_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "not yet projected"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Sweeps",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Rows swept per hour",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (sweep) (increase(orgteam_sweep_rows_total{job=\"org-team-service\"}[1h]))",
+          "legendFormat": "{{sweep}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Sweep duration (avg)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 44,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (sweep) (rate(orgteam_sweep_duration_seconds_sum{job=\"org-team-service\"}[15m])) / sum by (sweep) (rate(orgteam_sweep_duration_seconds_count{job=\"org-team-service\"}[15m]))",
+          "legendFormat": "{{sweep}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "Invite funnel and membership",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "bargauge",
+      "title": "Invite funnel",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_invites_created_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "created"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_invites_accepted_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "accepted"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (reason) (increase(orgteam_invites_rejected_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "rejected {{reason}}"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_invites_expired_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "expired"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_invites_revoked_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "revoked"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "type": "bargauge",
+      "title": "Membership and tenant activity",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 53,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_members_added_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "members added"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_members_removed_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "members removed"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_members_role_changed_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "role changes"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_apps_created_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "apps created"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(orgteam_orgs_deleted_total{job=\"org-team-service\"}[$__range]))",
+          "legendFormat": "orgs deleted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "Authorization",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 61,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Denials by reason",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (reason) (rate(orgteam_authz_denied_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Token role drift",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 62,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(orgteam_authz_token_role_drift_total{job=\"org-team-service\"}[5m]))",
+          "legendFormat": "drift"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "description": "Requests whose token's highest role differs from the local membership role: identity sync lag or breakage."
+    }
+  ]
+}

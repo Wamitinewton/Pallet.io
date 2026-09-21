@@ -107,6 +107,7 @@ flowchart LR
         L1["OrgMemberRemovedListener<br/>(@KafkaListener)"]
         L2["OrgMemberRoleChangedListener"]
         L3["OrgDeletedListener"]
+        L4["OrgInviteRejectedListener"]
     end
 
     KC[(Keycloak<br/>Admin API + token endpoint)]
@@ -121,6 +122,7 @@ flowchart LR
         T6[["org.member.removed"]]
         T7[["org.member.role.changed"]]
         T8[["org.deleted"]]
+        T9[["org.invite.rejected"]]
     end
 
     subgraph OTS["org-team-service"]
@@ -139,14 +141,16 @@ flowchart LR
     OApi -- publish --> T6
     OApi -- publish --> T7
     OApi -- publish --> T8
+    OApi -- publish --> T9
     T6 --> L1 --> KC
     T7 --> L2 --> KC
     T8 --> L3 --> KC
+    T9 --> L4 --> KC
     OApi -. verifies signed token minted here, no call .-> API
 ```
 
 `identity-service` is both a producer and, for the first time in the repo, a **consumer that calls
-an external third party from inside a `@KafkaListener`** — the three listeners on the right all
+an external third party from inside a `@KafkaListener`** — the four listeners on the right all
 end in a Keycloak Admin call. That combination (consume an event, then make a resilience-wrapped
 external call before the message is considered handled) is new; `notification-service`'s listener
 already does the analogous thing for SMTP, so the pattern isn't unprecedented, but it's worth
@@ -668,7 +672,7 @@ sequenceDiagram
     participant KC as Keycloak Admin API
     participant DB as Postgres (identity)
 
-    K->>L: OrgMemberRemoved | OrgMemberRoleChanged | OrgDeleted
+    K->>L: OrgMemberRemoved | OrgMemberRoleChanged | OrgDeleted | OrgInviteRejected
     L->>G: markProcessed(eventId)
     alt already processed
         G-->>L: false
@@ -697,7 +701,7 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | Concern | Mechanism | Where |
 |---|---|---|
 | Cross-service handoff with no synchronous call | Self-contained signed token (HS256, shared secret) carrying every claim the verifier needs | `SignedActionToken`, minted by `org-team-service`, verified here |
-| At-least-once → effectively-once (consumer side) | `EventIdempotencyGuard` on every `@KafkaListener`, same shared contract as `notification-service` | The three membership-lifecycle listeners |
+| At-least-once → effectively-once (consumer side) | `EventIdempotencyGuard` on every `@KafkaListener`, same shared contract as `notification-service` | The four membership-lifecycle listeners |
 | Replay protection for a stateless-verified token | Local `consumed_invite_tokens(jti)` row, checked after signature/expiry verification | Invite accept |
 | Idempotent mutation (HTTP) | `Idempotency-Key` + request-hash comparison, `IdempotencyKeyReuseException` (`platform-common-exception`) on mismatch | Sign-up |
 | Publish-after-commit | `@TransactionalEventListener(AFTER_COMMIT)` — never publish from inside the mutating transaction | Sign-up, invite-accept |
@@ -722,6 +726,7 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | Invite token replayed after first successful accept | `409 CONFLICT` — `consumed_invite_tokens(jti)` already has a row. |
 | Invite token expired | `400 INVALID_TOKEN` — `SignedActionToken.verify` checks `exp` before this service ever looks at a database. |
 | Invite token's `orgId` no longer exists (org deleted between invite and accept) | Accept still succeeds at the Keycloak-user-creation level — this service has no way to know the org was deleted (no sync call to `org-team-service`) — but the resulting `OrgInviteAccepted` event's consumer in `org-team-service` finds no matching organization row and drops it, logging a metric. The new account exists with an `org_id` claim pointing nowhere. This is a real, if narrow, consequence of the no-sync-call design and is named here rather than assumed away; mitigated in practice by invite tokens having a short TTL and org deletion being a rare, deliberate owner action. **Superseded by ADR-0016**: `org-team-service` now publishes `OrgInviteRejected` for this case (and for revoked/expired invites), and this service's `OrgInviteRejectedListener` (checkpoint 14) disables the account, so the orphan no longer survives. |
+| Invite revoked or expired, then accepted anyway | Accept succeeds here (the token verifies locally and this service cannot see the invite row). `org-team-service` finds the invite unusable and publishes `OrgInviteRejected{reason}`; `OrgInviteRejectedListener` verifies the Keycloak user's `org_id` attribute equals the event's `orgId`, then disables the account, marks the local row `DISABLED`, and revokes any session. An org mismatch or unknown user is a counted no-op (`identity.membership_sync.noop`), never a disable. The remaining window is outbox plus consumer latency. |
 | `OrgMemberRemoved` / `OrgMemberRoleChanged` / `OrgDeleted` arrives for an `orgId`/`userId` this service has no local row for | Logged and acknowledged as a no-op rather than treated as an error — a legitimate outcome if, e.g., `identity-service` and `org-team-service` are deployed at different times during a rollout. |
 | A password-reset token is used twice | Second use finds `used_at` already set → `400 INVALID_TOKEN`, same code path as expiry. |
 | An email-verification code is guessed beyond the configured attempt budget | The code is invalidated outright — a subsequent correct-code attempt still fails until a fresh `/identity/auth/email/resend-verification` call. A bounded, self-contained defense; broader per-IP/per-email rate limiting on the endpoint itself is checkpoint 12's deliberate decision. |
@@ -768,12 +773,12 @@ would share one budget per endpoint.
 `identity.invites.accepted`, `identity.invites.replayed`, `identity.logins.{success,failed,unverified}`,
 `identity.email_verification.{requested,verified,attempts_exhausted}`, and
 `identity.membership_sync.{processed,noop}` are exported from `SignupService`, `InviteAcceptService`,
-`AuthService`, `EmailVerificationService`, and the three membership listeners respectively — the
+`AuthService`, `EmailVerificationService`, and the four membership listeners respectively — the
 diagnosability signals the two decisions above and the membership-sync no-op gap depend on. The
 existing `@Monitored` placements on `SignupService.provision`, `InviteAcceptService.accept`, and
 each membership listener's `onMessage` already compose into one trace per operation, the Keycloak
 `ExternalCall` span included — confirmed, not newly built; this service's own
-consume-then-external-call trace shape (new to the repo) links correctly for all three listeners.
+consume-then-external-call trace shape (new to the repo) links correctly for all four listeners.
 `keycloak-admin` and `keycloak-token` circuit-breaker state is already a Prometheus gauge via
 `platform-common-resilience`'s existing binding. Spring Security's default response headers
 (`X-Content-Type-Options`, `X-Frame-Options`, cache-control, HSTS once behind TLS) are present on
@@ -799,6 +804,7 @@ flowchart TB
         L1[OrgMemberRemovedListener]
         L2[OrgMemberRoleChangedListener]
         L3[OrgDeletedListener]
+        L4[OrgInviteRejectedListener]
         Repo1[OrgBootstrapRepository]
         Repo2[IdentityUserRepository]
         Repo3[OneTimeActionTokenRepository]
@@ -827,11 +833,12 @@ flowchart TB
     L1 --> KCAdmin --> Repo2
     L2 --> KCAdmin
     L3 --> KCAdmin --> Repo1
+    L4 --> KCAdmin
 ```
 
 ## Deployment and scaling view
 
-Stateless HTTP + one Kafka consumer group (`identity-service`, three topics), same shape as
+Stateless HTTP + one Kafka consumer group (`identity-service`, four topics), same shape as
 `notification-service`'s combined consumer/API deployable — one process type, scaled by instance
 count. No partition-count constraint worth calling out separately: `org.member.*`/`org.deleted`
 volume is orders of magnitude below `notification.requested`'s, so this service's consumer side is
@@ -852,7 +859,8 @@ services/identity-service/
     │                     OneTimeActionTokenRepository, password-reset service
     ├── keycloak/           KeycloakAdminConfiguration, the shared `Keycloak` admin bean
     ├── token/              SignedActionToken, InvalidTokenException
-    ├── membership/         OrgMemberRemovedListener, OrgMemberRoleChangedListener, OrgDeletedListener
+    ├── membership/         OrgMemberRemovedListener, OrgMemberRoleChangedListener, OrgDeletedListener,
+    │                     OrgInviteRejectedListener
     ├── idempotency/        IdempotencyService, IdempotencyKeyRepository
     └── audit/               AuditPublisher
 ```

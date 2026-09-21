@@ -76,7 +76,7 @@ flowchart LR
         ISApi[Auth + account API]
     end
 
-    subgraph OTS["org-team-service<br/>(Phase 2, not yet built)"]
+    subgraph OTS["org-team-service"]
         OApi[Org/team/member API]
     end
 
@@ -216,10 +216,11 @@ bare `localhost` ports). The day a service joins `docker-compose.yml` as its own
 route's env var default becomes that container's service name (`http://identity-service:8082`);
 in the cluster it becomes Kubernetes DNS (`http://identity-service.pallet.svc.cluster.local`).
 Nothing about `GatewayRoutingConfiguration` changes at either transition — only the env var value
-does. `org-team-service` gets its own `pallet.gateway.routes.org-team-service` entry (added in `docs/workflows/org-team-service/15-openapi-and-gateway.md`; `path:
-/api/v1/org-team/**`, per the same ADR-0013 namespace convention) the day that service exists;
-until then, `/api/v1/org-team/**` simply isn't registered as a route and 404s at the gateway, which
-is the correct behavior for a route that doesn't exist yet rather than a gap to work around. An
+does. `org-team-service` has its own `pallet.gateway.routes.org-team-service` entry
+(`path: /api/v1/org-team/**`, per the same ADR-0013 namespace convention, added by
+`docs/workflows/org-team-service/15-openapi-and-gateway.md`). Its only public paths are the invite
+preview (`/api/v1/org-team/invites/*`, one path segment: the token) and its API docs; nothing under
+`/api/v1/org-team/orgs/**` is public. An
 endpoint `identity-service` adds *later* under its own existing `/api/v1/identity/**` namespace
 needs **zero** gateway routing change — only its own `public-paths`/`allowed-methods` entries if
 the new endpoint is public or introduces a new HTTP method that service didn't use before; this is
@@ -318,6 +319,14 @@ every `ExternalCall` call site's own fallback behavior — one set of numbers, o
 whether the call is `identity-service` calling Keycloak or `api-gateway` calling
 `identity-service`.
 
+**Only `GET` is ever retried.** The retry filter's method allow-list defaults to `GET`, so a `POST`,
+`PATCH` or `DELETE` that fails is never re-sent by the route's retry policy. The proxy's Apache
+HttpClient has its own automatic retry, which by default re-sends *any* method once after a `503`
+or `429`, one second later and outside that policy. `ProxyClientConfiguration` disables it, so a
+failed `POST /orgs/{orgId}/members/{userId}/transfer-ownership` reaches the backend exactly once.
+`OrgTeamRouteIntegrationTest` pins both halves: a failing `GET` is retried, and a `POST`, `PATCH` or
+`DELETE` answered with `503` or `429` is not.
+
 **Timeout is the backing HTTP client's own read/connect timeout, not a `TimeLimiter` decorator.**
 `ExternalCall` wraps a blocking `Supplier` in Resilience4j's `TimeLimiter`, which needs an async
 boundary (a `CompletableFuture`) to actually enforce a deadline against. A gateway route's proxy
@@ -415,7 +424,7 @@ gauges are likewise exported with zero wiring, the concrete signal named in
 
 | Scenario | Behavior |
 |---|---|
-| No route configured for the request's path | `404`, `ErrorResponse`-shaped — the gateway has no opinion about a path it was never told about; this is the expected state for `/api/v1/org-team/**` until `org-team-service`'s route is added. |
+| No route configured for the request's path | `404`, `ErrorResponse`-shaped — the gateway has no opinion about a path it was never told about; an unrouted path such as `/api/v1/billing/**` is the current example. |
 | Missing/expired/invalid JWT on a protected route | `401 AUTHENTICATION_REQUIRED`, same `ErrorResponse` shape `SecurityExceptionHandler` already renders for every other service — request never reaches a backend. |
 | Valid JWT but the caller is over their rate-limit budget | `429 TOO_MANY_REQUESTS` from `RateLimitFilterFunction` — request never reaches the circuit breaker or a backend. Distinguishable from `identity-service`'s own 429 only by which layer's counter tripped; both use the same error code. |
 | Backend's circuit is open for a route | `503 SERVICE_UNAVAILABLE` from `GatewayFallbackHandler` — no call attempted against the backend at all while the breaker is open, per Resilience4j's own half-open recovery behavior. |
@@ -473,7 +482,8 @@ services/api-gateway/
 └── src/main/java/io/pallet/apigateway/
     ├── ApiGatewayApplication.java
     ├── config/            GatewayProperties (routes + rate-limit config)
-    ├── routing/           GatewayRoutingConfiguration (one RouterFunction bean per configured route)
+    ├── routing/           GatewayRoutingConfiguration (one RouterFunction bean per configured route),
+    │                     ProxyClientConfiguration (proxy HTTP client, automatic retries off)
     ├── security/          GatewaySecurityConfiguration (SecurityFilterChain, public-path allowlist
     │                     derived from GatewayProperties)
     ├── resilience/         GatewayResilienceConfiguration (circuit-breaker/retry filter wiring
@@ -505,9 +515,6 @@ which is itself a consequence of this service owning no domain data.
   `org-team-service`'s membership/plan data (via a consumed event projecting plan tier locally,
   never a synchronous call) is additive once that data exists — `docs/PROJECT.md`'s own stated
   target for this component.
-- **A route for `org-team-service`**: one new `pallet.gateway.routes.org-team-service` entry
-  (`path: /api/v1/org-team/**`) the day that service ships — no code change, per
-  [Routing model](#routing-model) and [ADR-0013](../adr/0013-per-service-api-path-namespace.md).
 - **WebSocket/streaming routing** for `build-service`/`log-service`'s eventual log-tailing needs:
   Gateway Server MVC's functional routing model supports a streaming `HandlerFunction` distinct
   from `HandlerFunctions.http(...)`; a deliberate, separate route type when that need is real, not

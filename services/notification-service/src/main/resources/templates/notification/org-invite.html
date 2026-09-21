@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+  <p>Hi,</p>
+  <p>
+    <strong th:text="${inviterName}">Someone</strong> has invited you to join
+    <strong th:text="${orgName}">an organization</strong> on Pallet as
+    <strong th:text="${role}">a member</strong>.
+  </p>
+  <p><a th:href="${acceptUrl}">Accept the invitation</a></p>
+  <p>If the link does not work, copy this address into your browser:<br/>
+    <span th:text="${acceptUrl}">https://example.com/invites/token</span></p>
+  <p>If you were not expecting this invitation, you can ignore this email.</p>
+</body>
+</html>

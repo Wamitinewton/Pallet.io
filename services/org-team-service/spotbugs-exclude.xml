@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <!-- Invite ids are assigned in the constructor; only JPA's no-arg constructor leaves one null. -->
+    <Match>
+        <Class name="~io\.pallet\.orgteam\.invite\.Invite(Acceptance)?Service"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+    </Match>
+    <!-- The DNS-1123 label pattern uses a fixed literal separator between quantified groups, so it
+         cannot backtrack catastrophically; request lengths are also capped by @Size. -->
+    <Match>
+        <Class name="~io\.pallet\.orgteam\.(support\.Slugs|app\.CreateAppRequest|team\.CreateTeamRequest)"/>
+        <Bug pattern="REDOS"/>
+    </Match>
+    <!-- Emails, header names and slugs are compared or folded for matching only, never used as an
+         authorization or security-boundary identifier after case mapping. -->
+    <Match>
+        <Class name="~io\.pallet\.orgteam\.(invite\.InviteAcceptanceService|member\.ProfileProjectionService|support\.Slugs|observability\.RedactingAccessLog.*)"/>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
+    <!-- These rethrow the caught RuntimeException unchanged to preserve its exact type for the
+         retry and error-handling paths after recording the failure. -->
+    <Match>
+        <Class name="~io\.pallet\.orgteam\.(outbox\.OutboxRelay|observability\.OrgTeamMetrics)"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+</FindBugsFilter>

@@ -37,3 +37,11 @@ repos:
         language: system
         files: ^services/identity-service/.*\.java$
         pass_filenames: false
+
+      - id: spotless-check-org-team-service
+        name: Spotless (org-team-service)
+        description: Java formatting/import-order — cd services/org-team-service && ./mvnw spotless:apply to fix
+        entry: services/org-team-service/mvnw -q -f services/org-team-service/pom.xml spotless:check
+        language: system
+        files: ^services/org-team-service/.*\.java$
+        pass_filenames: false
