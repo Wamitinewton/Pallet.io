@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -79,7 +80,11 @@ class OutboxRelay {
         if (clock.instant().isBefore(brokerRetryAt)) {
             return;
         }
-        transaction.executeWithoutResult(status -> relayBatch());
+        try {
+            transaction.executeWithoutResult(status -> relayBatch());
+        } catch (PessimisticLockingFailureException e) {
+            log.warn("Outbox relay gave up waiting for a lock, retrying next poll: {}", describe(e));
+        }
     }
 
     Duration brokerBackoff() {
@@ -87,6 +92,7 @@ class OutboxRelay {
     }
 
     private void relayBatch() {
+        repository.applyLockTimeout(properties.lockTimeout());
         boolean holdsLock = repository.tryAcquireRelayLock(properties.advisoryLockKey());
         metrics.relayActive(holdsLock);
         if (!holdsLock) {
@@ -120,7 +126,10 @@ class OutboxRelay {
                 failRow(row, e, blockedOrgs);
                 continue;
             }
-            rowTransaction.executeWithoutResult(status -> repository.markPublished(row.id()));
+            rowTransaction.executeWithoutResult(status -> {
+                repository.applyLockTimeout(properties.lockTimeout());
+                repository.markPublished(row.id());
+            });
             metrics.published(row.eventType());
             published++;
         }
@@ -178,8 +187,11 @@ class OutboxRelay {
     private void failRow(OutboxEvent row, RuntimeException cause, Set<String> blockedOrgs) {
         blockedOrgs.add(row.orgId());
         String description = describe(cause);
-        boolean parked = Boolean.TRUE.equals(rowTransaction.execute(status -> repository.recordFailure(
-                row.id(), properties.maxAttempts(), description, rowRetryDelay(row.attempts() + 1))));
+        boolean parked = Boolean.TRUE.equals(rowTransaction.execute(status -> {
+            repository.applyLockTimeout(properties.lockTimeout());
+            return repository.recordFailure(
+                    row.id(), properties.maxAttempts(), description, rowRetryDelay(row.attempts() + 1));
+        }));
         metrics.publishFailure(MetricsCatalog.KIND_ROW);
         if (parked) {
             log.error(

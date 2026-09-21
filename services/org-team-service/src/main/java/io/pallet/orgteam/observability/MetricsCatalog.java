@@ -7,6 +7,7 @@ public final class MetricsCatalog {
 
     public static final String OUTBOX_PENDING = "orgteam.outbox.pending";
     public static final String OUTBOX_OLDEST_PENDING_AGE = "orgteam.outbox.oldest_pending_age_seconds";
+    public static final String OUTBOX_HELD_BACK = "orgteam.outbox.held_back";
     public static final String OUTBOX_PARKED = "orgteam.outbox.parked";
     public static final String OUTBOX_PUBLISHED = "orgteam.outbox.published";
     public static final String OUTBOX_PUBLISH_FAILURES = "orgteam.outbox.publish_failures";

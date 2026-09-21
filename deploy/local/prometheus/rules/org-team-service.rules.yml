@@ -23,6 +23,17 @@ groups:
           description: Oldest pending outbox row is {{ $value | humanizeDuration }} old. Runbook procedure 1.
           runbook: docs/org-team-service/RUNBOOK.md#1-outbox-stalled
 
+      - alert: OrgTeamOutboxHeldBack
+        expr: min(orgteam_outbox_held_back{job="org-team-service"}) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: A long-running write transaction is delaying outbox publishing
+          description: "{{ $value }} outbox row(s) are waiting for an older open transaction to finish. Runbook procedure 1."
+          runbook: docs/org-team-service/RUNBOOK.md#1-outbox-stalled
+
       - alert: OrgTeamOutboxParked
         expr: max(orgteam_outbox_parked{job="org-team-service"}) > 0
         for: 1m
