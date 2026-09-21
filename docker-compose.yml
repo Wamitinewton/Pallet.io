@@ -203,6 +203,7 @@ services:
       - "--web.enable-lifecycle"
     volumes:
       - ./deploy/local/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - ./deploy/local/prometheus/rules:/etc/prometheus/rules:ro,Z
     ports:
       - "9090:9090"
     networks: [pallet]
@@ -230,6 +231,7 @@ services:
       - "3000:3000"
     volumes:
       - ./deploy/local/grafana/provisioning:/etc/grafana/provisioning:ro,Z
+      - ./deploy/local/grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus

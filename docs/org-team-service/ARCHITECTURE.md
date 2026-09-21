@@ -856,7 +856,7 @@ operation) and made observable rather than assumed.
 | Invite token leaks | Never returned by the REST API; only in the outbound notification; nulled in Postgres on publish; short TTL; single-use at identity's replay guard; invite revoke → `OrgInviteRejected` compensation. Residual: the token sits in `notification.requested` until retention. |
 | Invite as an email-spam vector | Per-org pending-invite quota, resend cooldown and cap, ADMIN+ only, gateway rate limit on top. |
 | Enumeration via public preview | Bad tokens are indistinguishable (`INVALID_TOKEN`); a valid token is by definition held by its owner; masked email in the response. |
-| Public endpoint DoS | HMAC check before any DB access; gateway per-IP rate limit; no unbounded work per request. |
+| Public endpoint DoS | HMAC check before any DB access; gateway per-IP rate limit; no unbounded work per request. **No service-local limiter**, by measurement: `SecurityHardeningIntegrationTest.aBurstOfForgedPreviewTokensRunsNoSql` sends a burst of forged tokens and asserts the burst prepares zero SQL statements, so an attacker can only burn CPU, which the gateway's per-IP limit already bounds. Revisit if the preview ever reads before it verifies. |
 | Mass assignment | PATCH DTOs are explicit and reject unknown properties; provider/region/slug/role/owner are not on any update DTO. |
 | Injection | JPA parameterized queries only; sort fields whitelisted. |
 | Secrets in logs | The invite token path segment is redacted in access logs and span attributes; PII (email) logged only at DEBUG and never for the public endpoint; `sensitive` outbox payloads never logged. |

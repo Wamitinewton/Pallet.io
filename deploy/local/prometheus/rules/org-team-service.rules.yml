@@ -1,0 +1,102 @@
+groups:
+  - name: org-team-service
+    rules:
+      - alert: OrgTeamOutboxStalled
+        expr: max(orgteam_outbox_oldest_pending_age_seconds{job="org-team-service"}) > 60
+        for: 1m
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: Outbox events are not reaching Kafka
+          description: Oldest pending outbox row is {{ $value | humanizeDuration }} old. Runbook procedure 1.
+          runbook: docs/org-team-service/RUNBOOK.md#1-outbox-stalled
+
+      - alert: OrgTeamOutboxStalled
+        expr: max(orgteam_outbox_oldest_pending_age_seconds{job="org-team-service"}) > 300
+        for: 1m
+        labels:
+          severity: page
+          service: org-team-service
+        annotations:
+          summary: Outbox stalled for more than five minutes; membership removals are not being applied
+          description: Oldest pending outbox row is {{ $value | humanizeDuration }} old. Runbook procedure 1.
+          runbook: docs/org-team-service/RUNBOOK.md#1-outbox-stalled
+
+      - alert: OrgTeamOutboxParked
+        expr: max(orgteam_outbox_parked{job="org-team-service"}) > 0
+        for: 1m
+        labels:
+          severity: page
+          service: org-team-service
+        annotations:
+          summary: A poison outbox row is holding an organization's event history
+          description: "{{ $value }} parked outbox row(s). Runbook procedure 2."
+          runbook: docs/org-team-service/RUNBOOK.md#2-parked-outbox-row
+
+      - alert: OrgTeamDeadLetter
+        expr: |
+          sum by (topic) (increase(messaging_dead_letter_total{topic=~"org.provisioned.DLT|org.invite.accepted.DLT|user.profile.updated.DLT"}[10m])) > 0
+          or
+          (sum by (topic) (messaging_dead_letter_total{topic=~"org.provisioned.DLT|org.invite.accepted.DLT|user.profile.updated.DLT"} > 0)
+            unless
+           sum by (topic) (messaging_dead_letter_total{topic=~"org.provisioned.DLT|org.invite.accepted.DLT|user.profile.updated.DLT"} offset 10m))
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: An inbound event failed every retry and was dead-lettered
+          description: "{{ $labels.topic }} received a record. Runbook procedure 3."
+          runbook: docs/org-team-service/RUNBOOK.md#3-dead-letter-topic-is-not-empty
+
+      - alert: OrgTeamConsumerLag
+        expr: max(kafka_consumer_fetch_manager_records_lag_max{job="org-team-service"}) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: Membership projections are falling behind identity-service events
+          description: Maximum consumer lag is {{ $value }} records.
+
+      - alert: OrgTeamTokenRoleDrift
+        expr: sum(rate(orgteam_authz_token_role_drift_total{job="org-team-service"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: Token roles disagree with local memberships; identity sync is behind or broken
+          description: "{{ $value }} drifting requests per second."
+          runbook: docs/org-team-service/RUNBOOK.md#4-verify-a-removal-reached-keycloak
+
+      - alert: OrgTeamInviteRejected
+        expr: sum(increase(orgteam_invites_rejected_total{job="org-team-service"}[5m])) > 0
+        labels:
+          severity: info
+          service: org-team-service
+        annotations:
+          summary: An invite acceptance was refused and its account is being disabled
+          description: Runbook procedure 5.
+          runbook: docs/org-team-service/RUNBOOK.md#5-an-orginviterejected-fired
+
+      - alert: OrgTeamHighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="org-team-service",status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count{job="org-team-service"}[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: page
+          service: org-team-service
+        annotations:
+          summary: More than 1% of requests are failing with a 5xx
+
+      - alert: OrgTeamHighLatency
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job="org-team-service"}[5m]))) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: org-team-service
+        annotations:
+          summary: p99 latency above the 500 ms write SLO

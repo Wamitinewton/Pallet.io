@@ -24,6 +24,14 @@ pallet:
         public-paths:
           - /api/v1/notification/v3/api-docs
         resilience-policy: notification-service
+      org-team-service:
+        uri: ${ORG_TEAM_SERVICE_URI:http://localhost:8084}
+        path: /api/v1/org-team/**
+        allowed-methods: [GET, POST, PATCH, DELETE]
+        public-paths:
+          - /api/v1/org-team/invites/*
+          - /api/v1/org-team/v3/api-docs
+        resilience-policy: org-team-service
     rate-limit:
       enabled: true
       capacity: 60

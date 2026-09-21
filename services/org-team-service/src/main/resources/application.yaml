@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+  # api-gateway is the only thing exposed to callers, so the socket peer is always the gateway.
+  forward-headers-strategy: native
+
+spring:
+  application:
+    name: org-team-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  task:
+    scheduling:
+      pool:
+        size: 2
+  flyway:
+    schemas: org_team
+    default-schema: org_team
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: org_team
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,kafkaProducer

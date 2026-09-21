@@ -26,6 +26,11 @@ springdoc:
   api-docs:
     path: /notification/v3/api-docs
 
+pallet:
+  notification:
+    email:
+      from: no-reply@pallet.local
+
 management:
   tracing:
     sampling:
