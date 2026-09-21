@@ -14,7 +14,7 @@ goes through retries/timeouts/circuit breakers. Full design brief: `PROJECT.md`.
 their rationale live in `docs/adr/`: read the relevant ADR before assuming *why* something is
 built a certain way, and don't re-derive a rationale that's already recorded.
 
-- Java 21, Spring Boot 4.1.0 / Spring Cloud 2025.1.2 (Oakwood): modular starters (e.g.
+- Java 21, Spring Boot 4.1.1 / Spring Cloud 2025.1.3 (Oakwood): modular starters (e.g.
   `spring-boot-starter-webmvc`, not `-web`), Jackson 3 (`tools.jackson.databind.*` for
   ObjectMapper/databind, `com.fasterxml.jackson.annotation` stays put). See
   `docs/adr/0005-java-21-spring-boot-4.md`.
@@ -77,10 +77,9 @@ cd services/notification-service
 make help
 ```
 
-CI (`.github/workflows/build.yml`) always runs `-DskipITs`: unit/slice tests only, path-filtered
-per service or `platform-common` module. `./mvnw clean verify` with integration tests is **your**
-job before opening a PR, not CI's. See `Test.md`'s "CI vs. local" and `CONTRIBUTING.md`'s §CI.
-Don't treat a green CI check as "this works"; it means "unit tests pass."
+CI (`.github/workflows/build.yml`) runs `./mvnw clean verify` (unit + integration tests),
+path-filtered per service or `platform-common` module. Still run it locally before a PR. See
+`Test.md`'s "CI vs. local" and `CONTRIBUTING.md`'s §CI.
 
 | Service | Local endpoint |
 |---|---|
@@ -196,8 +195,8 @@ setup; import the shared configuration instead.
 - Publish domain events through `PlatformEventPublisher`, as a `PlatformEvent` record in
   `platform-common-events`.
 - Write an ADR (`docs/adr/`) in the same PR as any architecture-changing decision.
-- Run the full `./mvnw clean verify` (integration tests, Docker required) yourself before a PR.
-  CI only runs unit tests.
+- Run the full `./mvnw clean verify` (integration tests, Docker required) yourself before a PR;
+  CI runs it too.
 - Check `PROJECT.md` and the relevant `docs/adr/*` before implementing behavior that isn't already
   obvious from existing code.
 

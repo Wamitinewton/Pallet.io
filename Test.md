@@ -163,25 +163,15 @@ in the same run reuses the same running container.
 
 ## CI vs. local
 
-CI (`.github/workflows/build.yml`) runs `./mvnw clean verify -DskipITs`, Surefire's `*Test`
-classes only. It does **not** boot Postgres, Kafka, or Keycloak. This isn't a statement that
-integration tests don't matter; it's a concession to free GitHub Actions runners (2 vCPU,
-shared, no self-hosted option here): booting several real containers alongside a full Spring
-context and asserting on eventually-consistent async behaviour (Kafka consumer catch-up, email
-delivery) needs headroom those runners don't reliably have, and a CI run that fails one time in
-five for timing reasons is worse than no CI signal at all. It trains everyone to ignore red.
+CI (`.github/workflows/build.yml`) runs `./mvnw clean verify`: Surefire's `*Test` classes and
+Failsafe's `*IntegrationTest` classes, with real Testcontainers (Postgres, Kafka, Keycloak,
+ClickHouse). Docker is preinstalled on `ubuntu-latest`. Runs are path-filtered per service or
+`platform-common` module, so only what a PR touches gets built.
 
 What this means for you:
 
-- `*IntegrationTest` classes still exist, are still required, and are still the only correct way
-  to test anything that touches Postgres, Kafka, Keycloak, or ClickHouse, nothing in this
-  section changes `CONTRIBUTING.md`'s "never mock those" rule.
-- Running the full suite, `./mvnw clean verify`, no `-DskipITs`, is **your** job before you
-  open a PR, not CI's. A green CI check on a PR means "unit tests pass," not "this works." Say so
-  in the PR description if you skipped this for some reason (you shouldn't).
-- A failing `*IntegrationTest` you can't get green locally is a blocker the same way a failing
-  unit test is, it just won't be a red X on the PR telling you that. Don't take CI's silence on
-  integration tests as permission to skip running them.
-- If you're touching Testcontainers config, container images, or anything under
-  `platform-common-test`, run the full suite (`./mvnw verify`) more than once locally before
-  opening the PR, that's exactly the code CI is no longer checking for you.
+- A green CI check means the full suite passed, integration tests included.
+- Still run `./mvnw clean verify` locally before pushing; it's the fast feedback loop.
+- A flaky `*IntegrationTest` is a bug to fix (usually an assertion that needs an Awaitility wait,
+  not a sleep), not a reason to re-run until green or to reintroduce `-DskipITs`.
+- `-DskipITs` (Failsafe's own property) remains handy for a quick local unit-only pass.
