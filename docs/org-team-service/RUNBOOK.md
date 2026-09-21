@@ -43,10 +43,14 @@ account stays enabled.
    published rate, not the gauge, to see which replica is relaying; the advisory lock is what guarantees a single
    publisher.
 3. Is Postgres up? The relay cannot poll without it; readiness `db` will also be `DOWN`.
-4. Is one organization blocking? `PARKED` rows leave the global gauge flat while that organization's events wait:
+4. Is a write transaction held open? `orgteam_outbox_held_back` above 0 (`OrgTeamOutboxHeldBack`) means the relay is
+   withholding rows until every older transaction in the database finishes (ADR-0017). Find it with
+   `SELECT pid, state, xact_start, query FROM pg_stat_activity WHERE backend_xid IS NOT NULL OR state = 'idle in transaction' ORDER BY xact_start;`
+   and end the transaction (or fix the caller); the backlog then drains by itself.
+5. Is one organization blocking? `PARKED` rows leave the global gauge flat while that organization's events wait:
    go to procedure 2.
 
-**Fix**: restore the broker or database. The relay drains in `id` order by itself, with backoff capped at
+**Fix**: restore the broker or database, or end the long-running transaction. The relay drains in `id` order by itself, with backoff capped at
 `pallet.orgteam.outbox.broker-backoff-max`. Do not restart pods for this.
 
 **Verify**: `orgteam_outbox_oldest_pending_age_seconds` returns to 0 and the alert resolves.

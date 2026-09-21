@@ -40,6 +40,7 @@ pallet:
       broker-backoff-initial: PT1S
       broker-backoff-max: PT30S
       row-backoff-max: PT60S
+      lock-timeout: PT5S
     inbox:
       retention: P14D
     retention:

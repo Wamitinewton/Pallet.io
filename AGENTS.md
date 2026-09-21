@@ -77,10 +77,9 @@ cd services/notification-service
 make help
 ```
 
-CI (`.github/workflows/build.yml`) always runs `-DskipITs`: unit/slice tests only, path-filtered
-per service or `platform-common` module. `./mvnw clean verify` with integration tests is **your**
-job before opening a PR, not CI's. See `Test.md`'s "CI vs. local" and `CONTRIBUTING.md`'s §CI.
-Don't treat a green CI check as "this works"; it means "unit tests pass."
+CI (`.github/workflows/build.yml`) runs `./mvnw clean verify` (unit + integration tests),
+path-filtered per service or `platform-common` module. Still run it locally before a PR. See
+`Test.md`'s "CI vs. local" and `CONTRIBUTING.md`'s §CI.
 
 | Service | Local endpoint |
 |---|---|
@@ -196,8 +195,8 @@ setup; import the shared configuration instead.
 - Publish domain events through `PlatformEventPublisher`, as a `PlatformEvent` record in
   `platform-common-events`.
 - Write an ADR (`docs/adr/`) in the same PR as any architecture-changing decision.
-- Run the full `./mvnw clean verify` (integration tests, Docker required) yourself before a PR.
-  CI only runs unit tests.
+- Run the full `./mvnw clean verify` (integration tests, Docker required) yourself before a PR;
+  CI runs it too.
 - Check `PROJECT.md` and the relevant `docs/adr/*` before implementing behavior that isn't already
   obvious from existing code.
 

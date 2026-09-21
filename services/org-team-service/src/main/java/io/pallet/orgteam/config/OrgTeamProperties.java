@@ -81,7 +81,9 @@ public record OrgTeamProperties(
             @NotNull @PositiveDuration @DefaultValue("PT60S")
             Duration rowBackoffMax,
 
-            @NotNull @PositiveDuration @DefaultValue("PT5S") Duration metricsRefreshInterval) {
+            @NotNull @PositiveDuration @DefaultValue("PT5S") Duration metricsRefreshInterval,
+
+            @NotNull @PositiveDuration @DefaultValue("PT5S") Duration lockTimeout) {
 
         @AssertTrue(message = "broker-backoff-max must not be shorter than broker-backoff-initial") boolean isBrokerBackoffRangeValid() {
             return brokerBackoffInitial == null

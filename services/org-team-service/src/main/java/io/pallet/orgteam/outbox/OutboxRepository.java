@@ -1,5 +1,6 @@
 package io.pallet.orgteam.outbox;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -14,11 +15,12 @@ class OutboxRepository {
             FROM org_team.outbox_events e
             WHERE e.status = 'PENDING'
               AND e.next_attempt_at <= now()
+              AND e.tx_id < pg_snapshot_xmin(pg_current_snapshot())
               AND NOT EXISTS (
                   SELECT 1 FROM org_team.outbox_events b
-                  WHERE b.org_id = e.org_id AND b.id < e.id AND b.status <> 'PUBLISHED'
+                  WHERE b.org_id = e.org_id AND (b.tx_id, b.id) < (e.tx_id, e.id) AND b.status <> 'PUBLISHED'
                     AND (b.status = 'PARKED' OR b.next_attempt_at > now()))
-            ORDER BY e.id
+            ORDER BY e.tx_id, e.id
             LIMIT :batchSize
             """;
 
@@ -26,7 +28,9 @@ class OutboxRepository {
             SELECT count(*) FILTER (WHERE status = 'PENDING') AS pending,
                    count(*) FILTER (WHERE status = 'PARKED') AS parked,
                    COALESCE(EXTRACT(EPOCH FROM now() - min(created_at) FILTER (WHERE status = 'PENDING')), 0)
-                       AS oldest_pending_age_seconds
+                       AS oldest_pending_age_seconds,
+                   count(*) FILTER (WHERE status = 'PENDING' AND tx_id >= pg_snapshot_xmin(pg_current_snapshot()))
+                       AS held_back
             FROM org_team.outbox_events
             WHERE status <> 'PUBLISHED'
             """;
@@ -59,6 +63,14 @@ class OutboxRepository {
                 .single();
     }
 
+    /** Bounds how long this transaction waits on any lock, so a schema change cannot freeze the relay. */
+    void applyLockTimeout(Duration timeout) {
+        jdbc.sql("SELECT set_config('lock_timeout', :timeout, true)")
+                .param("timeout", timeout.toMillis() + "ms")
+                .query(String.class)
+                .single();
+    }
+
     List<OutboxEvent> findRelayBatch(int batchSize) {
         return jdbc.sql(RELAY_BATCH)
                 .param("batchSize", batchSize)
@@ -77,7 +89,10 @@ class OutboxRepository {
     OutboxStats stats() {
         return jdbc.sql(STATS)
                 .query((rs, rowNum) -> new OutboxStats(
-                        rs.getLong("pending"), rs.getLong("parked"), rs.getDouble("oldest_pending_age_seconds")))
+                        rs.getLong("pending"),
+                        rs.getLong("parked"),
+                        rs.getDouble("oldest_pending_age_seconds"),
+                        rs.getLong("held_back")))
                 .single();
     }
 

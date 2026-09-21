@@ -44,9 +44,8 @@ cd services/config-server
 ./mvnw -P security verify                        # + SpotBugs / OWASP Dependency-Check
 ```
 
-CI never runs the plain `clean verify` above (see §CI): it passes `-DskipITs`, unit tests only.
-`./mvnw clean verify`, integration tests included, is a gate you run yourself before opening a
-PR (see `Test.md`'s "CI vs. local").
+CI runs the same `clean verify`, integration tests included (see §CI and `Test.md`'s
+"CI vs. local"). Run it yourself before opening a PR.
 
 The root `Makefile` only wraps shared local infrastructure (`make up` / `make obs` /
 `make kind-up`, and so on) and repo-wide formatting (`make format-check`); run `make help` at the
@@ -84,10 +83,8 @@ Boot 3, expect these to bite ([ADR-0005](docs/adr/0005-java-21-spring-boot-4.md)
 - Tests: unit tests are `*Test`, integration tests are `*IntegrationTest`.
   Surefire runs the first, Failsafe (`verify`) runs the second. Integration
   tests use Testcontainers for Kafka, Postgres, ClickHouse, and Keycloak. Don't
-  mock those; the failure modes they hide are the point of the project. CI only
-  runs Surefire (`-DskipITs`, see §CI); Failsafe's integration tests are a
-  required local gate before opening a PR, not something CI checks for you. See
-  `Test.md` for the full testing guide.
+  mock those; the failure modes they hide are the point of the project. CI runs
+  both (see §CI). See `Test.md` for the full testing guide.
 - Workflows: `deploy-orchestrator-service` and `billing-service` are the two services embedding a
   Temporal worker, per [ADR-0009](docs/adr/0009-temporal-for-saga-orchestration.md). Their
   workflow and activity unit tests are `*WorkflowTest`, using the Temporal Java SDK's
@@ -147,14 +144,14 @@ the PR's base SHA or the push's previous SHA:
 
 - A change under `platform-common/<name>/` only triggers a matrix job that builds each
   affected `platform-common` module, from inside `platform-common/` with its
-  own wrapper (`./mvnw -pl <module> -am -amd clean verify -DskipITs`: also-make
+  own wrapper (`./mvnw -pl <module> -am -amd clean verify`: also-make
   its dependencies so it compiles, also-make-dependents so the change is
   verified against every `platform-common` module downstream of it). Unrelated
   `platform-common` modules are skipped.
 - A change under `services/<name>/` triggers a matrix job that builds *only* that service,
   since every service is now a fully independent Maven project. It runs
   from inside its own directory with its own wrapper (`cd services/<name> &&
-  ./mvnw clean verify -DskipITs`). There is no `-am`/`-amd` step and no other
+  ./mvnw clean verify`). There is no `-am`/`-amd` step and no other
   service is touched, because none of them share anything to also-make.
 - A change to `platform-common/pom.xml`, `platform-common`'s own Maven
   wrapper, its SpotBugs/OWASP files, or `build.yml` itself falls back to a
@@ -165,17 +162,8 @@ the PR's base SHA or the push's previous SHA:
   the zero SHA, or unreachable, as with a new branch, first push, or force push), the same
   full-build fallback applies, since there's nothing safe to diff.
 
-Every `clean verify` invocation above carries `-DskipITs`: Surefire's `*Test`
-classes run, Failsafe's `*IntegrationTest` classes (Testcontainers: Postgres,
-Kafka, Keycloak) don't. That's deliberate, not an oversight. Free GitHub
-Actions runners are 2 vCPU and can't reliably boot several real containers
-alongside the app under test without the same async assertions that pass
-locally timing out under load. Integration tests remain mandatory; they're
-just a local gate (`./mvnw clean verify`, no flag, Docker required) instead of
-a CI one. See `Test.md`'s "CI vs. local" section for the full reasoning and
-what this expects of you as a contributor. `-DskipITs` is Maven Failsafe's own
-recognized property; nothing in `platform-common-test` or any service's `pom.xml`
-had to change to support it.
+Every `clean verify` invocation above runs Failsafe's `*IntegrationTest` classes
+(Testcontainers) alongside Surefire's `*Test` classes. See `Test.md`'s "CI vs. local".
 
 Two separate `security` jobs mirror that scoping, SpotBugs plus FindSecBugs, a
 hard fail. `security-common` runs whenever any `platform-common` module (or

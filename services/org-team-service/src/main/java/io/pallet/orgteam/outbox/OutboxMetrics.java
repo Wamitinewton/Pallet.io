@@ -26,6 +26,7 @@ public class OutboxMetrics {
         this.registry = registry;
         Gauge.builder(OUTBOX_PENDING, stats, s -> s.get().pending()).register(registry);
         Gauge.builder(OUTBOX_PARKED, stats, s -> s.get().parked()).register(registry);
+        Gauge.builder(OUTBOX_HELD_BACK, stats, s -> s.get().heldBack()).register(registry);
         Gauge.builder(OUTBOX_OLDEST_PENDING_AGE, stats, s -> s.get().oldestPendingAgeSeconds())
                 .baseUnit("seconds")
                 .register(registry);
