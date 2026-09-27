@@ -13,6 +13,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public final class OrgTeamTestTokens {
     private String sessionId = UUID.randomUUID().toString();
     private List<String> realmRoles = List.of();
     private boolean withSubject = true;
+    private final Map<String, String> profileClaims = new LinkedHashMap<>();
 
     private OrgTeamTestTokens() {}
 
@@ -36,6 +38,10 @@ public final class OrgTeamTestTokens {
         tokens.orgId = orgId;
         tokens.userId = userId;
         return tokens;
+    }
+
+    public static OrgTeamTestTokens forAccount(String userId) {
+        return forMember(null, userId);
     }
 
     public static RSAPublicKey publicKey() {
@@ -62,6 +68,21 @@ public final class OrgTeamTestTokens {
         return this;
     }
 
+    public OrgTeamTestTokens withEmail(String email) {
+        profileClaims.put("email", email);
+        return this;
+    }
+
+    public OrgTeamTestTokens withName(String name) {
+        profileClaims.put("name", name);
+        return this;
+    }
+
+    public OrgTeamTestTokens withPreferredUsername(String preferredUsername) {
+        profileClaims.put("preferred_username", preferredUsername);
+        return this;
+    }
+
     public String sessionId() {
         return sessionId;
     }
@@ -72,9 +93,12 @@ public final class OrgTeamTestTokens {
                 .header("alg", "RS256")
                 .issuedAt(issuedAt)
                 .expiresAt(issuedAt.plusSeconds(300))
-                .claim("org_id", orgId)
                 .claim("sid", sessionId)
                 .claim("realm_access", Map.of("roles", realmRoles));
+        if (orgId != null) {
+            builder.claim("org_id", orgId);
+        }
+        profileClaims.forEach(builder::claim);
         if (withSubject) {
             builder.subject(userId);
         }
@@ -89,9 +113,12 @@ public final class OrgTeamTestTokens {
         JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
                 .issueTime(Date.from(issuedAt))
                 .expirationTime(Date.from(issuedAt.plusSeconds(300)))
-                .claim("org_id", orgId)
                 .claim("sid", sessionId)
                 .claim("realm_access", Map.of("roles", realmRoles));
+        if (orgId != null) {
+            claims.claim("org_id", orgId);
+        }
+        profileClaims.forEach(claims::claim);
         if (withSubject) {
             claims.subject(userId);
         }

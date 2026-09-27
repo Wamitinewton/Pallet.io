@@ -1,6 +1,5 @@
 package io.pallet.orgteam.security;
 
-import io.pallet.common.security.OrgContext;
 import io.pallet.orgteam.member.MemberAccess;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
@@ -15,7 +14,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -29,6 +27,9 @@ public class AccessResolver {
     private static final String REQUEST_ATTRIBUTE = AccessResolver.class.getName() + ".CONTEXT";
     private static final String AUTH_TIME_CLAIM = "auth_time";
     private static final String REALM_ACCESS_CLAIM = "realm_access";
+    private static final String EMAIL_CLAIM = "email";
+    private static final String NAME_CLAIM = "name";
+    private static final String PREFERRED_USERNAME_CLAIM = "preferred_username";
 
     private final MembershipRepository memberships;
     private final OrgTeamMetrics metrics;
@@ -53,34 +54,43 @@ public class AccessResolver {
         return resolved;
     }
 
-    private AccessContext load(String pathOrgId) {
-        Optional<String> tokenOrgId = OrgContext.currentOrgId();
-        if (tokenOrgId.isEmpty() || !tokenOrgId.get().equals(pathOrgId)) {
-            throw denied(MetricsCatalog.DENIED_ORG_MISMATCH, new OrgNotFoundException());
-        }
+    public AccessContext caller() {
         Jwt jwt = currentJwt();
-        String userId = jwt.getSubject();
-        if (userId == null) {
-            throw denied(MetricsCatalog.DENIED_NOT_A_MEMBER, new NotAMemberException());
-        }
+        return new AccessContext(
+                null, subject(jwt), null, authTime(jwt), jwt.getClaimAsString(EMAIL_CLAIM), displayName(jwt));
+    }
+
+    private AccessContext load(String pathOrgId) {
+        Jwt jwt = currentJwt();
+        String userId = subject(jwt);
 
         MemberAccess access = memberships
                 .findAccess(pathOrgId, userId)
+                .filter(found -> found.orgStatus() == OrgStatus.ACTIVE)
                 .orElseThrow(() -> denied(MetricsCatalog.DENIED_ORG_NOT_FOUND, new OrgNotFoundException()));
-        if (access.orgStatus() != OrgStatus.ACTIVE) {
-            throw denied(MetricsCatalog.DENIED_ORG_NOT_FOUND, new OrgNotFoundException());
+        if (access.membershipStatus() == null) {
+            throw denied(MetricsCatalog.DENIED_NO_MEMBERSHIP, new OrgNotFoundException());
         }
         if (access.role() == null || access.membershipStatus() != MembershipStatus.ACTIVE) {
             throw denied(MetricsCatalog.DENIED_NOT_A_MEMBER, new NotAMemberException());
         }
 
         recordDrift(jwt, access.role());
-        return new AccessContext(pathOrgId, userId, access.role(), authTime(jwt));
+        return new AccessContext(
+                pathOrgId, userId, access.role(), authTime(jwt), jwt.getClaimAsString(EMAIL_CLAIM), displayName(jwt));
     }
 
     private <E extends RuntimeException> E denied(String reason, E exception) {
         metrics.authzDenied(reason);
         return exception;
+    }
+
+    private String subject(Jwt jwt) {
+        String userId = jwt.getSubject();
+        if (userId == null) {
+            throw denied(MetricsCatalog.DENIED_NOT_A_MEMBER, new NotAMemberException());
+        }
+        return userId;
     }
 
     private Jwt currentJwt() {
@@ -97,6 +107,11 @@ public class AccessResolver {
         } catch (IllegalArgumentException malformed) {
             return null;
         }
+    }
+
+    private static String displayName(Jwt jwt) {
+        String name = jwt.getClaimAsString(NAME_CLAIM);
+        return name != null && !name.isBlank() ? name : jwt.getClaimAsString(PREFERRED_USERNAME_CLAIM);
     }
 
     private void recordDrift(Jwt jwt, Role localRole) {

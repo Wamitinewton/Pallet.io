@@ -28,7 +28,10 @@ class OpenApiIntegrationTest {
     private static final String BASE = "/api/v1/org-team";
     private static final Set<String> HTTP_METHODS = Set.of("get", "post", "patch", "delete", "put");
     private static final List<String> STANDARD_ERRORS = List.of("400", "401", "403", "404", "409", "429", "500");
+    private static final Set<String> ACCOUNT_SCOPED = Set.of("POST " + BASE + "/orgs", "GET " + BASE + "/orgs");
     private static final Set<String> EXPECTED_OPERATIONS = Set.of(
+            "POST " + BASE + "/orgs",
+            "GET " + BASE + "/orgs",
             "GET " + BASE + "/orgs/{orgId}",
             "PATCH " + BASE + "/orgs/{orgId}",
             "DELETE " + BASE + "/orgs/{orgId}",
@@ -104,7 +107,10 @@ class OpenApiIntegrationTest {
             }
             assertThat(operation.path("description").asString(""))
                     .as(key + " description")
-                    .contains("judged from your current membership, not your token's roles");
+                    .contains(
+                            ACCOUNT_SCOPED.contains(key)
+                                    ? "no organization membership is involved"
+                                    : "judged from your current membership, not your token's roles");
         });
     }
 
@@ -179,7 +185,22 @@ class OpenApiIntegrationTest {
                         .get("POST " + BASE + "/orgs/{orgId}/invites")
                         .at("/responses/409/description")
                         .asString())
-                .contains("ALREADY_A_MEMBER", "MEMBER_PREVIOUSLY_REMOVED", "INVITE_ALREADY_PENDING", "QUOTA_EXCEEDED");
+                .contains(
+                        "ALREADY_A_MEMBER",
+                        "MEMBER_PREVIOUSLY_REMOVED",
+                        "INVITE_ALREADY_PENDING",
+                        "QUOTA_EXCEEDED",
+                        "PERSONAL_ORG_IMMUTABLE");
+        assertThat(operations()
+                        .get("DELETE " + BASE + "/orgs/{orgId}")
+                        .at("/responses/409/description")
+                        .asString())
+                .contains("PERSONAL_ORG_IMMUTABLE");
+        assertThat(operations()
+                        .get("POST " + BASE + "/orgs")
+                        .at("/responses/409/description")
+                        .asString())
+                .contains("SLUG_TAKEN");
         assertThat(operations().get(PREVIEW).at("/responses/410/description").asString())
                 .contains("INVITE_NO_LONGER_VALID");
         assertThat(operations()

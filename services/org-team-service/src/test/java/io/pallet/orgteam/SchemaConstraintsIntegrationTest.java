@@ -179,12 +179,12 @@ class SchemaConstraintsIntegrationTest {
 
     @Test
     void aDeletedOrgsSlugIsNeverReissued() {
-        jdbc.update("insert into org_team.organizations (org_id, name, slug, owner_user_id, status)"
-                + " values ('org-a', 'A', 'acme', 'u1', 'DELETED')");
+        jdbc.update("insert into org_team.organizations (org_id, name, slug, owner_user_id, kind, status)"
+                + " values ('org-a', 'A', 'acme', 'u1', 'TEAM', 'DELETED')");
 
         assertRejected(
-                () -> jdbc.update("insert into org_team.organizations (org_id, name, slug, owner_user_id, status)"
-                        + " values ('org-b', 'B', 'acme', 'u2', 'ACTIVE')"));
+                () -> jdbc.update("insert into org_team.organizations (org_id, name, slug, owner_user_id, kind, status)"
+                        + " values ('org-b', 'B', 'acme', 'u2', 'TEAM', 'ACTIVE')"));
     }
 
     private void assertRejected(Runnable statement) {
@@ -193,8 +193,8 @@ class SchemaConstraintsIntegrationTest {
 
     private void org(String orgId) {
         jdbc.update(
-                "insert into org_team.organizations (org_id, name, slug, owner_user_id, status)"
-                        + " values (?, ?, ?, 'owner', 'ACTIVE')",
+                "insert into org_team.organizations (org_id, name, slug, owner_user_id, kind, status)"
+                        + " values (?, ?, ?, 'owner', 'TEAM', 'ACTIVE')",
                 orgId,
                 orgId,
                 orgId);

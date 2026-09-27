@@ -1,6 +1,6 @@
 # 11. identity-service / org-team-service boundary, signed action tokens, single-org accounts
 
-- Status: accepted
+- Status: accepted; decision 3 superseded by [ADR-0018](0018-multi-org-per-account-and-per-request-authorization.md) — accounts are no longer single-org
 - Date: 2026-09-11
 
 ## Context

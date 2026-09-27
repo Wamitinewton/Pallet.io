@@ -164,8 +164,8 @@ class MetricsIntegrationTest extends ObservabilityIntegrationSupport {
         TestOrg org = newTeamOrg();
         TestOrg other = newTeamOrg();
         String viewer = fixtures.newMember(org.orgId(), "VIEWER", "ACTIVE");
-        double mismatch =
-                count(MetricsCatalog.AUTHZ_DENIED, MetricsCatalog.TAG_REASON, MetricsCatalog.DENIED_ORG_MISMATCH);
+        double noMembership =
+                count(MetricsCatalog.AUTHZ_DENIED, MetricsCatalog.TAG_REASON, MetricsCatalog.DENIED_NO_MEMBERSHIP);
         double insufficient =
                 count(MetricsCatalog.AUTHZ_DENIED, MetricsCatalog.TAG_REASON, MetricsCatalog.DENIED_INSUFFICIENT_ROLE);
 
@@ -179,8 +179,8 @@ class MetricsIntegrationTest extends ObservabilityIntegrationSupport {
                         viewer)
                 .andExpect(status().isForbidden());
 
-        assertThat(count(MetricsCatalog.AUTHZ_DENIED, MetricsCatalog.TAG_REASON, MetricsCatalog.DENIED_ORG_MISMATCH))
-                .isEqualTo(mismatch + 1);
+        assertThat(count(MetricsCatalog.AUTHZ_DENIED, MetricsCatalog.TAG_REASON, MetricsCatalog.DENIED_NO_MEMBERSHIP))
+                .isEqualTo(noMembership + 1);
         assertThat(count(
                         MetricsCatalog.AUTHZ_DENIED,
                         MetricsCatalog.TAG_REASON,

@@ -101,7 +101,8 @@ class EndToEndCrossServiceIntegrationTest {
 
             mvc.perform(as(get(ORG, org.orgId()), org, org.owner()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.slug").value(org.slug()));
+                    .andExpect(jsonPath("$.data.slug").value(org.slug()))
+                    .andExpect(jsonPath("$.data.kind").value("PERSONAL"));
             List<Received> added = probe.awaitCount(org.orgId(), 1);
             assertThat(added).hasSize(1);
             assertThat(added.getFirst().body().get("userId").asString()).isEqualTo(org.owner());
@@ -110,7 +111,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void anInviteIsEmailedPreviewedAcceptedAndTheInviteeBecomesAMember() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String email = newEmail();
         String invitee = newUser();
 
@@ -145,7 +146,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void aRoleChangeBitesImmediatelyAndARemovalCutsAccessAtOnce() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String member = joinAs(org, "DEVELOPER");
 
         try (TopicProbe roleChanged = probe(Topics.ORG_MEMBER_ROLE_CHANGED);
@@ -185,7 +186,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void aRevokedInviteAcceptedAnywayIsRejectedAndNoMembershipExists() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String email = newEmail();
         String invitee = newUser();
         UUID inviteId = createInvite(org, email, "VIEWER");
@@ -202,7 +203,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void anExpiredInviteAcceptedAnywayIsRejectedAsExpired() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String email = newEmail();
         String invitee = newUser();
         UUID inviteId = createInvite(org, email, "VIEWER");
@@ -218,7 +219,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void ownershipTransferNeedsFreshAuthAndEmitsPromoteBeforeDemote() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String successor = joinAs(org, "ADMIN");
         String staleToken = OrgTeamTestTokens.forMember(org.orgId(), org.owner())
                 .authenticatedAt(Instant.now().minus(Duration.ofHours(2)))
@@ -246,7 +247,7 @@ class EndToEndCrossServiceIntegrationTest {
 
     @Test
     void deletingTheOrgPublishesAppDeletedBeforeOrgDeletedAndRejectsLaterAccepts() throws Exception {
-        Org org = provision();
+        Org org = teamOrg();
         String email = newEmail();
         String invitee = newUser();
         UUID pendingInvite = createInvite(org, email, "VIEWER");
@@ -288,6 +289,29 @@ class EndToEndCrossServiceIntegrationTest {
                 .ignoreExceptions()
                 .untilAsserted(
                         () -> mvc.perform(as(get(ORG, orgId), org, org.owner())).andExpect(status().isOk()));
+        return org;
+    }
+
+    private Org teamOrg() throws Exception {
+        Org personal = provision();
+        String slug = "team-" + UUID.randomUUID().toString().substring(0, 8);
+        String body = mvc.perform(post(API + "/orgs")
+                        .header(
+                                "Authorization",
+                                "Bearer "
+                                        + OrgTeamTestTokens.forAccount(personal.owner())
+                                                .withEmail(personal.owner() + "@example.com")
+                                                .withName("Owner")
+                                                .signed())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Org " + slug + "\",\"slug\":\"" + slug + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.kind").value("TEAM"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Org org = new Org(jsonMapper.readTree(body).get("data").get("orgId").asString(), slug, personal.owner());
+        orgs.add(org);
         return org;
     }
 

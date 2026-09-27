@@ -76,23 +76,20 @@ that `org-team-service` mints a **self-contained, signed token** carrying every 
 without ever asking `org-team-service` a question. Both sides of the handoff after that go back to
 being ordinary async event publishes.
 
-**A second, related decision this forces**: does one person's account belong to exactly one
-organization, or can one login span several (a GitHub-style multi-org account)? ADR-0003 already
-committed to a single `org_id` **user attribute** in Keycloak — one attribute, one value, so
-today's Keycloak model already implies one org per account, not a choice this document invents.
-This document keeps that: **one Keycloak account = one organization, permanently.** A person who
-is genuinely part of two Pallet organizations (a contractor working for two clients, say) has two
-separate Pallet accounts — almost certainly with two different email addresses, since Keycloak
-(and this service's own `identity.users.email` unique index) enforce email uniqueness per realm.
-This is the same tradeoff plenty of real single-tenant-per-account B2B products make (a work email
-tied to one account, one company) rather than the heavier multi-tenant-membership model
-GitHub/Slack/Vercel use, where a token's active org is chosen per-session rather than fixed at the
-account level. The heavier model is strictly more capable and is the right call **if** Pallet ever
-needs "one person, many orgs" as a real product requirement — it is not designed here, and
-retrofitting it later means moving `org_id` off the Keycloak user attribute entirely and resolving
-it at token-issuance time instead, which is a genuine breaking change to ADR-0003, not an additive
-one. Flagged here so it's a conscious choice to revisit, not a limitation discovered by accident
-later — see [Open questions](#open-questions--deferred).
+**A second, related decision this forced**: does one person's account belong to exactly one
+organization, or can one login span several (a GitHub-style multi-org account)? This document
+originally kept ADR-0003's single `org_id` **user attribute** as one org per account, permanently,
+flagging the retrofit cost rather than paying it. That retrofit is now done:
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md) supersedes it. One
+Keycloak account may now hold any number of `org-team-service` memberships — one **personal** org,
+created here at sign-up as before, plus any number of **team** orgs created directly by
+`org-team-service` or joined by invite, exactly the model Vercel/Supabase/GitHub use. The mechanism
+that makes this possible without a session-scoped "active org" switch step: `org_id` is no longer a
+token claim at all. This service's job narrows to what it already was — authenticate a person and
+found their first org — and every question of "which orgs is this person in, and at what role" is
+answered per request by `org-team-service`'s own membership table, never by this service or by a
+token claim. See ADR-0018 for the full design and its consequences for
+`platform-common-security`'s `OrgContext` contract.
 
 ## Position in the system
 
@@ -104,10 +101,8 @@ flowchart LR
 
     subgraph IS["identity-service"]
         API[Auth + account API]
-        L1["OrgMemberRemovedListener<br/>(@KafkaListener)"]
-        L2["OrgMemberRoleChangedListener"]
-        L3["OrgDeletedListener"]
-        L4["OrgInviteRejectedListener"]
+        L3["OrgDeletedListener<br/>(local cleanup only, no Keycloak call)"]
+        L4["OrgInviteRejectedListener<br/>(@KafkaListener)"]
     end
 
     KC[(Keycloak<br/>Admin API + token endpoint)]
@@ -142,19 +137,19 @@ flowchart LR
     OApi -- publish --> T7
     OApi -- publish --> T8
     OApi -- publish --> T9
-    T6 --> L1 --> KC
-    T7 --> L2 --> KC
-    T8 --> L3 --> KC
+    T8 --> L3 --> DB
     T9 --> L4 --> KC
     OApi -. verifies signed token minted here, no call .-> API
 ```
 
-`identity-service` is both a producer and, for the first time in the repo, a **consumer that calls
-an external third party from inside a `@KafkaListener`** — the four listeners on the right all
-end in a Keycloak Admin call. That combination (consume an event, then make a resilience-wrapped
-external call before the message is considered handled) is new; `notification-service`'s listener
-already does the analogous thing for SMTP, so the pattern isn't unprecedented, but it's worth
-stating plainly since `PROJECT.md`'s original sketch described this service as a producer only.
+`T6` (`org.member.removed`) and `T7` (`org.member.role.changed`) have no consumer in this service
+at all, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md):
+Keycloak holds no org-scoped membership or role state to keep in sync once an account can belong to
+several orgs. `identity-service` is still both a producer and a **consumer that calls an external
+third party from inside a `@KafkaListener`** — `OrgInviteRejectedListener` ends in a Keycloak Admin
+call, the same new-for-the-repo combination `notification-service`'s listener already does for
+SMTP. `OrgDeletedListener` does not call Keycloak; it only retires a local, already-stale
+`OrgBootstrapRecord`.
 
 ## Design goals and non-goals
 
@@ -182,7 +177,11 @@ stating plainly since `PROJECT.md`'s original sketch described this service as a
 
 - Owning organizations, teams, projects, or membership beyond the founding owner —
   `org-team-service`'s aggregate entirely (see [The boundary problem](#the-boundary-problem-this-design-solves)).
-- Multi-org-per-account — see the callout above; a real, deliberate limitation, not an oversight.
+- Resolving which orgs a person belongs to, or at what role — that is per-request, local to
+  `org-team-service`, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md);
+  this service has no membership table of its own to keep in sync.
+- Fine-grained, narrower-than-org-role permissions (e.g. per-app access) — a future extension of
+  `org-team-service`'s `MembershipPolicy`, not designed here or there yet.
 - MFA, SSO/SAML, personal access tokens for CLI/service automation — real needs eventually
   (`git-integration-service`'s OAuth app and a future CLI both point this way), not designed here.
   See [Extension points](#extension-points).
@@ -271,9 +270,13 @@ Naming it differently from "Organization" is deliberate: a reader shouldn't mist
 resource `org-team-service` owns.
 
 `IdentityUser` is the local projection of a Keycloak user — the same "Keycloak owns credentials,
-we keep a queryable local shadow of the rest" pattern established nowhere else in the repo yet but
-consistent with `platform-common-security`'s existing assumption that `org_id`/roles live in the
-token, not looked up per-request.
+we keep a queryable local shadow of the rest" pattern established nowhere else in the repo yet.
+**`IdentityUser.orgId` means the account's founding org only** (per
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)), set once at
+sign-up and never updated — not "the account's org," since an account may hold any number of
+`org-team-service` memberships beyond it. Nothing here tracks that fuller list; a person's actual
+org membership and role are resolved per request by `org-team-service` alone, never cached or
+mirrored here.
 
 `ConsumedInviteToken` exists purely for replay protection: the signed invite token is
 self-verifying (no DB lookup needed to know it's *valid*), but nothing stops the same valid token
@@ -489,9 +492,9 @@ together — the same approach `notification-service/ARCHITECTURE.md` took for `
 | `OrgInviteAccepted` | `org.invite.accepted` | `identity-service` | `org-team-service` | `orgId, inviteId, userId, email, displayName, role` |
 | `UserProfileUpdated` | `user.profile.updated` | `identity-service` | `org-team-service` (keeps its member-profile projection fresh) | `orgId, userId, email, displayName` |
 | `OrgMemberAdded` | `org.member.added` | `org-team-service` | `notification-service` (already expects this — ADR-0008) | `orgId, userId, email` — unchanged from what `notification-service` already assumes |
-| `OrgMemberRemoved` | `org.member.removed` | `org-team-service` | `notification-service` (already expects this), **`identity-service`** (new consumer — disables the Keycloak account) | `orgId, userId, email` |
-| `OrgMemberRoleChanged` | `org.member.role.changed` | `org-team-service` | `identity-service` (updates the Keycloak realm-role assignment) | `orgId, userId, previousRole, newRole` |
-| `OrgDeleted` | `org.deleted` | `org-team-service` | `identity-service` (disables every account under the org, retires the bootstrap record) | `orgId, deletedByUserId` |
+| `OrgMemberRemoved` | `org.member.removed` | `org-team-service` | `notification-service` only, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md) — see below | `orgId, userId, email` |
+| `OrgMemberRoleChanged` | `org.member.role.changed` | `org-team-service` | No `identity-service` consumer as of ADR-0018 — see below | `orgId, userId, previousRole, newRole` |
+| `OrgDeleted` | `org.deleted` | `org-team-service` | `identity-service` (retires the bootstrap record only, no Keycloak call) — see below | `orgId, deletedByUserId` |
 | `OrgInviteRejected` | `org.invite.rejected` | `org-team-service` | `identity-service` (disables the account created from an invite that `org-team-service` repudiated: revoked, expired, unknown, or org deleted) | `orgId, inviteId, userId, email, reason` |
 
 `identity-service` also publishes the two events already in the catalog: `NotificationRequested`
@@ -501,6 +504,18 @@ a second `NotificationRequested(EMAIL_VERIFICATION)` from the same `AFTER_COMMIT
 checkpoint 5's mandatory-verification mechanism above) and `AuditEventRecorded` (sign-up, login,
 and every action in the table above that changes an account's authentication state — password
 reset completed, email verified, account disabled).
+
+**`OrgMemberRemoved` and `OrgMemberRoleChanged` no longer trigger a Keycloak call here**, per
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md): Keycloak holds no
+org-scoped role or membership state to keep in sync once `org_id` and realm roles are off the
+token. Removing someone from one org must never disable their whole account, since the same account
+may hold a personal org and other memberships untouched by that removal — the previous design's
+"disable the account" / "rewrite the realm role" actions assumed exactly the single-org world this
+ADR ends. `OrgDeletedListener` keeps a narrower job: retire the local `OrgBootstrapRecord` for the
+deleted org (it's stale bootstrap data regardless), but makes no Keycloak call, since a deleted
+`TEAM` org's former members keep their accounts. `OrgInviteRejectedListener` is unaffected — it
+disables an account that was created fresh purely for the now-repudiated invite, which is still
+exactly correct.
 
 Why `identity-service` publishes `OrgMemberAdded` itself for the *owner* at sign-up was considered
 and rejected: `org.member.added` is `org-team-service`'s fact about its own membership aggregate,
@@ -523,7 +538,7 @@ means `POST /api/v1/identity/signup`).
 | Method | Path | Idempotency | Notes |
 |---|---|---|---|
 | `POST` | `/identity/signup` | `Idempotency-Key` header, required | Creates the Keycloak owner (`emailVerified: false`, `VERIFY_EMAIL` required action pending) + `OrgBootstrapRecord`; publishes `OrgProvisioned`, `NotificationRequested` (`WELCOME`), `NotificationRequested` (`EMAIL_VERIFICATION`), `AuditEventRecorded`. Response includes `orgId`/`orgName`/`slug` so the dashboard's first screen doesn't need to wait on `org-team-service`'s async projection — but the account **cannot authenticate yet**; see [Mandatory email verification](#mandatory-email-verification). |
-| `POST` | `/identity/invites/{token}/accept` | One-time-use `jti` (see `ConsumedInviteToken`), not a header | Verifies the signed token locally, creates a Keycloak user scoped to the token's `orgId`/`role`, **`emailVerified: true`, no required action** (see [Mandatory email verification](#mandatory-email-verification) for why), publishes `OrgInviteAccepted`, `AuditEventRecorded`. A token whose `jti` is already consumed returns `409 CONFLICT` (not `200`) — replaying an accept is not safely idempotent the way sign-up is, because a second accept would try to create a second Keycloak user for an email that (by definition) now already has one. |
+| `POST` | `/identity/invites/{token}/accept` | One-time-use `jti` (see `ConsumedInviteToken`), not a header | Verifies the signed token locally, then branches on whether the token's `email` already has an `IdentityUser` (per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)). No existing account: body carries a password, creates a Keycloak user, **`emailVerified: true`, no required action** (see [Mandatory email verification](#mandatory-email-verification) for why). Existing account: no password taken; the caller must be authenticated as that account (log in first if not already), no Keycloak call is made. Either way, publishes `OrgInviteAccepted{orgId, inviteId, userId, email, displayName, role}` for `org-team-service` to turn into a membership, and `AuditEventRecorded`. A token whose `jti` is already consumed returns `409 CONFLICT` (not `200`). |
 
 ### Auth actions (public, except logout)
 
@@ -541,7 +556,7 @@ means `POST /api/v1/identity/signup`).
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/identity/users/me` | `sub`, `org_id`, and full composite realm-role set from the token — the `OrgContext`-exercising endpoint from the existing checkpoint 9 design. |
+| `GET` | `/identity/users/me` | `sub`, email, display name, and `identity.users.orgId` labeled explicitly as the account's **founding** org (never "the" org — see [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)). The dashboard's org switcher calls `org-team-service`'s `GET /org-team/orgs` for the caller's actual membership list; this endpoint no longer returns an authoritative `org_id`, because the token no longer carries one. |
 | `PATCH` | `/identity/users/me` | Display name only (never email/password here — those have their own dedicated, more careful flows above). Publishes `UserProfileUpdated`. |
 | `POST` | `/identity/users/me/password` | Authenticated change-password: requires the *current* password (re-verified against Keycloak, not trusted from the token alone) before setting a new one. |
 | `GET` | `/identity/users/me/sessions` | Read-through to Keycloak's Admin API (`GET /admin/realms/pallet/users/{id}/sessions`) — no local session table, so this can never drift from what Keycloak actually has active. |
@@ -620,6 +635,20 @@ Unlike sign-up, this account is `emailVerified: true` with no pending required a
 moment it's created — see [Mandatory email verification](#mandatory-email-verification) for why
 presenting a valid invite token is already equivalent proof of email ownership.
 
+**The diagram above is the no-existing-account branch.** Per
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md),
+`InviteAcceptController` first checks `identityUserRepository.existsByEmail(claims.email())` —
+the same proactive-check style `SignupService.ensureSlugAndEmailAreAvailable()` already uses,
+replacing `InviteAcceptService`'s previous catch-the-409-from-Keycloak approach for this path. If
+an account exists: no `password` field is read from the body, no Keycloak call is made at all, and
+the caller must already be authenticated (via the normal `platform-common-security` filter chain,
+not this controller's own token param) as the account matching `claims.email()` — a mismatch is
+`403`, and an unauthenticated caller gets a response telling the dashboard to send them to
+`/identity/auth/login` first, then retry the same accept URL. On success: insert
+`consumed_invite_tokens(jti)`, publish `OrgInviteAccepted{orgId, inviteId, userId, email,
+displayName, role}` with the **existing** `userId`, publish `AuditEventRecorded`. Nothing is
+written to `identity.users` in this branch — the account already has a row.
+
 ### Email verification
 
 ```mermaid
@@ -662,39 +691,44 @@ This pipeline is what actually lifts sign-up's `VERIFY_EMAIL` required action �
 once, every login attempt against the account fails per the classification
 `KeycloakTokenClient` performs (§API — Auth actions).
 
-### Membership-lifecycle listeners (Keycloak sync)
+### Membership-lifecycle listener (Keycloak sync, invite rejection only)
+
+Per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md), only
+`OrgInviteRejectedListener` still makes a Keycloak call; `OrgMemberRemovedListener` and
+`OrgMemberRoleChangedListener` are retired entirely (nothing in Keycloak reflects org membership or
+role any more), and `OrgDeletedListener` keeps only its local `OrgBootstrapRecord` cleanup:
 
 ```mermaid
 sequenceDiagram
     participant K as Kafka
-    participant L as *Listener (one per event)
+    participant L as OrgInviteRejectedListener
     participant G as EventIdempotencyGuard
     participant KC as Keycloak Admin API
     participant DB as Postgres (identity)
 
-    K->>L: OrgMemberRemoved | OrgMemberRoleChanged | OrgDeleted | OrgInviteRejected
+    K->>L: OrgInviteRejected
     L->>G: markProcessed(eventId)
     alt already processed
         G-->>L: false
         L-->>K: ack, no-op
     else first delivery
         G-->>L: true
-        L->>KC: disable user / replace realm role / disable all users for org
+        L->>KC: disable user (the account minted fresh for this invite)
         KC-->>L: ok or ExternalServiceException
         alt Keycloak call fails
             L->>G: release(eventId)
             L-->>K: throw — Kafka redelivers per platform-common-messaging's retry policy
         else success
-            L->>DB: mark identity.users.status = DISABLED (for the removed/deleted cases)
+            L->>DB: mark identity.users.status = DISABLED
             L-->>K: ack
         end
     end
 ```
 
-Each listener uses the same `EventIdempotencyGuard` contract every other consumer in the repo
-uses — a redelivered `OrgMemberRemoved` must not fail because the Keycloak user is already
-disabled (Keycloak's disable-an-already-disabled-user call is itself idempotent, but the guard is
-what makes the *whole* handler safe to re-run, including the local DB write).
+The guard is what makes the handler safe to re-run on redelivery, including the local DB write —
+Keycloak's disable-an-already-disabled-user call is itself idempotent, but the guard covers the
+whole handler, not just that call. `OrgDeletedListener` runs the same claim-then-effect shape but
+its effect is a local `UPDATE`, no external call, no retry policy needed.
 
 ## Distributed systems mechanisms
 
@@ -727,11 +761,12 @@ what makes the *whole* handler safe to re-run, including the local DB write).
 | Invite token expired | `400 INVALID_TOKEN` — `SignedActionToken.verify` checks `exp` before this service ever looks at a database. |
 | Invite token's `orgId` no longer exists (org deleted between invite and accept) | Accept still succeeds at the Keycloak-user-creation level — this service has no way to know the org was deleted (no sync call to `org-team-service`) — but the resulting `OrgInviteAccepted` event's consumer in `org-team-service` finds no matching organization row and drops it, logging a metric. The new account exists with an `org_id` claim pointing nowhere. This is a real, if narrow, consequence of the no-sync-call design and is named here rather than assumed away; mitigated in practice by invite tokens having a short TTL and org deletion being a rare, deliberate owner action. **Superseded by ADR-0016**: `org-team-service` now publishes `OrgInviteRejected` for this case (and for revoked/expired invites), and this service's `OrgInviteRejectedListener` (checkpoint 14) disables the account, so the orphan no longer survives. |
 | Invite revoked or expired, then accepted anyway | Accept succeeds here (the token verifies locally and this service cannot see the invite row). `org-team-service` finds the invite unusable and publishes `OrgInviteRejected{reason}`; `OrgInviteRejectedListener` verifies the Keycloak user's `org_id` attribute equals the event's `orgId`, then disables the account, marks the local row `DISABLED`, and revokes any session. An org mismatch or unknown user is a counted no-op (`identity.membership_sync.noop`), never a disable. The remaining window is outbox plus consumer latency. |
-| `OrgMemberRemoved` / `OrgMemberRoleChanged` / `OrgDeleted` arrives for an `orgId`/`userId` this service has no local row for | Logged and acknowledged as a no-op rather than treated as an error — a legitimate outcome if, e.g., `identity-service` and `org-team-service` are deployed at different times during a rollout. |
+| `OrgDeleted` arrives for an `orgId` this service has no `OrgBootstrapRecord` for | Logged and acknowledged as a no-op rather than treated as an error — a legitimate outcome if, e.g., `identity-service` and `org-team-service` are deployed at different times during a rollout. (`OrgMemberRemoved`/`OrgMemberRoleChanged` have no listener here at all, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md).) |
 | A password-reset token is used twice | Second use finds `used_at` already set → `400 INVALID_TOKEN`, same code path as expiry. |
 | An email-verification code is guessed beyond the configured attempt budget | The code is invalidated outright — a subsequent correct-code attempt still fails until a fresh `/identity/auth/email/resend-verification` call. A bounded, self-contained defense; broader per-IP/per-email rate limiting on the endpoint itself is checkpoint 12's deliberate decision. |
 | A self-registered account never completes email verification | The account exists in both Keycloak and locally indefinitely but can never obtain a token via `/identity/auth/login` — by design. There's no expiry on the *account*, only on each unconsumed code; a fresh one can always be requested. |
-| An account is disabled (removed from its only org) and the same email tries to sign up again | Keycloak's own email-uniqueness rejects it — surfaces as `409 CONFLICT`, "an account with this email already exists." No automatic reactivation; a genuinely different flow (account recovery) that isn't designed here — see [Open questions](#open-questions--deferred). |
+| An account is disabled (removed from its only remaining org) and the same email tries to sign up again | Keycloak's own email-uniqueness rejects it — surfaces as `409 CONFLICT`, "an account with this email already exists." No automatic reactivation; a genuinely different flow (account recovery) that isn't designed here — see [Open questions](#open-questions--deferred). Distinct from the row below: this is a *disabled* account, not a second, unrelated org's invite. |
+| Someone is invited whose email already has an active identity account (a different org's member, or that org's own founding member) | No longer a failure, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md): the existing-account branch of accept (above) runs, no Keycloak call is made, and `OrgInviteAccepted` carries the existing `userId`. |
 
 ### Checkpoint 12 decisions: dual-write gap, rate limiting, and observability
 
@@ -773,12 +808,15 @@ would share one budget per endpoint.
 `identity.invites.accepted`, `identity.invites.replayed`, `identity.logins.{success,failed,unverified}`,
 `identity.email_verification.{requested,verified,attempts_exhausted}`, and
 `identity.membership_sync.{processed,noop}` are exported from `SignupService`, `InviteAcceptService`,
-`AuthService`, `EmailVerificationService`, and the four membership listeners respectively — the
+`AuthService`, `EmailVerificationService`, and `OrgDeletedListener`/`OrgInviteRejectedListener`
+respectively (per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md),
+`OrgMemberRemovedListener`/`OrgMemberRoleChangedListener` no longer exist to emit it) — the
 diagnosability signals the two decisions above and the membership-sync no-op gap depend on. The
 existing `@Monitored` placements on `SignupService.provision`, `InviteAcceptService.accept`, and
-each membership listener's `onMessage` already compose into one trace per operation, the Keycloak
-`ExternalCall` span included — confirmed, not newly built; this service's own
-consume-then-external-call trace shape (new to the repo) links correctly for all four listeners.
+each remaining listener's `onMessage` already compose into one trace per operation, the Keycloak
+`ExternalCall` span included where one is still made (`OrgInviteRejectedListener` only) — confirmed,
+not newly built; this service's own consume-then-external-call trace shape (new to the repo) links
+correctly for both remaining listeners.
 `keycloak-admin` and `keycloak-token` circuit-breaker state is already a Prometheus gauge via
 `platform-common-resilience`'s existing binding. Spring Security's default response headers
 (`X-Content-Type-Options`, `X-Frame-Options`, cache-control, HSTS once behind TLS) are present on
@@ -801,8 +839,6 @@ flowchart TB
         Gen[VerificationCodeGenerator]
         KCAdmin["Keycloak Admin client<br/>(ExternalCall-wrapped call sites)"]
         KCToken[KeycloakTokenClient]
-        L1[OrgMemberRemovedListener]
-        L2[OrgMemberRoleChangedListener]
         L3[OrgDeletedListener]
         L4[OrgInviteRejectedListener]
         Repo1[OrgBootstrapRepository]
@@ -830,9 +866,7 @@ flowchart TB
     UC --> KCAdmin
     UC --> Repo3
     UC --> Pub
-    L1 --> KCAdmin --> Repo2
-    L2 --> KCAdmin
-    L3 --> KCAdmin --> Repo1
+    L3 --> Repo1
     L4 --> KCAdmin
 ```
 
@@ -859,8 +893,8 @@ services/identity-service/
     │                     OneTimeActionTokenRepository, password-reset service
     ├── keycloak/           KeycloakAdminConfiguration, the shared `Keycloak` admin bean
     ├── token/              SignedActionToken, InvalidTokenException
-    ├── membership/         OrgMemberRemovedListener, OrgMemberRoleChangedListener, OrgDeletedListener,
-    │                     OrgInviteRejectedListener
+    ├── membership/         OrgDeletedListener (local cleanup only), OrgInviteRejectedListener
+    │                     (`OrgMemberRemovedListener`/`OrgMemberRoleChangedListener` retired, ADR-0018)
     ├── idempotency/        IdempotencyService, IdempotencyKeyRepository
     └── audit/               AuditPublisher
 ```
@@ -900,11 +934,11 @@ starter already required for `platform-common-security` — no new dependency to
 
 ## Open questions / deferred
 
-- **Multi-org-per-account.** Named in detail above — the single biggest scope decision this
-  document makes explicitly rather than by accident. Revisit if "one person, several orgs" becomes
-  a real product requirement; the fix is moving `org_id` off the Keycloak user attribute and
-  resolving it at token-issuance/session time instead, which is a breaking change to ADR-0003, not
-  additive.
+- ~~**Multi-org-per-account.**~~ Resolved: [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)
+  supersedes the single-org constraint this section used to describe. `org_id` is off the token;
+  `org-team-service` resolves membership per request. The remaining open piece is genuinely minor:
+  where the dashboard's "last active org" convenience hint is stored (a profile field here, or
+  purely client-side) — either is fine, since it is never an authorization input.
 - **Shared HMAC secret between two services.** Proportionate for what it protects (invite claims,
   not a bearer credential) but is real coupling — an asymmetric scheme (`org-team-service` signs
   with a private key, `identity-service` verifies with the public one, no secret ever duplicated)

@@ -1,6 +1,6 @@
 # 3. One Keycloak realm, org_id claim on every token
 
-- Status: accepted
+- Status: accepted; amended by [ADR-0018](0018-multi-org-per-account-and-per-request-authorization.md) — `org_id` is no longer a token claim; every tenant-scoped service resolves org membership per request instead
 - Date: 2026-09-07
 
 ## Context

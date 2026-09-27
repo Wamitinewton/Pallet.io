@@ -22,6 +22,7 @@ import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.OrgStatus;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
@@ -79,7 +80,8 @@ class InviteAcceptanceServiceTest {
     }
 
     private static Organization organization(OrgStatus status) {
-        Organization organization = new Organization(ORG_ID, "Acme", "acme", "owner-1", NOW.minusSeconds(3600));
+        Organization organization =
+                new Organization(ORG_ID, "Acme", "acme", "owner-1", OrgKind.TEAM, NOW.minusSeconds(3600));
         ReflectionTestUtils.setField(organization, "status", status);
         return organization;
     }

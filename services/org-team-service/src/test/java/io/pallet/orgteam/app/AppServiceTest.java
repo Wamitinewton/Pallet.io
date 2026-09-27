@@ -24,6 +24,7 @@ import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
 import io.pallet.orgteam.outbox.OutboxWriter;
@@ -62,7 +63,8 @@ class AppServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(organizations.lockById(ORG)).thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", NOW)));
+        when(organizations.lockById(ORG))
+                .thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", OrgKind.TEAM, NOW)));
         seedMember(DEV, Role.DEVELOPER);
         seedMember(ADMIN, Role.ADMIN);
         OrgTeamProperties properties = new OrgTeamProperties(

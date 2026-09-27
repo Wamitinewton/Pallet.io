@@ -16,12 +16,19 @@ public final class OrgFixtures {
 
     public String newOrg(String status) {
         String orgId = "org-" + UUID.randomUUID();
-        jdbc.update("""
-                        INSERT INTO org_team.organizations (org_id, name, slug, owner_user_id, status)
-                        VALUES (?, ?, ?, ?, ?)
-                        """, orgId, "Org " + orgId, orgId, "owner-" + orgId, status);
-        orgIds.add(orgId);
+        insertOrg(orgId, "owner-" + orgId, "TEAM", status);
         return orgId;
+    }
+
+    public String newPersonalOrg(String ownerUserId) {
+        String orgId = "org-" + UUID.randomUUID();
+        insertOrg(orgId, ownerUserId, "PERSONAL", "ACTIVE");
+        addMember(orgId, ownerUserId, "OWNER", "ACTIVE");
+        return orgId;
+    }
+
+    public void track(String orgId) {
+        orgIds.add(orgId);
     }
 
     public String newActiveOrg() {
@@ -29,7 +36,10 @@ public final class OrgFixtures {
     }
 
     public String newMember(String orgId, String role, String status) {
-        String userId = "user-" + UUID.randomUUID();
+        return addMember(orgId, "user-" + UUID.randomUUID(), role, status);
+    }
+
+    public String addMember(String orgId, String userId, String role, String status) {
         jdbc.update("""
                         INSERT INTO org_team.memberships (org_id, user_id, email, display_name, role, status)
                         VALUES (?, ?, ?, ?, ?, ?)
@@ -44,6 +54,14 @@ public final class OrgFixtures {
     public void setStatus(String orgId, String userId, String status) {
         jdbc.update(
                 "UPDATE org_team.memberships SET status = ? WHERE org_id = ? AND user_id = ?", status, orgId, userId);
+    }
+
+    private void insertOrg(String orgId, String ownerUserId, String kind, String status) {
+        jdbc.update("""
+                        INSERT INTO org_team.organizations (org_id, name, slug, owner_user_id, kind, status)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """, orgId, "Org " + orgId, orgId, ownerUserId, kind, status);
+        orgIds.add(orgId);
     }
 
     public void cleanUp() {

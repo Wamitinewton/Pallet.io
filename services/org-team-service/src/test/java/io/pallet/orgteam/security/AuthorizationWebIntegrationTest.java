@@ -1,5 +1,6 @@
 package io.pallet.orgteam.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,6 +12,8 @@ import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -37,6 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 class AuthorizationWebIntegrationTest {
 
     private static final String PROBE = "/api/v1/org-team-probe/orgs/{orgId}";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Autowired
     private MockMvc mvc;
@@ -139,6 +146,75 @@ class AuthorizationWebIntegrationTest {
     }
 
     @Test
+    void anOrgTheCallerNeverBelongedToHasTheSameNotFoundBodyAsAnUnknownOrg() throws Exception {
+        String ownOrg = fixtures.newActiveOrg();
+        String someoneElsesOrg = fixtures.newActiveOrg();
+        fixtures.newMember(someoneElsesOrg, "OWNER", "ACTIVE");
+        String userId = fixtures.newMember(ownOrg, "OWNER", "ACTIVE");
+        OrgTeamTestTokens token = OrgTeamTestTokens.forAccount(userId);
+        String unknownOrg = "org-" + UUID.randomUUID();
+
+        String neverAMember = notFoundBody(someoneElsesOrg, token);
+        String unknown = notFoundBody(unknownOrg, token);
+
+        assertThat(normalized(neverAMember, someoneElsesOrg)).isEqualTo(normalized(unknown, unknownOrg));
+    }
+
+    @Test
+    void aRemovedMemberIsNotAMemberUnderATokenWithNoOrgClaim() throws Exception {
+        String orgId = fixtures.newActiveOrg();
+        String userId = fixtures.newMember(orgId, "OWNER", "REMOVED");
+
+        call("/viewer", orgId, OrgTeamTestTokens.forAccount(userId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("NOT_A_MEMBER"));
+    }
+
+    @Test
+    void twoAccountsEachReachTheirOwnOrgOnTheMembershipGateAlone() throws Exception {
+        String orgA = fixtures.newActiveOrg();
+        String orgB = fixtures.newActiveOrg();
+        String accountA = fixtures.newMember(orgA, "OWNER", "ACTIVE");
+        String accountB = fixtures.newMember(orgB, "DEVELOPER", "ACTIVE");
+
+        call("/viewer", orgA, OrgTeamTestTokens.forAccount(accountA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("OWNER"));
+        call("/viewer", orgB, OrgTeamTestTokens.forAccount(accountB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("DEVELOPER"));
+    }
+
+    @Test
+    void oneAccountCallingAnothersOrgGetsTheSameBodyAsANonexistentOrg() throws Exception {
+        String orgA = fixtures.newActiveOrg();
+        String orgB = fixtures.newActiveOrg();
+        String accountA = fixtures.newMember(orgA, "OWNER", "ACTIVE");
+        fixtures.newMember(orgB, "OWNER", "ACTIVE");
+        String nonexistent = "org-" + UUID.randomUUID();
+
+        for (OrgTeamTestTokens token :
+                List.of(OrgTeamTestTokens.forAccount(accountA), OrgTeamTestTokens.forMember(orgA, accountA))) {
+            String anothers = notFoundBody(orgB, token);
+            String missing = notFoundBody(nonexistent, token);
+
+            assertThat(normalized(anothers, orgB)).isEqualTo(normalized(missing, nonexistent));
+        }
+    }
+
+    @Test
+    void aMemberOfSeveralOrgsReachesEachWithOneToken() throws Exception {
+        String founding = fixtures.newActiveOrg();
+        String joined = fixtures.newActiveOrg();
+        String userId = fixtures.newMember(founding, "OWNER", "ACTIVE");
+        fixtures.addMember(joined, userId, "VIEWER", "ACTIVE");
+        String token = OrgTeamTestTokens.forMember(founding, userId).signed();
+
+        callWithToken("/viewer", founding, token).andExpect(jsonPath("$.data").value("OWNER"));
+        callWithToken("/viewer", joined, token).andExpect(jsonPath("$.data").value("VIEWER"));
+    }
+
+    @Test
     void aDeletedOrgIsNotFoundEvenForItsOwner() throws Exception {
         String orgId = fixtures.newOrg("DELETED");
         String userId = fixtures.newMember(orgId, "OWNER", "ACTIVE");
@@ -214,6 +290,25 @@ class AuthorizationWebIntegrationTest {
 
     private ResultActions callWithToken(String path, String orgId, String token) throws Exception {
         return mvc.perform(get(PROBE + path, orgId).header("Authorization", "Bearer " + token));
+    }
+
+    private String notFoundBody(String orgId, OrgTeamTestTokens token) throws Exception {
+        return call("/viewer", orgId, token)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ORG_NOT_FOUND"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+    }
+
+    private static JsonNode normalized(String body, String orgId) {
+        ObjectNode json = (ObjectNode) JSON.readTree(body);
+        assertThat(json.has("timestamp")).isTrue();
+        json.remove("timestamp");
+        if (json.has("path")) {
+            json.put("path", json.get("path").asString().replace(orgId, "{orgId}"));
+        }
+        return json;
     }
 
     private ResultActions callDelete(String orgId, OrgTeamTestTokens token) throws Exception {

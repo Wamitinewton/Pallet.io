@@ -1,23 +1,35 @@
 package io.pallet.orgteam.org;
 
+import io.pallet.common.api.PageQuery;
+import io.pallet.common.api.PageResponse;
 import io.pallet.common.events.OrgMemberAdded;
 import io.pallet.common.events.OrgProvisioned;
 import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.config.ConstraintViolations;
 import io.pallet.orgteam.inbox.EventPayloads;
 import io.pallet.orgteam.inbox.MalformedEventException;
+import io.pallet.orgteam.member.MemberExceptions.InvalidSortException;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.MetricsCatalog;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.EmailClaimMissingException;
+import io.pallet.orgteam.org.OrgExceptions.OrgSlugTakenException;
 import io.pallet.orgteam.outbox.OutboxWriter;
+import io.pallet.orgteam.security.AccessContext;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
+import io.pallet.orgteam.support.PageSorting;
+import io.pallet.orgteam.support.Slugs;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +42,10 @@ public class OrgService {
     private static final String SLUG_INDEX = "ux_organizations_slug";
     private static final int ID_MAX = 64;
     private static final int TEXT_MAX = 255;
+    private static final Map<String, String> SORTABLE = Map.of("kind", "kind", "name", "name");
+    private static final String TIEBREAKER = "orgId";
+    private static final Sort DEFAULT_SORT =
+            Sort.by(Sort.Order.asc("kind"), Sort.Order.asc("name").ignoreCase(), Sort.Order.asc(TIEBREAKER));
 
     private final OrganizationRepository organizations;
     private final MembershipRepository memberships;
@@ -62,7 +78,12 @@ public class OrgService {
         int inserted;
         try {
             inserted = organizations.insertIfAbsent(
-                    event.orgId(), event.orgName().strip(), event.slug(), event.ownerUserId(), now);
+                    event.orgId(),
+                    event.orgName().strip(),
+                    event.slug(),
+                    event.ownerUserId(),
+                    OrgKind.PERSONAL.name(),
+                    now);
         } catch (DataIntegrityViolationException violation) {
             ConstraintViolations.requireViolationOf(violation, SLUG_INDEX);
             throw new OrgSlugConflictException(event.orgId(), violation);
@@ -88,6 +109,40 @@ public class OrgService {
         metrics.eventProcessed(MetricsCatalog.LISTENER_ORG_PROVISIONED);
     }
 
+    @Transactional
+    public OrgDto createTeamOrg(AccessContext caller, String rawName, String rawSlug) {
+        String email = ownerEmail(caller);
+        String name = rawName.strip();
+        String slug = rawSlug == null ? Slugs.fromName(name) : rawSlug;
+        String orgId = UUID.randomUUID().toString();
+        Instant now = clock.instant();
+
+        Organization org;
+        try {
+            org = organizations.saveAndFlush(new Organization(orgId, name, slug, caller.userId(), OrgKind.TEAM, now));
+        } catch (DataIntegrityViolationException violation) {
+            ConstraintViolations.requireViolationOf(violation, SLUG_INDEX);
+            throw new OrgSlugTakenException();
+        }
+
+        Membership owner =
+                new Membership(orgId, caller.userId(), email, ownerDisplayName(caller, email), Role.OWNER, now);
+        owner.markProfileSynced(now);
+        memberships.save(owner);
+
+        outbox.append(OrgMemberAdded.of(orgId, caller.userId(), email));
+        outbox.append(AuditEvents.orgCreated(orgId, caller.userId()));
+        metrics.memberAdded();
+        return OrgDto.of(org, new OrgDto.Counts(1, 0, 0));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<OrgSummaryDto> listMyOrgs(String userId, PageQuery pageQuery) {
+        Pageable pageable =
+                PageSorting.resolve(pageQuery, DEFAULT_SORT, Sort.Order.asc(TIEBREAKER), OrgService::whitelisted);
+        return PageResponse.of(organizations.findMyOrgs(userId, pageable));
+    }
+
     @Transactional(readOnly = true)
     public OrgDto get(String orgId) {
         Organization org = organizations.findById(orgId).orElseThrow(OrgNotFoundException::new);
@@ -103,6 +158,28 @@ public class OrgService {
             outbox.append(AuditEvents.orgRenamed(orgId, actorUserId, previousName, newName));
         }
         return OrgDto.of(org, counts.countsFor(orgId));
+    }
+
+    private static String ownerEmail(AccessContext caller) {
+        String email = caller.email() == null ? "" : caller.email().strip().toLowerCase(Locale.ROOT);
+        if (email.length() > TEXT_MAX || !EMAIL.matcher(email).matches()) {
+            throw new EmailClaimMissingException();
+        }
+        return email;
+    }
+
+    private static String ownerDisplayName(AccessContext caller, String email) {
+        String displayName = EventPayloads.displayNameOrLocalPart(caller.displayName(), email);
+        return displayName.length() > TEXT_MAX ? displayName.substring(0, TEXT_MAX) : displayName;
+    }
+
+    private static Sort.Order whitelisted(Sort.Order order) {
+        String property = SORTABLE.get(order.getProperty());
+        if (property == null) {
+            throw new InvalidSortException(order.getProperty());
+        }
+        Sort.Order mapped = order.withProperty(property);
+        return property.equals("name") ? mapped.ignoreCase() : mapped;
     }
 
     private static void validate(OrgProvisioned event) {

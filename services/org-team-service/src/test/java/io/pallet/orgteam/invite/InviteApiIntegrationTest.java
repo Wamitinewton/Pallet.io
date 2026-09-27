@@ -113,6 +113,20 @@ class InviteApiIntegrationTest extends InviteIntegrationSupport {
     }
 
     @Test
+    void nobodyCanBeInvitedIntoAPersonalOrg() throws Exception {
+        String owner = "user-" + UUID.randomUUID();
+        String orgId = fixtures.newPersonalOrg(owner);
+
+        invite(orgId, owner, "jane@example.com", "VIEWER")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("PERSONAL_ORG_IMMUTABLE"));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM org_team.invites WHERE org_id = ?", Integer.class, orgId))
+                .isZero();
+        assertThat(outbox(orgId)).isEmpty();
+    }
+
+    @Test
     void aDuplicateInviteIsAConflict() throws Exception {
         TestOrg org = newTeamOrg();
         invite(org.orgId(), org.owner(), "jane@example.com", "VIEWER").andExpect(status().isCreated());

@@ -22,6 +22,7 @@ import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
 import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
@@ -56,7 +57,7 @@ class OrgDeletionServiceTest {
 
     @BeforeEach
     void setUp() {
-        org = new Organization(ORG, "Acme", "acme", OWNER, NOW.minusSeconds(3600));
+        org = new Organization(ORG, "Acme", "acme", OWNER, OrgKind.TEAM, NOW.minusSeconds(3600));
         when(organizations.lockById(ORG)).thenReturn(Optional.of(org));
         service = new OrgDeletionService(
                 organizations,
@@ -131,6 +132,18 @@ class OrgDeletionServiceTest {
         assertThat(org.getStatus()).isEqualTo(OrgStatus.ACTIVE);
         verifyNoInteractions(memberships, teamMembers, invites, outbox);
         verify(apps, never()).deleteAllActive(any(), any());
+    }
+
+    @Test
+    void aPersonalOrgIsRefusedBeforeAnyOtherCheck() {
+        Organization personal = new Organization("org-p", "Ada", "ada", OWNER, OrgKind.PERSONAL, NOW);
+        when(organizations.lockById("org-p")).thenReturn(Optional.of(personal));
+
+        assertThatThrownBy(() -> service.delete("org-p", "someone-else", "wrong-slug"))
+                .isInstanceOf(PersonalOrgImmutableException.class);
+
+        assertThat(personal.getStatus()).isEqualTo(OrgStatus.ACTIVE);
+        verifyNoInteractions(memberships, teamMembers, invites, apps, outbox);
     }
 
     @Test

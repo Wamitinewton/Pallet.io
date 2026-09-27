@@ -8,6 +8,9 @@ public final class ApiDocs {
     public static final String DEVELOPER = "Requires DEVELOPER or above" + BASIS;
     public static final String ADMIN = "Requires ADMIN or above" + BASIS;
     public static final String OWNER = "Requires the OWNER" + BASIS;
+    public static final String ANY_ACCOUNT =
+            "Requires any signed-in account; no organization membership is involved, and the result is scoped to "
+                    + "the caller alone.";
     public static final String RECENT_AUTH =
             " Also requires a recent sign-in; a stale session is rejected with 403 REAUTHENTICATION_REQUIRED.";
     public static final String RETRY_CONFLICTS = " Retrying conflicts (409) rather than creating a duplicate.";

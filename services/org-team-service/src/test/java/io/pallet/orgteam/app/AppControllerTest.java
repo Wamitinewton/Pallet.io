@@ -74,7 +74,8 @@ class AppControllerTest {
     @BeforeEach
     void allowEveryRole() {
         given(access.atLeast(anyString(), anyString())).willReturn(true);
-        given(accessResolver.resolve("org-1")).willReturn(new AccessContext("org-1", "dev-1", Role.DEVELOPER, NOW));
+        given(accessResolver.resolve("org-1"))
+                .willReturn(new AccessContext("org-1", "dev-1", Role.DEVELOPER, NOW, null, null));
     }
 
     @Test

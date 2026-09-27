@@ -1,10 +1,13 @@
 package io.pallet.orgteam.org;
 
+import io.pallet.orgteam.config.CallerScoped;
 import io.pallet.orgteam.config.CrossTenant;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,11 +18,29 @@ public interface OrganizationRepository extends JpaRepository<Organization, Stri
     /** @return 1 if the organization was created, 0 if {@code orgId} already existed */
     @Modifying
     @Query(value = """
-            INSERT INTO org_team.organizations (org_id, name, slug, owner_user_id, status, created_at, updated_at)
-            VALUES (:orgId, :name, :slug, :ownerUserId, 'ACTIVE', :now, :now)
+            INSERT INTO org_team.organizations (org_id, name, slug, owner_user_id, kind, status, created_at, updated_at)
+            VALUES (:orgId, :name, :slug, :ownerUserId, :kind, 'ACTIVE', :now, :now)
             ON CONFLICT (org_id) DO NOTHING
             """, nativeQuery = true)
-    int insertIfAbsent(String orgId, String name, String slug, String ownerUserId, Instant now);
+    int insertIfAbsent(String orgId, String name, String slug, String ownerUserId, String kind, Instant now);
+
+    @CallerScoped("lists the organizations the calling account belongs to")
+    @Query(value = """
+                    select new io.pallet.orgteam.org.OrgSummaryDto(o.orgId, o.name, o.slug, o.kind, m.role)
+                    from Organization o
+                    join Membership m on m.orgId = o.orgId
+                    where m.userId = :userId
+                      and m.status = io.pallet.orgteam.member.MembershipStatus.ACTIVE
+                      and o.status = io.pallet.orgteam.org.OrgStatus.ACTIVE
+                    """, countQuery = """
+                    select count(o)
+                    from Organization o
+                    join Membership m on m.orgId = o.orgId
+                    where m.userId = :userId
+                      and m.status = io.pallet.orgteam.member.MembershipStatus.ACTIVE
+                      and o.status = io.pallet.orgteam.org.OrgStatus.ACTIVE
+                    """)
+    Page<OrgSummaryDto> findMyOrgs(String userId, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Organization o where o.orgId = :orgId")
@@ -49,5 +70,5 @@ public interface OrganizationRepository extends JpaRepository<Organization, Stri
             SET name = :name, purged_at = now(), updated_at = now(), version = version + 1
             WHERE org_id = :orgId
             """, nativeQuery = true)
-    int markPurged(String orgId, String name);
+    void markPurged(String orgId, String name);
 }
