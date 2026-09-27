@@ -6,27 +6,35 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.pallet.common.api.PageQuery;
+import io.pallet.common.api.PageResponse;
 import io.pallet.common.events.AuditEventRecorded;
 import io.pallet.common.events.OrgMemberAdded;
 import io.pallet.common.events.OrgProvisioned;
 import io.pallet.common.events.PlatformEvent;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.inbox.MalformedEventException;
+import io.pallet.orgteam.member.MemberExceptions.InvalidSortException;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.EmailClaimMissingException;
+import io.pallet.orgteam.org.OrgExceptions.OrgSlugTakenException;
 import io.pallet.orgteam.outbox.OutboxWriter;
+import io.pallet.orgteam.security.AccessContext;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -38,6 +46,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @UnitTest
 class OrgServiceTest {
@@ -123,11 +135,12 @@ class OrgServiceTest {
     @Test
     void provisioningCreatesTheOrgTheOwnerMembershipAndBothOutboxEvents() {
         OrgProvisioned event = event("Ada@Example.COM", "Ada Lovelace");
-        when(organizations.insertIfAbsent(any(), any(), any(), any(), any())).thenReturn(1);
+        when(organizations.insertIfAbsent(any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         service.provision(event);
 
-        verify(organizations).insertIfAbsent("org-1", "Acme", "acme", "user-1", NOW);
+        verify(organizations).insertIfAbsent("org-1", "Acme", "acme", "user-1", "PERSONAL", NOW);
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
         verify(memberships).save(membership.capture());
         assertThat(membership.getValue().getOrgId()).isEqualTo("org-1");
@@ -139,7 +152,7 @@ class OrgServiceTest {
         assertThat(membership.getValue().getProfileSyncedAt()).isEqualTo(EVENT_TIME);
 
         ArgumentCaptor<PlatformEvent> published = ArgumentCaptor.forClass(PlatformEvent.class);
-        verify(outbox, org.mockito.Mockito.times(2)).append(published.capture());
+        verify(outbox, times(2)).append(published.capture());
         OrgMemberAdded added = (OrgMemberAdded) published.getAllValues().get(0);
         assertThat(added.orgId()).isEqualTo("org-1");
         assertThat(added.userId()).isEqualTo("user-1");
@@ -154,7 +167,8 @@ class OrgServiceTest {
     @ParameterizedTest
     @MethodSource("blankDisplayNames")
     void aBlankDisplayNameFallsBackToTheEmailLocalPart(String displayName) {
-        when(organizations.insertIfAbsent(any(), any(), any(), any(), any())).thenReturn(1);
+        when(organizations.insertIfAbsent(any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         service.provision(event("Grace.Hopper@example.com", displayName));
 
@@ -169,7 +183,8 @@ class OrgServiceTest {
 
     @Test
     void anAlreadyExistingOrgProducesNothing() {
-        when(organizations.insertIfAbsent(any(), any(), any(), any(), any())).thenReturn(0);
+        when(organizations.insertIfAbsent(any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
 
         service.provision(event("ada@example.com", "Ada"));
 
@@ -178,7 +193,7 @@ class OrgServiceTest {
 
     @Test
     void aSlugClaimedByAnotherOrgIsANonRetryableConflict() {
-        when(organizations.insertIfAbsent(any(), any(), any(), any(), any()))
+        when(organizations.insertIfAbsent(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new DataIntegrityViolationException("ux_organizations_slug"));
 
         assertThatThrownBy(() -> service.provision(event("ada@example.com", "Ada")))
@@ -190,7 +205,8 @@ class OrgServiceTest {
     @Test
     void anyOtherIntegrityViolationIsNotMistakenForASlugConflict() {
         DataIntegrityViolationException other = new DataIntegrityViolationException("value too long");
-        when(organizations.insertIfAbsent(any(), any(), any(), any(), any())).thenThrow(other);
+        when(organizations.insertIfAbsent(any(), any(), any(), any(), any(), any()))
+                .thenThrow(other);
 
         assertThatThrownBy(() -> service.provision(event("ada@example.com", "Ada")))
                 .isSameAs(other);
@@ -249,8 +265,172 @@ class OrgServiceTest {
         assertThat(dto.counts()).isEqualTo(new OrgDto.Counts(3, 2, 1));
     }
 
+    static Stream<Arguments> unusableEmailClaims() {
+        return Stream.of(
+                Arguments.of("missing", null),
+                Arguments.of("blank", "   "),
+                Arguments.of("without at sign", "not-an-email"),
+                Arguments.of("without domain dot", "ada@example"),
+                Arguments.of("over 255 characters", "a".repeat(250) + "@example.com"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("unusableEmailClaims")
+    void aTeamOrgIsNotCreatedForATokenWithoutAUsableEmail(String ignored, String email) {
+        assertThatThrownBy(() -> service.createTeamOrg(caller(email, "Ada"), "Acme", null))
+                .isInstanceOf(EmailClaimMissingException.class);
+
+        verifyNoInteractions(organizations, memberships, outbox);
+    }
+
+    static Stream<Arguments> slugsForCreate() {
+        return Stream.of(
+                Arguments.of("Acme Inc", null, "acme-inc"),
+                Arguments.of("  Café Zürich  ", null, "cafe-zurich"),
+                Arguments.of("Acme Inc", "acme-hq", "acme-hq"),
+                Arguments.of("---", null, null));
+    }
+
+    @ParameterizedTest(name = "{0} / {1}")
+    @MethodSource("slugsForCreate")
+    void aTeamOrgTakesTheGivenSlugOrDerivesOneFromTheName(String name, String slug, String expectedSlug) {
+        savesOrganizations();
+
+        OrgDto dto = service.createTeamOrg(caller("ada@example.com", "Ada"), name, slug);
+
+        assertThat(dto.name()).isEqualTo(name.strip());
+        if (expectedSlug == null) {
+            assertThat(dto.slug()).startsWith("slug-");
+        } else {
+            assertThat(dto.slug()).isEqualTo(expectedSlug);
+        }
+    }
+
+    @Test
+    void creatingATeamOrgMakesTheCallerItsOwnerFromTheTokenClaimsAndQueuesBothEvents() {
+        ArgumentCaptor<Organization> saved = savesOrganizations();
+
+        OrgDto dto = service.createTeamOrg(caller("  Ada@Example.COM ", "Ada Lovelace"), "Acme Inc", null);
+
+        Organization org = saved.getValue();
+        assertThat(org.getKind()).isEqualTo(OrgKind.TEAM);
+        assertThat(org.getStatus()).isEqualTo(OrgStatus.ACTIVE);
+        assertThat(org.getOwnerUserId()).isEqualTo("user-1");
+        assertThat(org.getCreatedAt()).isEqualTo(NOW);
+        assertThat(UUID.fromString(org.getOrgId())).isNotNull();
+        assertThat(dto.orgId()).isEqualTo(org.getOrgId());
+        assertThat(dto.kind()).isEqualTo(OrgKind.TEAM);
+        assertThat(dto.counts()).isEqualTo(new OrgDto.Counts(1, 0, 0));
+
+        ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
+        verify(memberships).save(membership.capture());
+        assertThat(membership.getValue().getOrgId()).isEqualTo(org.getOrgId());
+        assertThat(membership.getValue().getUserId()).isEqualTo("user-1");
+        assertThat(membership.getValue().getRole()).isEqualTo(Role.OWNER);
+        assertThat(membership.getValue().getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+        assertThat(membership.getValue().getEmail()).isEqualTo("ada@example.com");
+        assertThat(membership.getValue().getDisplayName()).isEqualTo("Ada Lovelace");
+        assertThat(membership.getValue().getProfileSyncedAt()).isEqualTo(NOW);
+
+        ArgumentCaptor<PlatformEvent> published = ArgumentCaptor.forClass(PlatformEvent.class);
+        verify(outbox, times(2)).append(published.capture());
+        OrgMemberAdded added = (OrgMemberAdded) published.getAllValues().get(0);
+        assertThat(added.orgId()).isEqualTo(org.getOrgId());
+        assertThat(added.userId()).isEqualTo("user-1");
+        assertThat(added.email()).isEqualTo("ada@example.com");
+        AuditEventRecorded audit = (AuditEventRecorded) published.getAllValues().get(1);
+        assertThat(audit.action()).isEqualTo("org.created");
+        assertThat(audit.actor()).isEqualTo("user-1");
+        assertThat(audit.resource()).isEqualTo(org.getOrgId());
+    }
+
+    @ParameterizedTest
+    @MethodSource("blankDisplayNames")
+    void aTeamOrgOwnerWithoutADisplayNameClaimFallsBackToTheEmailLocalPart(String displayName) {
+        savesOrganizations();
+
+        service.createTeamOrg(caller("Grace.Hopper@example.com", displayName), "Acme", null);
+
+        ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
+        verify(memberships).save(membership.capture());
+        assertThat(membership.getValue().getDisplayName()).isEqualTo("grace.hopper");
+    }
+
+    @Test
+    void anOverlongDisplayNameClaimIsCutToTheColumnWidth() {
+        savesOrganizations();
+
+        service.createTeamOrg(caller("ada@example.com", "n".repeat(300)), "Acme", null);
+
+        ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
+        verify(memberships).save(membership.capture());
+        assertThat(membership.getValue().getDisplayName()).hasSize(255);
+    }
+
+    @Test
+    void aTakenSlugIsAConflictAndNothingElseIsWritten() {
+        when(organizations.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("ux_organizations_slug"));
+
+        assertThatThrownBy(() -> service.createTeamOrg(caller("ada@example.com", "Ada"), "Acme", "acme"))
+                .isInstanceOf(OrgSlugTakenException.class);
+
+        verifyNoInteractions(memberships, outbox);
+    }
+
+    @Test
+    void anyOtherIntegrityViolationOnCreateIsNotMistakenForATakenSlug() {
+        DataIntegrityViolationException other = new DataIntegrityViolationException("value too long");
+        when(organizations.saveAndFlush(any())).thenThrow(other);
+
+        assertThatThrownBy(() -> service.createTeamOrg(caller("ada@example.com", "Ada"), "Acme", "acme"))
+                .isSameAs(other);
+    }
+
+    @Test
+    void myOrgsDefaultToPersonalFirstThenByNameThenId() {
+        OrgSummaryDto personal = new OrgSummaryDto("org-1", "Ada", "ada", OrgKind.PERSONAL, Role.OWNER);
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(organizations.findMyOrgs(eq("user-1"), pageable.capture()))
+                .thenAnswer(call -> new PageImpl<>(List.of(personal), call.getArgument(1), 1));
+
+        PageResponse<OrgSummaryDto> page = service.listMyOrgs("user-1", new PageQuery(null, null, null));
+
+        assertThat(page.content()).containsExactly(personal);
+        assertThat(pageable.getValue().getSort())
+                .containsExactly(Sort.Order.asc("kind"), Sort.Order.asc("name").ignoreCase(), Sort.Order.asc("orgId"));
+    }
+
+    @Test
+    void myOrgsMaySortByNameOnly() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(organizations.findMyOrgs(eq("user-1"), pageable.capture())).thenReturn(Page.empty());
+
+        service.listMyOrgs("user-1", new PageQuery(null, null, "name,desc"));
+
+        assertThat(pageable.getValue().getSort())
+                .containsExactly(Sort.Order.desc("name").ignoreCase(), Sort.Order.asc("orgId"));
+    }
+
+    @Test
+    void myOrgsRejectAnUnlistedSortField() {
+        assertThatThrownBy(() -> service.listMyOrgs("user-1", new PageQuery(null, null, "ownerUserId,asc")))
+                .isInstanceOf(InvalidSortException.class);
+
+        verifyNoInteractions(organizations);
+    }
+
+    private ArgumentCaptor<Organization> savesOrganizations() {
+        ArgumentCaptor<Organization> saved = ArgumentCaptor.forClass(Organization.class);
+        when(organizations.saveAndFlush(saved.capture())).thenAnswer(call -> call.getArgument(0));
+        return saved;
+    }
+
+    private static AccessContext caller(String email, String displayName) {
+        return new AccessContext(null, "user-1", null, NOW, email, displayName);
+    }
+
     private static Organization organization(String name) {
-        return new Organization("org-1", name, "acme", "user-1", Instant.parse("2026-01-01T00:00:00Z"));
+        return new Organization("org-1", name, "acme", "user-1", OrgKind.TEAM, Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     private static OrgProvisioned event(String ownerEmail, String displayName) {

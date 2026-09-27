@@ -20,6 +20,8 @@ import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.OrgStatus;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
@@ -97,6 +99,9 @@ public class InviteService {
     @Transactional
     public InviteDto create(String orgId, String actorUserId, String rawEmail, Role role) {
         Organization organization = guard.lockActive(orgId);
+        if (organization.getKind() == OrgKind.PERSONAL) {
+            throw new PersonalOrgImmutableException();
+        }
         Membership actor = guard.activeActor(orgId, actorUserId);
         policy.checkCanInvite(actor.getRole(), role);
 

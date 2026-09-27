@@ -137,6 +137,23 @@ class OrgDeletionIntegrationTest {
     }
 
     @Test
+    void aPersonalOrgCannotBeDeletedEvenByItsOwnerWithTheRightSlug() throws Exception {
+        String owner = "user-" + UUID.randomUUID();
+        String orgId = fixtures.newPersonalOrg(owner);
+        orgIds.add(orgId);
+
+        deleteAs(orgId, owner, orgId)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("PERSONAL_ORG_IMMUTABLE"));
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT status FROM org_team.organizations WHERE org_id = ?", String.class, orgId))
+                .isEqualTo("ACTIVE");
+        assertThat(count("memberships", orgId, "status = 'ACTIVE'")).isEqualTo(1);
+        assertThat(outboxTypes(orgId)).isEmpty();
+    }
+
+    @Test
     void deletingCascadesThroughEveryAggregateAndEmitsTheEventsInOrder() throws Exception {
         Seed seed = seed(3, 2, 2);
 

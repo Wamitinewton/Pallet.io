@@ -75,7 +75,8 @@ class InviteControllerTest {
     @BeforeEach
     void allowEveryRole() {
         given(access.atLeast(anyString(), anyString())).willReturn(true);
-        given(accessResolver.resolve("org-1")).willReturn(new AccessContext("org-1", "owner-1", Role.OWNER, NOW));
+        given(accessResolver.resolve("org-1"))
+                .willReturn(new AccessContext("org-1", "owner-1", Role.OWNER, NOW, null, null));
     }
 
     @Test

@@ -31,6 +31,8 @@ import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
 import io.pallet.orgteam.outbox.OutboxWriter;
@@ -80,7 +82,8 @@ class InviteServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(organizations.lockById(ORG)).thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", NOW)));
+        when(organizations.lockById(ORG))
+                .thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", OrgKind.TEAM, NOW)));
         OrgTeamProperties properties = new OrgTeamProperties(
                 new OrgTeamProperties.Invites(TTL, 2, COOLDOWN, 3, Duration.ofMinutes(2), URL_TEMPLATE),
                 null,
@@ -132,6 +135,19 @@ class InviteServiceTest {
         String token = url.substring(URL_PREFIX.length());
         return SignedActionToken.verify(
                 "invite", URLDecoder.decode(token, StandardCharsets.UTF_8), KEY, java.time.Clock.systemUTC());
+    }
+
+    @Test
+    void createIntoAPersonalOrgIsRefusedBeforeTheActorOrPolicyIsConsulted() {
+        when(organizations.lockById(ORG))
+                .thenReturn(Optional.of(new Organization(ORG, "Ada", "ada", "owner", OrgKind.PERSONAL, NOW)));
+        actor("owner", Role.OWNER);
+
+        assertThatThrownBy(() -> service.create(ORG, "owner", "jane@example.com", Role.OWNER))
+                .isInstanceOf(PersonalOrgImmutableException.class);
+
+        verify(memberships, never()).findByOrgIdAndUserIdAndStatus(any(), any(), any());
+        verifyNoInteractions(invites, outbox);
     }
 
     @Test

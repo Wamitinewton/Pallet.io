@@ -27,12 +27,16 @@ public class Organization {
     private String ownerUserId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "kind", nullable = false, updatable = false)
+    private OrgKind kind;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private OrgStatus status;
 
     @Version
     @Column(name = "version", nullable = false)
-    private long version;
+    private Long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -51,11 +55,12 @@ public class Organization {
 
     protected Organization() {}
 
-    public Organization(String orgId, String name, String slug, String ownerUserId, Instant now) {
+    public Organization(String orgId, String name, String slug, String ownerUserId, OrgKind kind, Instant now) {
         this.orgId = orgId;
         this.name = name;
         this.slug = slug;
         this.ownerUserId = ownerUserId;
+        this.kind = kind;
         this.status = OrgStatus.ACTIVE;
         this.createdAt = now;
         this.updatedAt = now;
@@ -92,6 +97,10 @@ public class Organization {
 
     public String getOwnerUserId() {
         return ownerUserId;
+    }
+
+    public OrgKind getKind() {
+        return kind;
     }
 
     public OrgStatus getStatus() {

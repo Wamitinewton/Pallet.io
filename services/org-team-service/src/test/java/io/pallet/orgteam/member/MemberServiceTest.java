@@ -23,6 +23,7 @@ import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.member.MemberExceptions.InvalidSortException;
 import io.pallet.orgteam.member.MemberExceptions.MemberNotFoundException;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.OrgStatus;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
@@ -64,7 +65,7 @@ class MemberServiceTest {
 
     @BeforeEach
     void setUp() {
-        organization = new Organization(ORG, "Acme", "acme", "owner", NOW);
+        organization = new Organization(ORG, "Acme", "acme", "owner", OrgKind.TEAM, NOW);
         when(organizations.lockById(ORG)).thenReturn(Optional.of(organization));
         service = new MemberService(
                 new OrgGuard(organizations, memberships),

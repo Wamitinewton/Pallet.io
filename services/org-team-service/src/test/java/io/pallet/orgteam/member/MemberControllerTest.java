@@ -72,7 +72,8 @@ class MemberControllerTest {
     void allowEveryRole() {
         given(access.atLeast(anyString(), anyString())).willReturn(true);
         given(access.isOwner(anyString())).willReturn(true);
-        given(accessResolver.resolve("org-1")).willReturn(new AccessContext("org-1", "owner-1", Role.OWNER, JOINED));
+        given(accessResolver.resolve("org-1"))
+                .willReturn(new AccessContext("org-1", "owner-1", Role.OWNER, JOINED, null, null));
     }
 
     @Test

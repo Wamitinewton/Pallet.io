@@ -49,6 +49,6 @@ class RecentAuthenticationTest {
     }
 
     private static AccessContext contextAuthenticatedAt(Instant authTime) {
-        return new AccessContext("org-1", "user-1", Role.OWNER, authTime);
+        return new AccessContext("org-1", "user-1", Role.OWNER, authTime, null, null);
     }
 }

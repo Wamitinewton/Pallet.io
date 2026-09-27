@@ -49,8 +49,8 @@ class InviteController {
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
-                        description = "ALREADY_A_MEMBER, MEMBER_PREVIOUSLY_REMOVED, INVITE_ALREADY_PENDING or "
-                                + "QUOTA_EXCEEDED",
+                        description = "ALREADY_A_MEMBER, MEMBER_PREVIOUSLY_REMOVED, INVITE_ALREADY_PENDING, "
+                                + "QUOTA_EXCEEDED or PERSONAL_ORG_IMMUTABLE",
                         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
             })
     ResponseEntity<ApiResponse<InviteDto>> create(

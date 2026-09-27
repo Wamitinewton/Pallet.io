@@ -90,11 +90,12 @@ class OrgProvisionedListenerIntegrationTest {
         }
 
         Map<String, Object> org = jdbc.queryForMap(
-                "SELECT name, slug, owner_user_id, status FROM org_team.organizations WHERE org_id = ?", orgId);
+                "SELECT name, slug, owner_user_id, kind, status FROM org_team.organizations WHERE org_id = ?", orgId);
         assertThat(org)
                 .containsEntry("name", "Acme " + orgId)
                 .containsEntry("slug", slugFor(orgId))
                 .containsEntry("owner_user_id", event.ownerUserId())
+                .containsEntry("kind", "PERSONAL")
                 .containsEntry("status", "ACTIVE");
         Map<String, Object> owner = jdbc.queryForMap(
                 "SELECT email, display_name, role, status, profile_synced_at FROM org_team.memberships"

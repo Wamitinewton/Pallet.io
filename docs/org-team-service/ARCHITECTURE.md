@@ -5,7 +5,10 @@ The decisions that changed between the two passes (transactional outbox and inbo
 against the local membership row instead of the token's roles, the `OrgInviteRejected`
 compensation event) are recorded in
 [ADR-0016](../adr/0016-org-team-service-production-design.md); read that first if you are
-comparing versions.
+comparing versions. [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)
+changed it again: accounts are no longer single-org, the tenant gate below is gone, and this
+service gains its own org-creation endpoint. Read that ADR before touching authorization or org
+creation in this document.
 
 `PROJECT.md` describes this service in one paragraph: it "owns organizations, teams, projects, and
 membership, and maps Keycloak roles to what a user can actually do inside a given org. It also
@@ -95,7 +98,7 @@ flowchart LR
 
     subgraph IS["identity-service"]
         ISPub[Publishes org.provisioned,<br/>org.invite.accepted,<br/>user.profile.updated]
-        ISSub[Keycloak sync listeners]
+        ISSub["org.deleted (local cleanup),<br/>org.invite.rejected (Keycloak disable) —<br/>member.removed/role.changed: no consumer, ADR-0018"]
     end
 
     subgraph NS["notification-service"]
@@ -113,7 +116,7 @@ flowchart LR
     T3 --> L3 --> DB
     L1 & L2 & L3 -- same tx --> OB
 
-    T5 & T6 & T7 & T8 --> ISSub
+    T7 & T8 --> ISSub
     T4 & T5 & T7 & T10 --> NSL
 ```
 
@@ -153,9 +156,11 @@ moves the events to Kafka afterwards.
 
 - Anything requiring a Keycloak Admin call. If a future requirement genuinely needs it, that is a
   boundary decision to reopen explicitly, not a dependency to add quietly.
-- Multi-org-per-account (ADR-0011). A `userId` belongs to exactly one `org_id`.
 - Reactivating a removed member's account, or moving an account between orgs (account recovery is
   an `identity-service` open question).
+- Fine-grained, narrower-than-org-role permissions (e.g. per-app access). A future extension of
+  `MembershipPolicy` (see [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md)),
+  not designed here.
 - Billing, plans, and quota tiers. This service enforces flat, config-driven safety limits;
   plan-based limits are `billing-service`'s later concern.
 - Fine-grained permissions (custom roles, per-resource ACLs). Four fixed roles.
@@ -170,11 +175,17 @@ classDiagram
         String name
         String slug
         String ownerUserId
+        OrgKind kind
         OrgStatus status
         long version
         Instant createdAt
         Instant updatedAt
         Instant deletedAt
+    }
+    class OrgKind {
+        <<enumeration>>
+        PERSONAL
+        TEAM
     }
     class OrgStatus {
         <<enumeration>>
@@ -268,6 +279,11 @@ has its own lifecycle and its own consistency boundary:
 
 - **Organization**: does this tenant exist, what is it called, who owns it. It is also the **lock
   root** for every membership-affecting operation (see [Membership change](#membership-change-role-change-removal-transfer)).
+  Per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md), every org has
+  a `kind`: exactly one `PERSONAL` org per identity account (created at sign-up, non-deletable,
+  non-leaveable, never invitable) and any number of `TEAM` orgs (created by any existing account
+  through this service directly, or joined by invite) — everything in this document that isn't
+  explicitly about `kind` applies identically to both.
 - **Membership**: who is in it and at what role. The row that authorization reads and that
   `notification-service`'s broadcast projection mirrors.
 - **Invite**: who has been asked but has not joined. A different lifecycle (`REVOKED`, `EXPIRED`,
@@ -298,6 +314,7 @@ erDiagram
         varchar name
         varchar slug UK
         varchar owner_user_id
+        varchar kind "PERSONAL | TEAM"
         varchar status
         bigint version
         timestamptz created_at
@@ -395,7 +412,13 @@ Constraints and indexes worth calling out (the full DDL is in
 - `organizations.slug` **unique across all statuses**: a deleted org's slug is never reissued, so a
   later tenant cannot inherit a name (and eventually a hostname) that belonged to someone else.
   Same DNS-1123 label rule `identity-service` sign-up validates. Never updated after insert.
-- `memberships(org_id, user_id)` primary key: one row per user per org (single-org accounts).
+- `memberships(org_id, user_id)` primary key: one row per user per org. A `user_id` may have many
+  rows across many orgs (ADR-0018); nothing here ever assumed otherwise.
+- `organizations(owner_user_id) WHERE kind = 'PERSONAL' AND status = 'ACTIVE'` **unique partial**:
+  an identity account founds exactly one personal org. `kind` is set once at creation, has no
+  column default (every insert names it), and never changes.
+- `memberships(user_id) WHERE status = 'ACTIVE'`: backs `GET /orgs`, the one read keyed by the
+  caller's `sub` rather than an `orgId`.
 - `memberships(org_id) WHERE role = 'OWNER' AND status = 'ACTIVE'` **unique partial**: the
   database refuses a second active owner, whatever the application does.
 - `memberships(org_id, lower(email)) WHERE status = 'ACTIVE'` unique partial: an email is one
@@ -482,8 +505,10 @@ Base path `/api/v1/org-team` (ADR-0010's version prefix plus ADR-0013's per-serv
 the tables below, paths omit that base. Every response is `ApiResponse<T>`, lists are
 `PageResponse<T>` inside it, errors are `ErrorResponse` via `GlobalExceptionHandler`. Roles in the
 "Requires" column are the caller's **local membership role**
-([Authorization model](#authorization-model)), never a token claim. `{orgId}` must equal the token's
-`org_id` or the request is a `404`.
+([Authorization model](#authorization-model)), never a token claim. Per
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md), there is no token
+`org_id` to compare `{orgId}` against; every `/orgs/{orgId}/...` request is authorized entirely by
+whether the caller (`sub`) has a live membership row for that `orgId`.
 
 Conventions:
 
@@ -502,9 +527,11 @@ Conventions:
 
 | Method | Path | Requires | Notes |
 |---|---|---|---|
-| `GET` | `/orgs/{orgId}` | any member | Name, slug, status, `ownerUserId`, live `COUNT` of members/teams/apps. |
-| `PATCH` | `/orgs/{orgId}` | ADMIN+ | `name` only. Never `slug`, never `ownerUserId`. |
-| `DELETE` | `/orgs/{orgId}` | OWNER | Requires header `X-Confirm-Slug: <slug>` and a [recent authentication](#authorization-model). Soft delete; see [org deletion](#org-deletion). `204`. |
+| `POST` | `/orgs` | any authenticated caller | New: `{name, slug?}` creates a `TEAM` org directly, no Keycloak call, no event consumed — the caller becomes its `OWNER` immediately. `email`/`displayName` for the owner's membership row come from the token's own claims. See [Team org creation](#team-org-creation). `201`. |
+| `GET` | `/orgs` | any authenticated caller | New: the caller's own orgs (`PageResponse<OrgSummaryDto>`), personal and team, by role — the dashboard's org switcher. No `orgId` in the path; scoped entirely to `sub`. |
+| `GET` | `/orgs/{orgId}` | any member | Name, slug, `kind`, status, `ownerUserId`, live `COUNT` of members/teams/apps. |
+| `PATCH` | `/orgs/{orgId}` | ADMIN+ | `name` only. Never `slug`, `ownerUserId`, or `kind`. |
+| `DELETE` | `/orgs/{orgId}` | OWNER, `kind = TEAM` only | Requires header `X-Confirm-Slug: <slug>` and a [recent authentication](#authorization-model). A `PERSONAL` org can never be deleted through this endpoint (`409 PERSONAL_ORG_IMMUTABLE`); it is retired only alongside the account itself, an `identity-service` concern. Soft delete; see [org deletion](#org-deletion). `204`. |
 
 ### Members
 
@@ -521,7 +548,7 @@ Conventions:
 
 | Method | Path | Requires | Notes |
 |---|---|---|---|
-| `POST` | `/orgs/{orgId}/invites` | ADMIN+ | Body `{email, role}`. OWNER may grant `ADMIN`/`DEVELOPER`/`VIEWER`; ADMIN only `DEVELOPER`/`VIEWER`; never `OWNER`. `201` with the `Invite` (never the token). `409` for: already an active member, previously removed, a pending invite exists, pending-invite quota reached. |
+| `POST` | `/orgs/{orgId}/invites` | ADMIN+, `kind = TEAM` only | Body `{email, role}`. OWNER may grant `ADMIN`/`DEVELOPER`/`VIEWER`; ADMIN only `DEVELOPER`/`VIEWER`; never `OWNER`. `201` with the `Invite` (never the token). `409` for: already an active member, previously removed, a pending invite exists, pending-invite quota reached, target org is `PERSONAL` (`PERSONAL_ORG_IMMUTABLE`). |
 | `GET` | `/orgs/{orgId}/invites` | ADMIN+ | Filter `status`; expiry is evaluated at read time (`PENDING` with `expiresAt` in the past reads as `EXPIRED`), so correctness never depends on the sweep. |
 | `POST` | `/orgs/{orgId}/invites/{inviteId}/resend` | ADMIN+ | `PENDING` only. Re-mints a token for the **same** `jti` with a fresh expiry and re-sends. Cooldown between sends and a max send count; `409`/`429` otherwise. |
 | `DELETE` | `/orgs/{orgId}/invites/{inviteId}` | ADMIN+ | `PENDING` → `REVOKED`. `204`. Advisory, not absolute: see [invite acceptance](#invite-acceptance). |
@@ -556,8 +583,10 @@ All extend `AppException` and are rendered by the shared handler; none needs an 
 
 | Code | Status | When |
 |---|---|---|
-| `ORG_NOT_FOUND` | 404 | Path `orgId` differs from the token's, or the org is unknown/deleted. One answer for both, so existence is not leaked. |
-| `NOT_A_MEMBER` | 403 | Caller's membership is missing or `REMOVED`. |
+| `ORG_NOT_FOUND` | 404 | The org is unknown or deleted, **or** no membership row has ever existed for `(sub, orgId)` — indistinguishable, since the caller has no legitimate prior knowledge of the org either way (ADR-0018; see [Authorization model](#authorization-model)). |
+| `PERSONAL_ORG_IMMUTABLE` | 409 | An operation that only makes sense for a `TEAM` org (delete, invite, leave) targeted a `PERSONAL` one. |
+| `EMAIL_CLAIM_MISSING` | 403 | `POST /orgs` from a token without a usable `email` claim; the owner's membership row needs one and this service never looks it up elsewhere. |
+| `NOT_A_MEMBER` | 403 | A membership row exists for `(sub, orgId)` but its status is `REMOVED` — safe to state distinctly, since a row existing at all means the caller genuinely was a member once. |
 | `INSUFFICIENT_ROLE` | 403 | Caller's local role is below the endpoint's requirement. |
 | `REAUTHENTICATION_REQUIRED` | 403 | Sensitive operation with a stale `auth_time`. |
 | `LAST_OWNER` | 409 | An operation would leave the org without its owner. |
@@ -567,21 +596,30 @@ All extend `AppException` and are rendered by the shared handler; none needs an 
 | `INVALID_TOKEN` | 400 | Bad signature, expired, wrong purpose. |
 | `CONCURRENT_MODIFICATION` | 409 | Optimistic-lock loss. |
 | `MEMBER_NOT_FOUND`, `TEAM_NOT_FOUND`, `APP_NOT_FOUND`, `INVITE_NOT_FOUND` | 404 | Scoped to the caller's org. |
-| `SLUG_TAKEN` | 409 | Team or app slug already in use. |
+| `SLUG_TAKEN` | 409 | Team or app slug already in use in the org, or an org slug already in use anywhere. |
 | `INVALID_REGION` | 400 | Region not on the provider's allow-list. |
 
 ## Authorization model
 
-Two gates on every `/orgs/{orgId}/...` request, both local and neither a network call:
+One gate on every `/orgs/{orgId}/...` request, local and never a network call. Per
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md) there is no token
+`org_id` to compare the path against — a valid token can now legitimately address any org its
+holder belongs to, so the **tenant gate** ADR-0016 described (path `orgId` == token `org_id`) is
+gone. What remains, the **membership gate**, was always the real authorization decision and now
+carries the full IDOR-prevention burden alone:
 
-1. **Tenant gate.** `OrgContext.requireOrgId()` must equal the path `orgId`. If not, `404
-   ORG_NOT_FOUND`. This is what stops a caller in org A probing org B's ids (IDOR); it also means
-   a valid token can never address any org but its own.
-2. **Membership gate.** One primary-key read of `(org_id, user_id = token.sub)` joined to the
-   org's status returns the caller's **current local role**, their membership status, and whether
-   the org is live. A missing or `REMOVED` membership is `403 NOT_A_MEMBER`; a deleted org is
-   `404`. The endpoint's requirement (`@PreAuthorize("@access.atLeast(#orgId, 'ADMIN')")`, backed
-   by a request-scoped `AccessContext`) is then checked against **that role**.
+1. **Membership gate.** One query joining `organizations` and `memberships` on `(org_id)` and
+   `(org_id, user_id = token.sub)` returns `{orgStatus, membershipRole, membershipStatus}`.
+   - Org missing or `DELETED`, **or no membership row has ever existed** for `(sub, orgId)` →
+     `404 ORG_NOT_FOUND`. These two cases are made indistinguishable on purpose: a caller who was
+     never a member has no legitimate reason to learn whether a given org id even exists, which is
+     what stops probing another org's ids (IDOR) now that the tenant gate can no longer do it by
+     rejecting every non-own `orgId` outright.
+   - A membership row **exists** but is `REMOVED` → `403 NOT_A_MEMBER`. Safe to state distinctly
+     from `404`, since the row's existence already proves the caller was legitimately a member at
+     some point — nothing is disclosed that they didn't already know.
+   - Otherwise, the endpoint's requirement (`@PreAuthorize("@access.atLeast(#orgId, 'ADMIN')")`,
+     backed by a request-scoped `AccessContext`) is checked against the row's **current role**.
 
 **The token's `realm_access.roles` are not used for this service's decisions.** This reverses the
 first pass of this document, which read roles from the token and accepted a staleness window of up
@@ -644,6 +682,36 @@ sequenceDiagram
         L-->>K: commit, then ack
     end
 ```
+
+### Team org creation
+
+New in [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md): the first
+mutating endpoint in this service that creates an `Organization` outside a Kafka listener, because
+the caller is already a fully authenticated identity needing no Keycloak involvement at all.
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant Ctl as OrgController
+    participant Svc as OrgService
+    participant DB as Postgres
+    participant OB as outbox_events
+
+    C->>Ctl: POST /orgs {name, slug?}
+    Ctl->>Ctl: read sub, email, displayName from the token's own claims
+    Note over Svc,DB: one transaction
+    Svc->>DB: INSERT organizations (kind=TEAM, ACTIVE)
+    Svc->>DB: INSERT memberships (role=OWNER, ACTIVE, email/displayName from the token)
+    Svc->>OB: INSERT OrgMemberAdded, AuditEventRecorded (org.created)
+    Svc-->>Ctl: commit
+    Ctl-->>C: 201 OrgDto
+```
+
+No event is consumed and none needs to be: unlike sign-up's `OrgProvisioned` (which exists because
+`identity-service` must mint a Keycloak account first, asynchronously), a team org's creator
+already has a valid token, so there is nothing to wait on. `OrgMemberAdded` still fires, exactly as
+it does for the founding-owner path, so `notification-service`'s projection stays correct without
+caring which path produced the membership.
 
 ### Membership change (role change, removal, transfer)
 
@@ -807,9 +875,8 @@ payload) goes straight to the DLT.
 | Compensation without a synchronous call | `OrgInviteRejected` makes `identity-service` undo the account it created | Invite acceptance |
 | Serialized membership changes | `SELECT … FOR UPDATE` on the org row (lock root) plus optimistic `version` on aggregates | Members, transfer, delete |
 | Invariants twice | Application policy for messages; partial unique indexes, composite FKs, trigger for correctness | One owner, immutable provider/region, tenant-consistent team members |
-| Stateless-token staleness eliminated locally | Authorization reads the local membership row | Every endpoint |
-| Bounded staleness accepted elsewhere | Token roles reach other services within `accessTokenLifespan` of the sync completing | ADR-0003 |
-| Multi-tenant isolation | Tenant gate + `org_id` on every row/repository method + composite FKs | All |
+| Stateless-token staleness eliminated everywhere | No service trusts a token role or `org_id` claim for an org-scoped decision; every tenant-scoped service resolves its own local membership row instead | ADR-0018, generalizing what this service already did under ADR-0016 |
+| Multi-tenant isolation | Membership gate (own membership row required, indistinguishable 404 otherwise) + `org_id` on every row/repository method + composite FKs | All |
 | Bounded work | Page cap, per-org quotas, batch sizes, retry ceilings | All |
 | Time-driven state | Expiry evaluated at read time; sweep only tidies | Invites |
 | Observability | One trace per request and per consumed event, the outbox hop included; RED metrics plus outbox lag | [Operations](#observability-and-operations) |
@@ -838,8 +905,8 @@ operation) and made observable rather than assumed.
 | Two concurrent invites for one email | Partial unique index: one wins, one `409`. |
 | Two concurrent role changes / a demote racing a transfer | Serialized by the org row lock; the second sees the first's result and is re-validated (`LAST_OWNER`/`INVALID_ROLE_TRANSITION` as applicable). |
 | Removing the owner, demoting the owner, transferring to a non-member | Rejected before any event exists. |
-| `OrgMemberRemoved` published but `identity-service` is down | Kafka retains it; the account is disabled when the consumer returns. Meanwhile this service already denies the person (local check); other services honour their token until it expires or its session is revoked. |
-| Someone invited whose email already has a Pallet account elsewhere | Accept fails at `identity-service` with `409` (email uniqueness); nothing here changes. The invite stays `PENDING` until it expires or is revoked. |
+| `OrgMemberRemoved` published but consumers are down | Kafka retains it; `notification-service`'s projection catches up when its consumer returns. This service already denies the person immediately (local check) regardless — `identity-service` has no consumer for this event at all, per [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md), since removal from one org must never affect the account's ability to log in or use its other orgs. |
+| Someone invited whose email already has a Pallet account elsewhere | No longer a failure (ADR-0018): `identity-service`'s existing-account branch runs, no Keycloak call is made, and `OrgInviteAccepted` arrives carrying that account's existing `userId`. This service's handling is unchanged — it already resolved purely from the invite row and the event's `userId`/`email`. |
 | App deleted while a future deploy is running | Not handled here; `AppDeleted` exists for the consumer that will. Deletion always succeeds locally. |
 | Clock skew between instances | Expiry compares database time (`now()`), not JVM time, for stored deadlines. |
 | Deployment with old and new versions running | Migrations are expand/contract; a new column is nullable or defaulted first, then used, then constrained. Event changes are additive. |
@@ -848,7 +915,7 @@ operation) and made observable rather than assumed.
 
 | Threat | Mitigation |
 |---|---|
-| Caller reads/writes another org's data (IDOR) | Tenant gate (`404` when path org ≠ token org); every repository method takes `orgId`; composite FKs; an ArchUnit test fails the build on a tenant-table repository method without an `orgId` parameter. |
+| Caller reads/writes another org's data (IDOR) | Membership gate: no membership row for `(sub, orgId)` is indistinguishable `404` from an unknown org (ADR-0018); every repository method takes `orgId`; composite FKs; an ArchUnit test fails the build on a tenant-table repository method without an `orgId` parameter. |
 | Privilege escalation (admin grants themselves owner) | Role matrix in `MembershipPolicy`; `OWNER` never assignable outside transfer; ADMIN cannot touch ADMIN/OWNER; DB unique-owner index. |
 | Stale token keeps working after removal/demotion | Authorization on the local row; ADR-0015 revocation for session-level kills; identity sync for other services. |
 | Stolen access token used for destructive action | `auth_time` recency on org delete and ownership transfer; `X-Confirm-Slug` on delete. |
@@ -1085,10 +1152,17 @@ does not). The build plan is
 [`docs/workflows/org-team-service/`](../workflows/org-team-service/00-README.md), sequenced in
 [`docs/workflows/ROADMAP.md`](../workflows/ROADMAP.md) Phase 2.
 
-Two things elsewhere need to follow this document, both scheduled as checkpoint 16 rather than
-left implicit:
+Two things elsewhere needed to follow this document, both scheduled as checkpoint 16 rather than
+left implicit, and both since built:
 
 - `notification-service` needs the `ORG_INVITE` template and its `OrgMembershipEventListener`
   (ADR-0008 reserved the seam but never built the listener; the code confirms it is absent).
 - `identity-service` needs an `OrgInviteRejectedListener`, the same shape as its existing
   `OrgMemberRemovedListener`.
+
+[ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md) adds three more,
+sequenced as checkpoints 17–19 of
+[`docs/workflows/org-team-service/`](../workflows/org-team-service/00-README.md): the `kind`
+column and team-org self-service creation, retiring the tenant gate in favor of the membership gate
+alone, and the `identity-service`-side companion change (the existing-account branch of accept) that
+this service's own `InviteAcceptanceService` needs no code change to support.

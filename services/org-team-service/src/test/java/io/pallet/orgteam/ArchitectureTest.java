@@ -13,6 +13,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import io.pallet.common.test.annotations.UnitTest;
+import io.pallet.orgteam.config.CallerScoped;
 import io.pallet.orgteam.config.CrossTenant;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeAll;
@@ -37,7 +38,7 @@ class ArchitectureTest {
     }
 
     @Test
-    void tenantRepositoryMethodsTakeAnOrgIdOrDeclareThemselvesCrossTenant() {
+    void tenantRepositoryMethodsTakeAnOrgIdOrDeclareTheirScope() {
         methods()
                 .that()
                 .areDeclaredInClassesThat()
@@ -48,7 +49,7 @@ class ArchitectureTest {
                 .and()
                 .areDeclaredInClassesThat()
                 .resideInAnyPackage(TENANT_PACKAGES)
-                .should(takeOrgIdOrBeCrossTenant())
+                .should(takeOrgIdOrDeclareScope())
                 .allowEmptyShould(true)
                 .check(classes);
     }
@@ -130,18 +131,26 @@ class ArchitectureTest {
                         && Arrays.asList(JWT_CLAIM_READERS).contains(call.getName()));
     }
 
-    private static ArchCondition<JavaMethod> takeOrgIdOrBeCrossTenant() {
-        return new ArchCondition<>("declare an orgId parameter or be annotated @CrossTenant") {
+    private static ArchCondition<JavaMethod> takeOrgIdOrDeclareScope() {
+        return new ArchCondition<>(
+                "declare an orgId parameter, be @CallerScoped with a userId parameter, or be @CrossTenant") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 boolean crossTenant = method.isAnnotatedWith(CrossTenant.class);
-                boolean hasOrgId = Arrays.stream(method.reflect().getParameters())
-                        .anyMatch(parameter -> parameter.getName().equals("orgId"));
-                if (!crossTenant && !hasOrgId) {
-                    events.add(SimpleConditionEvent.violated(
-                            method, method.getFullName() + " has no orgId parameter and is not @CrossTenant"));
+                boolean callerScoped = method.isAnnotatedWith(CallerScoped.class) && hasParameter(method, "userId");
+                if (!crossTenant && !callerScoped && !hasParameter(method, "orgId")) {
+                    events.add(
+                            SimpleConditionEvent.violated(
+                                    method,
+                                    method.getFullName()
+                                            + " has no orgId parameter and is neither @CallerScoped on a userId nor @CrossTenant"));
                 }
             }
         };
+    }
+
+    private static boolean hasParameter(JavaMethod method, String name) {
+        return Arrays.stream(method.reflect().getParameters())
+                .anyMatch(parameter -> parameter.getName().equals(name));
     }
 }

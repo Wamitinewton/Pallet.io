@@ -8,6 +8,7 @@ import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
+import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
 import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
@@ -52,6 +53,9 @@ public class OrgDeletionService {
     @Transactional
     public void delete(String orgId, String actorUserId, String confirmedSlug) {
         Organization org = organizations.lockById(orgId).orElseThrow(OrgNotFoundException::new);
+        if (org.getKind() == OrgKind.PERSONAL) {
+            throw new PersonalOrgImmutableException();
+        }
         if (org.getStatus() != OrgStatus.ACTIVE) {
             throw new OrgNotFoundException();
         }

@@ -21,6 +21,7 @@ import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
+import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.OrgStatus;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
@@ -61,7 +62,8 @@ class TeamServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(organizations.lockById(ORG)).thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", NOW)));
+        when(organizations.lockById(ORG))
+                .thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", OrgKind.TEAM, NOW)));
         seedMember(ADMIN, Role.ADMIN);
         service = new TeamService(
                 new OrgGuard(organizations, memberships),
@@ -172,7 +174,7 @@ class TeamServiceTest {
 
     @Test
     void aDeletedOrOrphanedOrgIsNotFound() {
-        Organization deleted = new Organization("gone", "Gone", "gone", "owner", NOW);
+        Organization deleted = new Organization("gone", "Gone", "gone", "owner", OrgKind.TEAM, NOW);
         ReflectionTestUtils.setField(deleted, "status", OrgStatus.DELETED);
         when(organizations.lockById("gone")).thenReturn(Optional.of(deleted));
 

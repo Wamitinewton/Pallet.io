@@ -1,6 +1,8 @@
 package io.pallet.orgteam.org;
 
 import io.pallet.common.api.ApiResponse;
+import io.pallet.common.api.PageQuery;
+import io.pallet.common.api.PageResponse;
 import io.pallet.common.error.ErrorResponse;
 import io.pallet.orgteam.docs.ApiDocs;
 import io.pallet.orgteam.security.AccessContext;
@@ -12,12 +14,15 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/org-team/orgs")
-@Tag(name = "Organizations", description = "Read, rename and delete the caller's organization.")
+@Tag(name = "Organizations", description = "Create, list, read, rename and delete the caller's organizations.")
 class OrgController {
 
     private final OrgService orgService;
@@ -42,6 +47,34 @@ class OrgController {
         this.deletionService = deletionService;
         this.accessResolver = accessResolver;
         this.recentAuthentication = recentAuthentication;
+    }
+
+    @PostMapping
+    @Operation(
+            summary = "Create a team organization",
+            description = "Creates a TEAM organization owned by the caller. The slug is derived from the name when "
+                    + "omitted and must be unique across every organization. " + ApiDocs.ANY_ACCOUNT
+                    + ApiDocs.RETRY_CONFLICTS,
+            responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "409",
+                        description = "SLUG_TAKEN",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            })
+    ResponseEntity<ApiResponse<OrgDto>> create(@Valid @RequestBody CreateOrgRequest request) {
+        OrgDto org = orgService.createTeamOrg(accessResolver.caller(), request.name(), request.slug());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Organization created", org));
+    }
+
+    @GetMapping
+    @Operation(
+            summary = "List my organizations",
+            description = "Every organization the caller is an active member of, personal and team, with the "
+                    + "caller's role in each. The personal organization comes first by default. " + ApiDocs.ANY_ACCOUNT)
+    ApiResponse<PageResponse<OrgSummaryDto>> listMine(@ModelAttribute PageQuery pageQuery) {
+        return ApiResponse.ok(
+                "Organizations retrieved",
+                orgService.listMyOrgs(accessResolver.caller().userId(), pageQuery));
     }
 
     @GetMapping("/{orgId}")
@@ -68,7 +101,7 @@ class OrgController {
     @PreAuthorize("@access.isOwner(#orgId)")
     @Operation(
             summary = "Delete an organization",
-            description = "Soft-deletes the organization: every member is removed, pending invites are revoked and "
+            description = "Soft-deletes a TEAM organization: every member is removed, pending invites are revoked and "
                     + "apps are deleted. " + ApiDocs.OWNER + ApiDocs.RECENT_AUTH
                     + " The X-Confirm-Slug header must equal the organization's slug.",
             responses = {
@@ -80,6 +113,10 @@ class OrgController {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "400",
                         description = "CONFIRMATION_MISMATCH: X-Confirm-Slug is missing or wrong",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "409",
+                        description = "PERSONAL_ORG_IMMUTABLE: a personal organization is never deleted here",
                         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
             })
     ResponseEntity<Void> delete(

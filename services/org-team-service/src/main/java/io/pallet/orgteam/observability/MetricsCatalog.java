@@ -56,7 +56,7 @@ public final class MetricsCatalog {
     public static final String KIND_BROKER = "broker";
     public static final String KIND_ROW = "row";
 
-    public static final String DENIED_ORG_MISMATCH = "org_mismatch";
+    public static final String DENIED_NO_MEMBERSHIP = "no_membership";
     public static final String DENIED_ORG_NOT_FOUND = "org_not_found";
     public static final String DENIED_NOT_A_MEMBER = "not_a_member";
     public static final String DENIED_INSUFFICIENT_ROLE = "insufficient_role";

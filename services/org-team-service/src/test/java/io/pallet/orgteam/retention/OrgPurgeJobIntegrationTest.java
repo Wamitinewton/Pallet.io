@@ -138,8 +138,8 @@ class OrgPurgeJobIntegrationTest {
         orgIds.add(orgId);
         jdbc.update("""
                         INSERT INTO org_team.organizations
-                            (org_id, name, slug, owner_user_id, status, deleted_at)
-                        VALUES (?, 'Acme', ?, ?, ?,
+                            (org_id, name, slug, owner_user_id, kind, status, deleted_at)
+                        VALUES (?, 'Acme', ?, ?, 'TEAM', ?,
                                 CASE WHEN ? = 'DELETED' THEN now() - make_interval(days => ?) END)
                         """, orgId, "slug-" + orgId, "owner-" + orgId, status, status, deletedDaysAgo);
         String memberStatus = "DELETED".equals(status) ? "REMOVED" : "ACTIVE";
