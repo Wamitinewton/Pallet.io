@@ -26,7 +26,7 @@
     <!-- The DNS-1123 label pattern uses a fixed literal separator between quantified groups, so it
          cannot backtrack catastrophically; request lengths are also capped by @Size. -->
     <Match>
-        <Class name="~io\.pallet\.orgteam\.(support\.Slugs|app\.CreateAppRequest|team\.CreateTeamRequest)"/>
+        <Class name="~io\.pallet\.orgteam\.(support\.Slugs|app\.CreateAppRequest|org\.CreateOrgRequest|team\.CreateTeamRequest)"/>
         <Bug pattern="REDOS"/>
     </Match>
     <!-- Emails, header names and slugs are compared or folded for matching only, never used as an
