@@ -1739,15 +1739,19 @@ investigate an installation stuck `SUSPENDED`; rotate the user session encryptio
 
 | Data | Retention | Mechanism |
 |---|---|---|
-| `webhook_deliveries.payload` | 7 days | nulled by sweep |
-| `webhook_deliveries` rows | 30 days | sweep |
+| `webhook_deliveries.payload` | 7 days | nulled by sweep, hourly; every status but `RECEIVED`, so a parked delivery loses its payload too |
+| `webhook_deliveries` rows | 30 days | sweep; `RECEIVED` and `PARKED` rows are never deleted |
 | `outbox_events` published | 7 days | sweep |
 | `processed_events` | 14 days | sweep |
 | `authorization_states` | 1 day after expiry | sweep |
+| `manual_build_requests` | 7 days | sweep |
+| `check_runs` completed with nothing left to report | 30 days | sweep |
 | GitHub user sessions | at most 1 hour | Redis TTL |
-| `DISCONNECTED` repo links, `UNLINKED` installation links, `DELETED` installations | 90 days | sweep, keeping an audit event |
+| `DISCONNECTED` repo links, `UNLINKED` installation links, `DELETED` installations | 90 days | sweep, keeping an audit event; each only once nothing references it |
+| `DELETED` apps in the read model | 90 days | sweep, once no repo link references them |
+| `deleted_orgs` | 90 days | sweep, once no membership of the org is still `ACTIVE` |
 
-The outbox and inbox windows are `pallet.outbox.retention` and `pallet.inbox.retention`; every other window is `pallet.git.retention.*`. Sweeps run batched under the advisory-lock discipline.
+The outbox and inbox windows are `pallet.outbox.retention` and `pallet.inbox.retention`; every other window is `pallet.git.retention.*`. Each sweep runs single-active under its own advisory lock, in transactions of at most `batch-size` rows locked `SKIP LOCKED` with the outbox's `lock-timeout`, referencing rows before the rows they reference; a row still referenced is guarded, never cascaded from its parent.
 
 ## Component view
 
@@ -1940,8 +1944,10 @@ third-party API with rate limits, which is exactly what `PROJECT.md` said it wou
 | `pallet.git.checks.enabled` / `poll-interval` / `batch-size` / `lease` / `parallelism` / `max-attempts` | `true` / `PT2S` / `50` / `PT2M` / `4` / `20` | Check run reporter: whether it runs, how often, rows leased per cycle and for how long, installations written in parallel, and attempts before a check run is given up. Backoff and rate-limit jitter are `delivery.*`'s. |
 | `pallet.git.checks.await-deploy` | `false` | Whether a successful build waits for its deploy before completing the check. Off until `deploy-orchestrator-service` publishes `DeployStateChanged` with `appId` and `commitSha`. |
 | `pallet.outbox.*`, `pallet.inbox.retention` | as in `org-team-service`; `schema: git_integration`, `metrics-prefix: git`, `advisory-lock-key: 7305121409` | `platform-common-outbox` relay and inbox (ADR-0020). |
+| `pallet.git.retention.enabled` / `payload-sweep-interval` / `sweep-interval` / `batch-size` / `max-batches-per-run` | `true` / `PT1H` / `P1D` / `1000` / `1000` | Retention sweeps: whether they run, how often payloads are nulled, how often every other sweep runs, rows per transaction, and transactions per sweep run. |
 | `pallet.git.retention.delivery-payload` / `deliveries` | `P7D` / `P30D` | Webhook payload nulling and delivery row retention. |
-| `pallet.git.retention.authorization-states` / `terminal-connections` / `sweep-batch-size` | `P1D` / `P90D` / `500` | Expired states; `DISCONNECTED` links, `UNLINKED` installation links and `DELETED` installations; rows per sweep batch. |
+| `pallet.git.retention.authorization-states` / `manual-build-requests` / `check-runs` | `P1D` / `P7D` / `P30D` | Expired states; manual build requests; completed, fully reported check runs. |
+| `pallet.git.retention.terminal-connections` / `deleted-apps` / `deleted-orgs` | `P90D` / `P90D` / `P90D` | `DISCONNECTED` links, `UNLINKED` installation links and `DELETED` installations; `DELETED` apps in the read model; `deleted_orgs`. |
 | `pallet.resilience.policies.github-api` / `github-user` | see [Talking to GitHub](#talking-to-github) | Named policies. |
 
 ## Changes this design needs elsewhere

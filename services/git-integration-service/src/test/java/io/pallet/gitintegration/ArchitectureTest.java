@@ -35,7 +35,7 @@ class ArchitectureTest {
      * Tenant tables and the packages whose repositories map them. {@code installation} holds GitHub-keyed tables too,
      * so there only the {@code InstallationLink} repository is tenant-scoped.
      */
-    private static final Set<String> TENANT_PACKAGES = Set.of("repolink", "push", "checks", "projection");
+    private static final Set<String> TENANT_PACKAGES = Set.of("repolink", "push", "checks", "projection", "retention");
 
     private static final String TENANT_INSTALLATION_REPOSITORY = "InstallationLinkRepository";
 

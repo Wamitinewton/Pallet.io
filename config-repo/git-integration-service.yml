@@ -127,11 +127,19 @@ pallet:
       # until then a successful build completes the check, or every check would wait for a deploy forever.
       await-deploy: false
     retention:
+      enabled: true
+      payload-sweep-interval: PT1H
+      sweep-interval: P1D
+      batch-size: 1000
+      max-batches-per-run: 1000
       delivery-payload: P7D
       deliveries: P30D
       authorization-states: P1D
+      manual-build-requests: P7D
+      check-runs: P30D
       terminal-connections: P90D
-      sweep-batch-size: 500
+      deleted-apps: P90D
+      deleted-orgs: P90D
 
 springdoc:
   api-docs:

@@ -82,6 +82,15 @@ class GitIntegrationPropertiesTest {
             assertThat(properties.retention().deliveries()).isEqualTo(Duration.ofDays(30));
             assertThat(properties.retention().authorizationStates()).isEqualTo(Duration.ofDays(1));
             assertThat(properties.retention().terminalConnections()).isEqualTo(Duration.ofDays(90));
+            assertThat(properties.retention().enabled()).isTrue();
+            assertThat(properties.retention().payloadSweepInterval()).isEqualTo(Duration.ofHours(1));
+            assertThat(properties.retention().sweepInterval()).isEqualTo(Duration.ofDays(1));
+            assertThat(properties.retention().batchSize()).isEqualTo(1000);
+            assertThat(properties.retention().maxBatchesPerRun()).isEqualTo(1000);
+            assertThat(properties.retention().manualBuildRequests()).isEqualTo(Duration.ofDays(7));
+            assertThat(properties.retention().checkRuns()).isEqualTo(Duration.ofDays(30));
+            assertThat(properties.retention().deletedApps()).isEqualTo(Duration.ofDays(90));
+            assertThat(properties.retention().deletedOrgs()).isEqualTo(Duration.ofDays(90));
         });
     }
 

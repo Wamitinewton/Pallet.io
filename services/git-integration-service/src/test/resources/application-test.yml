@@ -64,6 +64,8 @@ pallet:
       enabled: false
     checks:
       enabled: false
+    retention:
+      enabled: false
 
 springdoc:
   api-docs:
