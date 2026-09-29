@@ -14,6 +14,7 @@ import io.pallet.common.events.Topics;
 import io.pallet.common.resilience.ResilienceRegistries;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
+import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.common.test.json.JsonTestSupport;
 import io.pallet.identity.keycloak.KeycloakAdminTestConfiguration;
 import io.pallet.identity.signup.SignupRequest;
@@ -40,6 +41,7 @@ import tools.jackson.databind.JsonNode;
 @Import({
     KeycloakTestContainerConfiguration.class,
     KeycloakAdminTestConfiguration.class,
+    RedisTestContainerConfiguration.class,
     AuthControllerIntegrationTest.EventCaptureConfiguration.class
 })
 class AuthControllerIntegrationTest {

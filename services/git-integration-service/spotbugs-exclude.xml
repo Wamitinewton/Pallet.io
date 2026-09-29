@@ -60,4 +60,13 @@
         <Class name="io.pallet.gitintegration.push.PushEventFactory"/>
         <Bug pattern="WEAK_MESSAGE_DIGEST_SHA1"/>
     </Match>
+    <!-- Case-insensitive comparison of ASCII-only values: GitHub logins and the canonical UUID form of a delivery id.
+         No Unicode case mapping is involved. -->
+    <Match>
+        <Or>
+            <Class name="io.pallet.gitintegration.access.AccessReverifier"/>
+            <Class name="io.pallet.gitintegration.recovery.RedeliverySweeper"/>
+        </Or>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
 </FindBugsFilter>

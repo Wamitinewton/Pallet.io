@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.pallet.common.events.AppCreated;
 import io.pallet.common.events.AppDeleted;
 import io.pallet.common.events.AuditEventRecorded;
+import io.pallet.common.events.BuildFailed;
+import io.pallet.common.events.BuildStarted;
+import io.pallet.common.events.BuildSucceeded;
 import io.pallet.common.events.DeployStateChanged;
 import io.pallet.common.events.GitPushReceived;
 import io.pallet.common.events.NotificationRequested;
@@ -49,7 +52,10 @@ class OutboxEventTypesConfigurationTest {
             UserProfileUpdated.class,
             OrgMembershipChanged.class,
             DeployStateChanged.class,
-            GitPushReceived.class);
+            GitPushReceived.class,
+            BuildStarted.class,
+            BuildSucceeded.class,
+            BuildFailed.class);
 
     private final OutboxEventTypes eventTypes = new OutboxEventTypesConfiguration().outboxEventTypes();
 
