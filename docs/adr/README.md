@@ -22,6 +22,12 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0014](0014-openapi-docs-aggregation.md) | OpenAPI documentation via `platform-common-openapi` and a gateway docs hub | accepted |
 | [0015](0015-session-revocation.md) | Platform-wide session revocation via `RevokedSessionRegistry` | accepted |
 | [0016](0016-org-team-service-production-design.md) | org-team-service: transactional outbox and inbox, local-row authorization, invite-rejection compensation | accepted |
+| [0017](0017-outbox-commit-order-and-relay-lock-timeout.md) | Outbox relay: commit-order delivery and bounded lock waits | accepted |
+| [0018](0018-multi-org-per-account-and-per-request-authorization.md) | Multi-org-per-account and per-request org authorization | accepted |
+| [0019](0019-membership-state-topic.md) | Compacted `org.membership.changed` topic for local membership read models | accepted |
+| [0020](0020-shared-transactional-outbox-and-inbox.md) | Transactional outbox and inbox extracted into `platform-common-outbox` | accepted |
+| [0021](0021-github-app-source-host-integration.md) | GitHub App (not OAuth App) as Pallet's source-host integration, shared installations, per-repository verification | accepted |
+| [0022](0022-durable-webhook-intake-with-active-recovery.md) | Durable webhook intake: persist-then-acknowledge in Postgres, the chain rule for order, active recovery because GitHub never redelivers | accepted |
 
 ## Still open (from `PROJECT.md`)
 

@@ -1,0 +1,11 @@
+{
+  "action": "revoked",
+  "sender": {
+    "login": "fixture-dev",
+    "id": 9100001,
+    "node_id": "U_kgDOAIrfYQ",
+    "type": "User",
+    "html_url": "https://github.com/fixture-dev",
+    "site_admin": false
+  }
+}

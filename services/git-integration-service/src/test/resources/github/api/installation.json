@@ -1,0 +1,11 @@
+{
+  "id": {{request.pathSegments.[2]}},
+  "account": {
+    "login": "octo-org",
+    "id": 5001,
+    "type": "Organization"
+  },
+  "repository_selection": "selected",
+  "permissions": { "checks": "write", "contents": "read", "metadata": "read" },
+  "suspended_at": null
+}

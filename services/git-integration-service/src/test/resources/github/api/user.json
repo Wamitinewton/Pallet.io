@@ -1,0 +1,9 @@
+{
+  "login": "fixture-dev",
+  "id": 9100001,
+  "node_id": "U_kgDOAIrfYQ",
+  "type": "User",
+  "site_admin": false,
+  "name": "Fixture Developer",
+  "email": "fixture-dev@example.com"
+}

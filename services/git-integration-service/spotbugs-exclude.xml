@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <!-- Rethrow the listener's RuntimeException unchanged after counting it, so the Kafka error handler
+         still sees the exact type that decides retry versus dead-letter. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.projection.ProjectionMetrics"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <Match>
+        <Class name="io.pallet.gitintegration.checks.CheckRunMetrics"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- Rethrows the exception the response was classified into, unchanged, so ExternalCall's breaker and retry see
+         the exact type that decides whether the failure counts against GitHub. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.github.GitHubHttp"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- The webhook's headers come from GitHub, or from anyone: each is read only to be checked (the signature against
+         the configured secrets, the content type and delivery headers against fixed rules, the event name against a
+         fixed set before it becomes a metric tag), never trusted as-is. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.webhook.WebhookController"/>
+        <Or>
+            <Bug pattern="SERVLET_HEADER"/>
+            <Bug pattern="SERVLET_CONTENT_TYPE"/>
+        </Or>
+    </Match>
+    <!-- A failure before any delivery was claimed (the claim query itself) is rethrown unchanged so the poll ends the
+         cycle; once a delivery is claimed, every failure becomes that delivery's recorded outcome instead. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.delivery.DeliveryProcessor"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- Control flow between a handler and the processor on one thread; never serialized. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.delivery.NeedsGitHub"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
+    <!-- UUIDv5 is defined over SHA-1; the digest derives a deterministic event id and protects nothing. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.push.PushEventFactory"/>
+        <Bug pattern="WEAK_MESSAGE_DIGEST_SHA1"/>
+    </Match>
+</FindBugsFilter>

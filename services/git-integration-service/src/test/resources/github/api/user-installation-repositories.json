@@ -1,0 +1,21 @@
+{
+  "total_count": 4,
+  "repositories": [
+    {
+      "id": 42, "full_name": "octo-org/api", "default_branch": "main", "private": true, "archived": false,
+      "permissions": { "admin": false, "maintain": false, "push": true, "triage": true, "pull": true }
+    },
+    {
+      "id": 43, "full_name": "octo-org/web", "default_branch": "main", "private": true, "archived": false,
+      "permissions": { "admin": false, "maintain": true, "push": true, "triage": true, "pull": true }
+    },
+    {
+      "id": 45, "full_name": "octo-org/legacy", "default_branch": "master", "private": false, "archived": true,
+      "permissions": { "admin": true, "maintain": true, "push": true, "triage": true, "pull": true }
+    },
+    {
+      "id": 46, "full_name": "octo-org/api-docs", "default_branch": "gh-pages", "private": false, "archived": false,
+      "permissions": { "admin": false, "maintain": false, "push": false, "triage": false, "pull": true }
+    }
+  ]
+}
