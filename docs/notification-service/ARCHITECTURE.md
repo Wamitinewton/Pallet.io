@@ -513,6 +513,10 @@ flowchart LR
   through the same `ChannelRouter` → `OrgRateLimiter` path. This decouples *ingestion speed*
   (bounded only by Kafka consumer throughput) from *delivery pacing* (bounded by each org's
   quota) — the two were conflated in a naive "rate-limit the listener" design and shouldn't be.
+  Each sweep first claims its batch in one statement (`THROTTLED` → `PENDING` over
+  `FOR UPDATE SKIP LOCKED`), so concurrent sweeps on several replicas never send the same row
+  twice. A pod that dies between the claim and the send leaves its claimed rows `PENDING`, the
+  same gap a fresh fan-out already has.
 - The same `OrgRateLimiter` registry can gate the read API too (a per-org or per-user request
   cap on `GET /api/v1/notification/notifications`) using Resilience4j's standard Spring MVC integration —
   worth adding once real traffic shows it's needed; the registry already exists either way.

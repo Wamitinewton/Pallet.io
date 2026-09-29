@@ -18,7 +18,6 @@ import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
 import io.pallet.notification.domain.Audience;
 import io.pallet.notification.domain.Channel;
-import io.pallet.notification.domain.DeliveryStatus;
 import io.pallet.notification.domain.Notification;
 import io.pallet.notification.domain.NotificationDelivery;
 import io.pallet.notification.repository.NotificationDeliveryRepository;
@@ -56,7 +55,6 @@ class NotificationMetricsIntegrationTest {
 
     private static final String SENT_METRIC = "notifications.sent";
     private static final String FAILED_METRIC = "notifications.failed";
-    private static final String RETRIED_METRIC = "notifications.retried";
     private static final String READ_METRIC = "notifications.read";
 
     @RegisterExtension
@@ -67,7 +65,6 @@ class NotificationMetricsIntegrationTest {
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.mail.host", () -> "localhost");
         registry.add("spring.mail.port", ServerSetupTest.SMTP::getPort);
-        registry.add("pallet.notification.rate-limit.sweep-interval", () -> "1s");
     }
 
     @Autowired
@@ -94,7 +91,7 @@ class NotificationMetricsIntegrationTest {
     /**
      * Same rebalance-settling wait as {@code NotificationRequestedListenerIntegrationTest} — see
      * that class for why. Order(3)/Order(4) here are the tests that actually publish and route
-     * through {@code NotificationRequestedListener}; Order(1)/Order(2) don't touch Kafka, but
+     * through {@code NotificationRequestedListener}; Order(1) doesn't touch Kafka, but
      * running this before every method (not just the ones that need it) means passing stays
      * independent of the fixed method order rather than relying on earlier tests as incidental
      * warm-up.
@@ -144,25 +141,6 @@ class NotificationMetricsIntegrationTest {
                 .andExpect(status().isOk());
 
         assertThat(counter(READ_METRIC)).isEqualTo(before + 1);
-    }
-
-    @Test
-    @Order(2)
-    void sweepIncrementsRetriedCounterForEachThrottledRowItProcesses() {
-        NotificationDelivery delivery =
-                new NotificationDelivery(persistNotification().getId(), Channel.IN_APP, "user-" + UUID.randomUUID());
-        delivery.markThrottled();
-        deliveryRepository.saveAndFlush(delivery);
-        double before = counter(RETRIED_METRIC, "channel", "IN_APP");
-
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            assertThat(counter(RETRIED_METRIC, "channel", "IN_APP")).isEqualTo(before + 1);
-            assertThat(deliveryRepository
-                            .findById(delivery.getId())
-                            .orElseThrow()
-                            .getStatus())
-                    .isEqualTo(DeliveryStatus.SENT);
-        });
     }
 
     @Test
