@@ -17,8 +17,9 @@ spring:
   task:
     scheduling:
       pool:
-        # The delivery poll can hold its thread through a GitHub call; the outbox relay and the gauges must not wait on it.
-        size: 7
+        # The delivery poll can hold its thread through a GitHub call, and the daily jobs and retention sweeps through a
+        # long run; the outbox relay and the gauges must not wait on them.
+        size: 9
   datasource:
     hikari:
       # GitHub abandons a webhook after 10s; with Postgres unreachable the handler must answer 503 well before that.

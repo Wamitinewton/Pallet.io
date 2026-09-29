@@ -230,10 +230,26 @@ public record GitIntegrationProperties(
             @Positive @DefaultValue("20") int maxAttempts,
             @DefaultValue("false") boolean awaitDeploy) {}
 
+    /**
+     * Unless disabled, payloads are nulled every {@code payloadSweepInterval} and every other sweep runs every
+     * {@code sweepInterval}. A sweep deletes in transactions of at most {@code batchSize} rows, at most
+     * {@code maxBatchesPerRun} of them per run. {@code terminalConnections} covers {@code DISCONNECTED} repo links,
+     * {@code UNLINKED} installation links and {@code DELETED} installations.
+     */
     public record Retention(
+            @DefaultValue("true") boolean enabled,
+
+            @NotNull @PositiveDuration @DefaultValue("PT1H") Duration payloadSweepInterval,
+
+            @NotNull @PositiveDuration @DefaultValue("P1D") Duration sweepInterval,
+            @Positive @DefaultValue("1000") int batchSize,
+            @Positive @DefaultValue("1000") int maxBatchesPerRun,
             @NotNull @PositiveDuration @DefaultValue("P7D") Duration deliveryPayload,
             @NotNull @PositiveDuration @DefaultValue("P30D") Duration deliveries,
             @NotNull @PositiveDuration @DefaultValue("P1D") Duration authorizationStates,
+            @NotNull @PositiveDuration @DefaultValue("P7D") Duration manualBuildRequests,
+            @NotNull @PositiveDuration @DefaultValue("P30D") Duration checkRuns,
             @NotNull @PositiveDuration @DefaultValue("P90D") Duration terminalConnections,
-            @Positive @DefaultValue("500") int sweepBatchSize) {}
+            @NotNull @PositiveDuration @DefaultValue("P90D") Duration deletedApps,
+            @NotNull @PositiveDuration @DefaultValue("P90D") Duration deletedOrgs) {}
 }
