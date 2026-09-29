@@ -1,0 +1,140 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
+    username: ${POSTGRES_USER:pallet}
+    password: ${POSTGRES_PASSWORD:pallet}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    consumer:
+      group-id: git-integration-service
+
+pallet:
+  outbox:
+    schema: git_integration
+    metrics-prefix: git
+    advisory-lock-key: 7305121409
+    poll-interval: PT0.25S
+    batch-size: 100
+    max-attempts: 10
+    retention: P7D
+    broker-backoff-initial: PT1S
+    broker-backoff-max: PT30S
+    row-backoff-max: PT60S
+    lock-timeout: PT5S
+  inbox:
+    retention: P14D
+  resilience:
+    policies:
+      github-api:
+        time-limiter: { timeout: 10s }
+        retry: { max-attempts: 3, wait-duration: 500ms, max-wait-duration: 5s }
+        circuit-breaker: { sliding-window-size: 20, minimum-number-of-calls: 10, failure-rate-threshold: 50, wait-duration-in-open-state: 30s }
+      # Separate breaker: GitHub's OAuth endpoint or one user's token failing must not stop pushes being processed.
+      github-user:
+        time-limiter: { timeout: 10s }
+        retry: { max-attempts: 2, wait-duration: 500ms }
+        circuit-breaker: { sliding-window-size: 20, minimum-number-of-calls: 10, failure-rate-threshold: 50, wait-duration-in-open-state: 30s }
+  git:
+    github:
+      app-id: ${PALLET_GIT_GITHUB_APP_ID:local-app-id}
+      client-id: ${PALLET_GIT_GITHUB_CLIENT_ID:local-client-id}
+      app-slug: ${PALLET_GIT_GITHUB_APP_SLUG:pallet-local}
+      client-secret: ${PALLET_GIT_GITHUB_CLIENT_SECRET}
+      private-key: ${PALLET_GIT_GITHUB_PRIVATE_KEY}
+      webhook-secrets:
+        - ${PALLET_GIT_WEBHOOK_SECRET}
+        - ${PALLET_GIT_WEBHOOK_SECRET_PREVIOUS:}
+      api-base-url: ${PALLET_GIT_GITHUB_API_BASE_URL:https://api.github.com}
+      web-base-url: ${PALLET_GIT_GITHUB_WEB_BASE_URL:https://github.com}
+      connect-timeout: PT5S
+      read-timeout: PT10S
+    authorization:
+      state-signing-key: ${PALLET_GIT_STATE_SIGNING_KEY}
+      state-ttl: PT10M
+    user-session:
+      encryption-key: ${PALLET_GIT_USER_SESSION_KEY}
+      max-ttl: PT1H
+    link:
+      min-repo-permission: push
+      max-installation-pages: 10
+      max-picker-pages: 10
+    repository-sync:
+      max-pages: 100
+      workers: 2
+      queue-capacity: 100
+      periodic: true
+      interval: P1D
+      max-per-run: 1000
+    reverify:
+      enabled: true
+      interval: P1D
+      max-per-run: 5000
+      min-age: PT12H
+      metrics-interval: PT1M
+    unused-installation:
+      grace: P30D
+      enabled: true
+      sweep-interval: P1D
+      max-per-run: 100
+      metrics-interval: PT1M
+    manual-builds-per-hour: 30
+    webhook:
+      max-body: 25MB
+      github-ip-allowlist:
+        enabled: false
+    delivery:
+      enabled: true
+      poll-interval: PT0.25S
+      batch-size: 50
+      max-attempts: 10
+      workers: 1
+      lease: PT30S
+      max-lookup-rounds: 3
+      backoff-base: PT1S
+      backoff-max: PT10M
+      unavailable-backoff-max: PT5M
+      rate-limit-jitter: PT5S
+      metrics-interval: PT15S
+    redelivery:
+      enabled: true
+      interval: PT5M
+      lookback: PT24H
+      overlap: PT10M
+      max-per-run: 100
+      max-pages: 50
+    reconciler:
+      enabled: true
+      interval: PT15M
+      max-per-run: 500
+    ratelimit:
+      reserve: 500
+    tokens:
+      refresh-skew: PT5M
+      max-cached: 10000
+    push:
+      skip-markers: ["[skip ci]", "[ci skip]", "[pallet skip]"]
+    checks:
+      enabled: true
+      poll-interval: PT2S
+      batch-size: 50
+      lease: PT2M
+      parallelism: 4
+      max-attempts: 20
+      # On only once deploy-orchestrator-service publishes deploy.state.changed with appId and commitSha;
+      # until then a successful build completes the check, or every check would wait for a deploy forever.
+      await-deploy: false
+    retention:
+      delivery-payload: P7D
+      deliveries: P30D
+      authorization-states: P1D
+      terminal-connections: P90D
+      sweep-batch-size: 500
+
+springdoc:
+  api-docs:
+    path: /git-integration/v3/api-docs
+  swagger-ui:
+    enabled: false

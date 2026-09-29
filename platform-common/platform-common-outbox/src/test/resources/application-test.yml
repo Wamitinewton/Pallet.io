@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: outbox-test
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+  flyway:
+    schemas: outbox_test
+    default-schema: outbox_test
+  kafka:
+    consumer:
+      group-id: outbox-test-${random.uuid}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      properties:
+        max.block.ms: 3000
+        request.timeout.ms: 2000
+        delivery.timeout.ms: 3000
+  task:
+    scheduling:
+      pool:
+        size: 2
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      export:
+        enabled: false
+    metrics:
+      export:
+        enabled: false
+
+pallet:
+  outbox:
+    schema: outbox_test
+    metrics-prefix: outboxtest
+    advisory-lock-key: 7305121499
+    enabled: false
+    max-attempts: 3
+  messaging:
+    create-topics: true
+    topic-replicas: 1
+    topic-partitions: 1
+    publish:
+      send-timeout: 3s
+    retry:
+      max-attempts: 30
+      initial-interval: 100ms
+      multiplier: 1.5
+      max-interval: 500ms

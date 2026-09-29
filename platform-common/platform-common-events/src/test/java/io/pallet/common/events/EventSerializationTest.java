@@ -18,7 +18,16 @@ class EventSerializationTest {
         JsonNode tree = json.readTree(json.writeValueAsString(event));
         assertThat(tree.propertyNames())
                 .containsExactlyInAnyOrder(
-                        "eventId", "eventType", "orgId", "occurredAt", "deploymentId", "fromState", "toState");
+                        "eventId",
+                        "eventType",
+                        "orgId",
+                        "occurredAt",
+                        "deploymentId",
+                        "fromState",
+                        "toState",
+                        "appId",
+                        "commitSha",
+                        "url");
 
         assertThat(json.readValue(json.writeValueAsString(event), DeployStateChanged.class))
                 .isEqualTo(event);

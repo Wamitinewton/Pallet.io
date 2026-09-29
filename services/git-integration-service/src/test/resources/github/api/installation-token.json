@@ -1,0 +1,4 @@
+{
+  "token": "ghs_{{randomValue length=36 type='ALPHANUMERIC'}}",
+  "expires_at": "{{now offset='1 hours'}}"
+}

@@ -1,0 +1,75 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+  cloud:
+    config:
+      enabled: false
+  kafka:
+    consumer:
+      group-id: git-integration-service-test-${random.uuid}
+      auto-offset-reset: earliest
+    producer:
+      properties:
+        max.block.ms: 3000
+        request.timeout.ms: 2000
+        delivery.timeout.ms: 3000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:1/not-used-in-tests
+
+pallet:
+  messaging:
+    publish:
+      send-timeout: 3s
+  resilience:
+    policies:
+      github-api:
+        time-limiter: { timeout: 2s }
+        retry: { max-attempts: 3, wait-duration: 20ms, max-wait-duration: 50ms }
+        circuit-breaker: { sliding-window-size: 20, minimum-number-of-calls: 10, failure-rate-threshold: 50, wait-duration-in-open-state: 30s }
+      github-user:
+        time-limiter: { timeout: 2s }
+        retry: { max-attempts: 2, wait-duration: 20ms }
+        circuit-breaker: { sliding-window-size: 20, minimum-number-of-calls: 10, failure-rate-threshold: 50, wait-duration-in-open-state: 30s }
+  outbox:
+    schema: git_integration
+    metrics-prefix: git
+    advisory-lock-key: 7305121409
+    enabled: true
+  git:
+    github:
+      app-id: "1"
+      client-id: test-client-id
+      app-slug: pallet-test
+      api-base-url: http://localhost:1
+      web-base-url: http://localhost:1
+    webhook:
+      max-body: 1MB
+    delivery:
+      enabled: false
+      max-attempts: 3
+    repository-sync:
+      periodic: false
+    redelivery:
+      enabled: false
+    reconciler:
+      enabled: false
+    reverify:
+      enabled: false
+    unused-installation:
+      enabled: false
+    checks:
+      enabled: false
+
+springdoc:
+  api-docs:
+    path: /git-integration/v3/api-docs
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0

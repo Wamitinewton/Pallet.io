@@ -1,6 +1,6 @@
 package io.pallet.orgteam.member;
 
-import io.pallet.orgteam.inbox.NonRetryableEventException;
+import io.pallet.common.inbox.NonRetryableEventException;
 
 class ProfileEmailConflictException extends NonRetryableEventException {
 

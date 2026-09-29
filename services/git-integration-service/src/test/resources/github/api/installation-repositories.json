@@ -1,0 +1,11 @@
+{
+  "total_count": 5,
+  "repository_selection": "selected",
+  "repositories": [
+    { "id": 42, "full_name": "octo-org/api", "default_branch": "main", "private": true, "archived": false },
+    { "id": 43, "full_name": "octo-org/web", "default_branch": "main", "private": true, "archived": false },
+    { "id": 44, "full_name": "octo-org/payroll", "default_branch": "main", "private": true, "archived": false },
+    { "id": 45, "full_name": "octo-org/legacy", "default_branch": "master", "private": false, "archived": true },
+    { "id": 46, "full_name": "octo-org/api-docs", "default_branch": "gh-pages", "private": false, "archived": false }
+  ]
+}

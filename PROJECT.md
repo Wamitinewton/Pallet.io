@@ -108,7 +108,7 @@ Twenty four services, grouped by what part of the system they own.
 
 ### Source and build pipeline
 
-`git-integration-service` handles the GitHub or GitLab OAuth app, receives push webhooks, and talks to the provider's API for repo metadata. This is the first place retries and a circuit breaker matter, since GitHub's API has rate limits and the occasional outage that has nothing to do with Pallet.
+`git-integration-service` handles the Pallet GitHub App (a GitHub App rather than an OAuth app, see `docs/adr/0021-github-app-source-host-integration.md`; GitLab is a later adapter), receives push webhooks, and talks to the provider's API for repo metadata. This is the first place retries and a circuit breaker matter, since GitHub's API has rate limits and the occasional outage that has nothing to do with Pallet.
 
 `build-queue-service` consumes `git.push.received` events and decides build priority and concurrency per org before handing jobs to `build-service`. This is where backpressure gets handled instead of every push landing straight in a build queue with no limit.
 

@@ -88,11 +88,6 @@ public class NotificationDelivery {
         this.updatedAt = Instant.now();
     }
 
-    public void markPending() {
-        this.status = DeliveryStatus.PENDING;
-        this.updatedAt = Instant.now();
-    }
-
     public void markRead() {
         if (readAt != null) {
             return;

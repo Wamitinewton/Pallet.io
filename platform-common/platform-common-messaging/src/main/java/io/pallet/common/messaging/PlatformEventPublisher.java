@@ -7,7 +7,7 @@ import io.pallet.common.events.Topics;
 
 /**
  * The one way a Pallet service publishes a platform event. It resolves the topic
- * from the event type, keys the record by {@code orgId}, stamps the standard
+ * from the event type, keys the record by {@code orgId} unless told otherwise, stamps the standard
  * headers and blocks a bounded time for the broker ack.
  */
 public interface PlatformEventPublisher {
@@ -26,4 +26,19 @@ public interface PlatformEventPublisher {
      * Escape hatch: publish to an explicit topic (e.g. a service-local topic not in {@link Topics}).
      */
     void publish(String topic, PlatformEvent event);
+
+    /**
+     * Publishes {@code event} to its catalog topic under {@code key} instead of {@code orgId}.
+     *
+     * @throws IllegalArgumentException if {@code key} is null or blank
+     */
+    void publish(PlatformEvent event, String key);
+
+    /**
+     * Publishes a tombstone (null value) for {@code key}; only valid on a compacted topic.
+     *
+     * @throws IllegalArgumentException if {@code topic} is not {@link Topics#isCompacted compacted} or
+     *     {@code key} is null or blank
+     */
+    void publishTombstone(String topic, String key);
 }

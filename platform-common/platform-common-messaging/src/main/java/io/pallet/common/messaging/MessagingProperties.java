@@ -17,7 +17,8 @@ public record MessagingProperties(
         @DefaultValue("true") boolean createTopics,
         @DefaultValue("1") short topicReplicas,
         @DefaultValue("3") int topicPartitions,
-        @DefaultValue DltMonitor dltMonitor) {
+        @DefaultValue DltMonitor dltMonitor,
+        @DefaultValue Compaction compaction) {
 
     /**
      * Consumer retry policy. {@code maxAttempts} is total deliveries; on the last failure the record is dead-lettered.
@@ -34,4 +35,11 @@ public record MessagingProperties(
     public record Publish(@DefaultValue("10s") Duration sendTimeout) {}
 
     public record DltMonitor(@DefaultValue("true") boolean enabled) {}
+
+    /**
+     * Settings for topics {@code Topics.isCompacted} marks. {@code minLag} keeps intermediate records
+     * readable by a briefly lagging consumer. Applied only when the topic is created: {@code KafkaAdmin}
+     * never alters an existing topic's config, so changing it later needs {@code kafka-configs --alter}.
+     */
+    public record Compaction(@DefaultValue("1h") Duration minLag) {}
 }

@@ -1,0 +1,19 @@
+{
+  "total_count": 2,
+  "installations": [
+    {
+      "id": 51000001,
+      "account": { "login": "octo-org", "id": 5001, "type": "Organization" },
+      "repository_selection": "selected",
+      "suspended_at": null,
+      "permissions": { "contents": "read", "metadata": "read", "checks": "write" }
+    },
+    {
+      "id": 51000002,
+      "account": { "login": "fixture-dev", "id": 9100001, "type": "User" },
+      "repository_selection": "all",
+      "suspended_at": "2026-09-01T12:00:00Z",
+      "permissions": { "contents": "read", "metadata": "read", "checks": "write" }
+    }
+  ]
+}

@@ -1,12 +1,14 @@
 package io.pallet.common.security;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -130,8 +132,8 @@ public class PalletResourceServerAutoConfiguration {
         @ConditionalOnBean(StringRedisTemplate.class)
         @ConditionalOnMissingBean(RevokedSessionRegistry.class)
         RevokedSessionRegistry redisRevokedSessionRegistry(
-                StringRedisTemplate redisTemplate, MeterRegistry meterRegistry) {
-            return new RedisRevokedSessionRegistry(redisTemplate, meterRegistry);
+                StringRedisTemplate redisTemplate, ObjectProvider<MeterRegistry> meterRegistry) {
+            return new RedisRevokedSessionRegistry(redisTemplate, meterRegistry.getIfUnique(SimpleMeterRegistry::new));
         }
     }
 

@@ -819,7 +819,7 @@ flowchart LR
 - Writers call `OutboxWriter.append(PlatformEvent)`; it serializes the record with its stable
   `eventId` into `outbox_events` **inside the caller's transaction**. If the transaction rolls
   back, the event never existed. If it commits, the event is durable.
-- `OutboxRelay` is a `@Scheduled` poller (`pallet.orgteam.outbox.poll-interval`, default 250 ms).
+- `OutboxRelay` (`platform-common-outbox`, ADR-0020) is a `@Scheduled` poller (`pallet.outbox.poll-interval`, default 250 ms).
   It holds a Postgres **session advisory lock** (`pg_try_advisory_lock`), so exactly one instance
   relays at a time and no event is reordered by two relays racing. Standby instances poll the lock
   and take over within one interval if the holder dies (the lock is released with its session).
@@ -1073,16 +1073,15 @@ services/org-team-service/
     ├── team/          TeamController, TeamService, Team, TeamMember, repositories
     ├── app/           AppController, AppService, App, AppRepository, RegionCatalog
     ├── token/         SignedActionToken (issue + verify), InvalidTokenException
-    ├── outbox/        OutboxWriter, OutboxEvent, OutboxRepository, OutboxRelay,
-    │                  EventTypeRegistry, OutboxMetrics
-    ├── inbox/         ProcessedEvent, TransactionalInbox
+    ├── outbox/        OutboxEventTypesConfiguration (the types this service publishes; the
+    │                  writer, relay, inbox and metrics come from platform-common-outbox)
     └── retention/     RetentionSweeps, OrgPurgeJob
 ```
 
 POM (independent project per `CONTRIBUTING.md`/`PACKAGES.md`: own wrapper, parented directly on
 `spring-boot-starter-parent`, `platform-common-*` as pinned published dependencies):
 `platform-common-api`, `-exception`, `-events`, `-observability`, `-messaging`, `-security`,
-`-openapi`; `spring-boot-starter-webmvc`, `-validation`, `-data-jpa`, `-data-redis` (for ADR-0015),
+`-openapi`, `-outbox`; `spring-boot-starter-webmvc`, `-validation`, `-data-jpa`, `-data-redis` (for ADR-0015),
 `-actuator`; `postgresql`; `flyway-database-postgresql`; test: `platform-common-test`, Testcontainers
 Postgres/Kafka/Redis, ArchUnit.
 **No `platform-common-resilience`**: no external/third-party call exists here. The relay's Kafka
@@ -1105,8 +1104,9 @@ external call appears.
 | `pallet.orgteam.limits.max-teams-per-org` / `max-apps-per-org` | `100` / `200` | Flat safety limits. |
 | `pallet.orgteam.apps.regions.aws` / `.gcp` | provider lists | Region allow-lists. |
 | `pallet.orgteam.security.recent-auth-window` | `PT10M` | Sensitive-operation recency. |
-| `pallet.orgteam.outbox.poll-interval` / `batch-size` / `max-attempts` / `retention` | `PT0.25S` / `100` / `10` / `P7D` | Relay. |
-| `pallet.orgteam.inbox.retention` | `P14D` | Inbox sweep. |
+| `pallet.outbox.schema` / `metrics-prefix` / `advisory-lock-key` | `org_team` / `orgteam` / `7305121408` | Required by `platform-common-outbox`, no default (ADR-0020). |
+| `pallet.outbox.poll-interval` / `batch-size` / `max-attempts` / `retention` | `PT0.25S` / `100` / `10` / `P7D` | Relay. |
+| `pallet.inbox.retention` | `P14D` | Inbox sweep. |
 | `pallet.orgteam.retention.*` | see [Retention](#retention-and-purge) | Sweeps. |
 | `spring.datasource.*`, `spring.kafka.*`, `spring.data.redis.*` | env-backed | Infrastructure. |
 

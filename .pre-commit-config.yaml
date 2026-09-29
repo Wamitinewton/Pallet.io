@@ -45,3 +45,11 @@ repos:
         language: system
         files: ^services/org-team-service/.*\.java$
         pass_filenames: false
+
+      - id: spotless-check-git-integration-service
+        name: Spotless (git-integration-service)
+        description: Java formatting/import-order — cd services/git-integration-service && ./mvnw spotless:apply to fix
+        entry: services/git-integration-service/mvnw -q -f services/git-integration-service/pom.xml spotless:check
+        language: system
+        files: ^services/git-integration-service/.*\.java$
+        pass_filenames: false

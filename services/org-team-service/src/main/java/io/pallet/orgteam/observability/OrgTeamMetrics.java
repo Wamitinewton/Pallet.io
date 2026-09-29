@@ -101,10 +101,6 @@ public class OrgTeamMetrics {
         count(EVENTS_DROPPED, TAG_LISTENER, listener, TAG_REASON, reason);
     }
 
-    public void inboxDuplicate(String listener) {
-        registry.counter(INBOX_DUPLICATES, TAG_LISTENER, listener).increment();
-    }
-
     public void profileNotYetProjected() {
         registry.counter(PROFILE_NOT_YET_PROJECTED).increment();
     }

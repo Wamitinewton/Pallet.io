@@ -2,9 +2,9 @@ package io.pallet.orgteam.org;
 
 import io.pallet.common.events.OrgProvisioned;
 import io.pallet.common.events.Topics;
-import io.pallet.orgteam.inbox.EventPayloads;
-import io.pallet.orgteam.inbox.MalformedEventException;
-import io.pallet.orgteam.inbox.TransactionalInbox;
+import io.pallet.common.inbox.EventPayloads;
+import io.pallet.common.inbox.MalformedEventException;
+import io.pallet.common.inbox.TransactionalInbox;
 import io.pallet.orgteam.observability.MetricsCatalog;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

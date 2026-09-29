@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import io.pallet.common.events.AuditEventRecorded;
 import io.pallet.common.events.PlatformEvent;
+import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.invite.InviteExceptions.QuotaExceededException;
@@ -25,7 +26,6 @@ import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.OrgStatus;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
-import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.NotAMemberException;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
@@ -71,7 +71,7 @@ class TeamServiceTest {
                 teams,
                 teamMembers,
                 outbox,
-                new OrgTeamProperties(null, new OrgTeamProperties.Limits(2, 200), null, null, null, null, null),
+                new OrgTeamProperties(null, new OrgTeamProperties.Limits(2, 200), null, null, null),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

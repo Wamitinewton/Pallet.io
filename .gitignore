@@ -30,6 +30,7 @@ application-local.yaml
 application-local.yml
 *.env
 .env
+.env.local
 
 # Local Kubernetes / infra state
 deploy/local/*.kubeconfig

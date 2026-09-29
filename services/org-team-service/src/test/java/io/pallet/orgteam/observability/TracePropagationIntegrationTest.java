@@ -35,7 +35,7 @@ import tools.jackson.databind.JsonNode;
     CapturedSpansConfiguration.class,
     TracePropagationIntegrationTest.RoleChangeConsumer.class
 })
-@TestPropertySource(properties = "pallet.orgteam.outbox.enabled=true")
+@TestPropertySource(properties = "pallet.outbox.enabled=true")
 class TracePropagationIntegrationTest extends ObservabilityIntegrationSupport {
 
     private static final Duration WAIT = Duration.ofSeconds(30);

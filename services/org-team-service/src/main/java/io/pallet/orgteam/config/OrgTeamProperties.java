@@ -1,7 +1,6 @@
 package io.pallet.orgteam.config;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -20,8 +19,6 @@ public record OrgTeamProperties(
         @Valid @NotNull @DefaultValue Limits limits,
         @Valid @NotNull @DefaultValue Apps apps,
         @Valid @NotNull @DefaultValue Security security,
-        @Valid @NotNull @DefaultValue Outbox outbox,
-        @Valid @NotNull @DefaultValue Inbox inbox,
         @Valid @NotNull @DefaultValue Retention retention) {
 
     public record Invites(
@@ -62,38 +59,6 @@ public record OrgTeamProperties(
     public record Security(
             @NotNull @PositiveDuration @DefaultValue("PT10M")
             Duration recentAuthWindow) {}
-
-    public record Outbox(
-            @DefaultValue("true") boolean enabled,
-
-            @NotNull @PositiveDuration @DefaultValue("PT0.25S")
-            Duration pollInterval,
-
-            @Positive @DefaultValue("100") int batchSize,
-            @Positive @DefaultValue("10") int maxAttempts,
-            @NotNull @PositiveDuration @DefaultValue("P7D") Duration retention,
-            @DefaultValue("7305121408") long advisoryLockKey,
-            @NotNull @PositiveDuration @DefaultValue("PT1S") Duration brokerBackoffInitial,
-
-            @NotNull @PositiveDuration @DefaultValue("PT30S")
-            Duration brokerBackoffMax,
-
-            @NotNull @PositiveDuration @DefaultValue("PT60S")
-            Duration rowBackoffMax,
-
-            @NotNull @PositiveDuration @DefaultValue("PT5S") Duration metricsRefreshInterval,
-
-            @NotNull @PositiveDuration @DefaultValue("PT5S") Duration lockTimeout) {
-
-        @AssertTrue(message = "broker-backoff-max must not be shorter than broker-backoff-initial") boolean isBrokerBackoffRangeValid() {
-            return brokerBackoffInitial == null
-                    || brokerBackoffMax == null
-                    || brokerBackoffMax.compareTo(brokerBackoffInitial) >= 0;
-        }
-    }
-
-    public record Inbox(
-            @NotNull @PositiveDuration @DefaultValue("P14D") Duration retention) {}
 
     public record Retention(
             @DefaultValue("true") boolean enabled,

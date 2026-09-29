@@ -40,6 +40,7 @@ public final class Topics {
     public static final String ORG_MEMBER_ADDED = "org.member.added";
     public static final String ORG_MEMBER_REMOVED = "org.member.removed";
     public static final String ORG_MEMBER_ROLE_CHANGED = "org.member.role.changed";
+    public static final String ORG_MEMBERSHIP_CHANGED = "org.membership.changed";
     public static final String ORG_DELETED = "org.deleted";
     public static final String ORG_INVITE_REJECTED = "org.invite.rejected";
     public static final String APP_CREATED = "app.created";
@@ -65,10 +66,12 @@ public final class Topics {
             ORG_MEMBER_ADDED,
             ORG_MEMBER_REMOVED,
             ORG_MEMBER_ROLE_CHANGED,
+            ORG_MEMBERSHIP_CHANGED,
             ORG_DELETED,
             ORG_INVITE_REJECTED,
             APP_CREATED,
             APP_DELETED);
+    private static final Set<String> COMPACTED = Set.of(ORG_MEMBERSHIP_CHANGED);
 
     private Topics() {}
 
@@ -84,5 +87,12 @@ public final class Topics {
      */
     public static Set<String> all() {
         return ALL;
+    }
+
+    /**
+     * Whether {@code topic} is created with {@code cleanup.policy=compact}. False for every dead-letter topic.
+     */
+    public static boolean isCompacted(String topic) {
+        return COMPACTED.contains(topic);
     }
 }

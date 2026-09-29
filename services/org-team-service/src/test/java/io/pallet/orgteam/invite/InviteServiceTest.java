@@ -17,6 +17,7 @@ import io.pallet.common.error.TooManyRequestsException;
 import io.pallet.common.events.AuditEventRecorded;
 import io.pallet.common.events.NotificationRequested;
 import io.pallet.common.events.PlatformEvent;
+import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.config.InviteSigningProperties;
 import io.pallet.orgteam.config.OrgTeamProperties;
@@ -35,7 +36,6 @@ import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
 import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
-import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.InvalidRoleTransitionException;
 import io.pallet.orgteam.security.AccessExceptions.NotAMemberException;
@@ -86,8 +86,6 @@ class InviteServiceTest {
                 .thenReturn(Optional.of(new Organization(ORG, "Acme", "acme", "owner", OrgKind.TEAM, NOW)));
         OrgTeamProperties properties = new OrgTeamProperties(
                 new OrgTeamProperties.Invites(TTL, 2, COOLDOWN, 3, Duration.ofMinutes(2), URL_TEMPLATE),
-                null,
-                null,
                 null,
                 null,
                 null,

@@ -1,0 +1,59 @@
+{
+  "action": "removed",
+  "installation": {
+    "id": 41000001,
+    "client_id": "Iv23liFixture000000",
+    "account": {
+      "login": "pallet-fixtures",
+      "id": 9000001,
+      "node_id": "O_kgDOAIlUQQ",
+      "type": "Organization",
+      "html_url": "https://github.com/pallet-fixtures",
+      "site_admin": false
+    },
+    "repository_selection": "selected",
+    "access_tokens_url": "https://api.github.com/app/installations/41000001/access_tokens",
+    "repositories_url": "https://api.github.com/installation/repositories",
+    "html_url": "https://github.com/organizations/pallet-fixtures/settings/installations/41000001",
+    "app_id": 1000001,
+    "app_slug": "pallet-test",
+    "target_id": 9000001,
+    "target_type": "Organization",
+    "permissions": {
+      "checks": "write",
+      "contents": "read",
+      "metadata": "read"
+    },
+    "events": [
+      "push",
+      "repository"
+    ],
+    "created_at": "2026-09-01T08:00:00Z",
+    "updated_at": "2026-09-01T08:00:00Z",
+    "single_file_name": null,
+    "has_multiple_single_files": false,
+    "single_file_paths": [],
+    "suspended_by": null,
+    "suspended_at": null
+  },
+  "repository_selection": "selected",
+  "repositories_added": [],
+  "repositories_removed": [
+    {
+      "id": 700000002,
+      "node_id": "R_kgDOKbQ3Ag",
+      "name": "worker",
+      "full_name": "pallet-fixtures/worker",
+      "private": true
+    }
+  ],
+  "requester": null,
+  "sender": {
+    "login": "fixture-dev",
+    "id": 9100001,
+    "node_id": "U_kgDOAIrfYQ",
+    "type": "User",
+    "html_url": "https://github.com/fixture-dev",
+    "site_admin": false
+  }
+}

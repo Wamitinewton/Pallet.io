@@ -1,7 +1,6 @@
 package io.pallet.notification.repository;
 
 import io.pallet.notification.domain.Channel;
-import io.pallet.notification.domain.DeliveryStatus;
 import io.pallet.notification.domain.NotificationDelivery;
 import java.util.List;
 import java.util.Optional;
@@ -42,11 +41,21 @@ public interface NotificationDeliveryRepository extends JpaRepository<Notificati
             """)
     void markAllReadFor(@Param("recipient") String recipient, @Param("channel") Channel channel);
 
-    /**
-     * The batch a {@code DeliveryRetryScheduler} sweep drains, oldest first. Backed by
-     * {@code ix_deliveries_throttled} ({@code status, created_at}).
-     */
-    List<NotificationDelivery> findByStatusOrderByCreatedAtAsc(DeliveryStatus status, Pageable pageable);
+    @Transactional
+    @Query(value = """
+                    WITH claimed AS (
+                        UPDATE notification.notification_deliveries
+                        SET status = 'PENDING', updated_at = now()
+                        WHERE id IN (
+                            SELECT id FROM notification.notification_deliveries
+                            WHERE status = 'THROTTLED'
+                            ORDER BY created_at
+                            LIMIT :limit
+                            FOR UPDATE SKIP LOCKED)
+                        RETURNING id, created_at)
+                    SELECT id FROM claimed ORDER BY created_at
+                    """, nativeQuery = true)
+    List<UUID> claimThrottled(@Param("limit") int limit);
 
     /**
      * Inserts a {@code PENDING} delivery row for (notificationId, channel, recipient) unless one

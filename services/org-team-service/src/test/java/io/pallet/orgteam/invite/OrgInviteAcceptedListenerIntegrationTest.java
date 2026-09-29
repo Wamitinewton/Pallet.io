@@ -11,9 +11,9 @@ import io.pallet.common.events.Topics;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
-import io.pallet.orgteam.outbox.TopicProbe;
-import io.pallet.orgteam.outbox.TopicProbe.Received;
 import io.pallet.orgteam.security.OrgFixtures;
+import io.pallet.orgteam.support.TopicProbe;
+import io.pallet.orgteam.support.TopicProbe.Received;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @Import(RedisTestContainerConfiguration.class)
-@TestPropertySource(properties = "pallet.orgteam.outbox.enabled=true")
+@TestPropertySource(properties = "pallet.outbox.enabled=true")
 class OrgInviteAcceptedListenerIntegrationTest {
 
     private static final Duration WAIT = Duration.ofSeconds(30);

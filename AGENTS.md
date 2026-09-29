@@ -123,7 +123,8 @@ service you're editing already uses.
 + the version-prefix auto-config), `exception` (`AppException` hierarchy + `GlobalExceptionHandler`),
 `events` (Kafka event contracts + topic catalog), `security` (resource-server baseline + `OrgContext`),
 `observability` (metrics/tracing/logging, correlation IDs), `messaging` (Kafka wiring, retry, DLT),
-`resilience` (Resilience4j defaults), `test` (composed Testcontainers test-slice annotations,
+`resilience` (Resilience4j defaults), `outbox` (transactional outbox + inbox, opt-in for services
+with a Postgres schema, ADR-0020), `test` (composed Testcontainers test-slice annotations,
 test-scope only).
 
 ### Key architectural patterns

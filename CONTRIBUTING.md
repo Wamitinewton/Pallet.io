@@ -16,8 +16,9 @@ Two different build shapes on purpose:
   topic catalog), `platform-common-security` (resource-server baseline + `org_id` check),
   `platform-common-observability` (metrics/tracing/logging dependencies),
   `platform-common-messaging` (Kafka wiring, retry, DLT), `platform-common-resilience`
-  (Resilience4j defaults), and `platform-common-test` (composed Testcontainers test-slice
-  annotations, test-scope only). It's published as versioned artifacts to GitHub Packages, see
+  (Resilience4j defaults), `platform-common-outbox` (transactional outbox and inbox, opt-in for
+  services with a Postgres schema, ADR-0020), and `platform-common-test` (composed Testcontainers
+  test-slice annotations, test-scope only). It's published as versioned artifacts to GitHub Packages, see
   `PACKAGES.md`.
 - Every service under `services/<name>/` is a **fully independent Maven project**: its own
   `pom.xml` (parented directly to `spring-boot-starter-parent`, not to anything in this repo),

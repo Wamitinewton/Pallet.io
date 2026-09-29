@@ -1,8 +1,8 @@
 package io.pallet.orgteam.member;
 
 import io.pallet.common.events.UserProfileUpdated;
-import io.pallet.orgteam.inbox.EventPayloads;
-import io.pallet.orgteam.inbox.MalformedEventException;
+import io.pallet.common.inbox.EventPayloads;
+import io.pallet.common.inbox.MalformedEventException;
 import io.pallet.orgteam.observability.MetricsCatalog;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import java.time.Instant;
