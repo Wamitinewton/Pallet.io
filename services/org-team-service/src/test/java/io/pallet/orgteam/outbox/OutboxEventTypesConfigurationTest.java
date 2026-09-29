@@ -15,9 +15,12 @@ import io.pallet.common.events.OrgInviteRejected;
 import io.pallet.common.events.OrgMemberAdded;
 import io.pallet.common.events.OrgMemberRemoved;
 import io.pallet.common.events.OrgMemberRoleChanged;
+import io.pallet.common.events.OrgMembershipChanged;
 import io.pallet.common.events.OrgProvisioned;
 import io.pallet.common.events.PlatformEvent;
 import io.pallet.common.events.UserProfileUpdated;
+import io.pallet.common.outbox.OutboxEventTypes;
+import io.pallet.common.outbox.UnknownEventTypeException;
 import io.pallet.common.test.annotations.UnitTest;
 import java.util.HashSet;
 import java.util.Set;
@@ -27,7 +30,7 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.core.type.filter.AssignableTypeFilter;
 
 @UnitTest
-class EventTypeRegistryTest {
+class OutboxEventTypesConfigurationTest {
 
     private static final Set<Class<? extends PlatformEvent>> PUBLISHED = Set.of(
             OrgMemberAdded.class,
@@ -44,23 +47,24 @@ class EventTypeRegistryTest {
             OrgProvisioned.class,
             OrgInviteAccepted.class,
             UserProfileUpdated.class,
+            OrgMembershipChanged.class,
             DeployStateChanged.class,
             GitPushReceived.class);
 
-    private final EventTypeRegistry registry = new EventTypeRegistry();
+    private final OutboxEventTypes eventTypes = new OutboxEventTypesConfiguration().outboxEventTypes();
 
     @Test
     void everyPublishedTypeResolvesToItsClassByItsTopic() throws Exception {
         for (Class<? extends PlatformEvent> eventClass : PUBLISHED) {
             String type = (String) eventClass.getField("TYPE").get(null);
-            assertThat(registry.classFor(type)).isEqualTo(eventClass);
+            assertThat(eventTypes.classFor(type)).isEqualTo(eventClass);
         }
-        assertThat(registry.publishedTypes()).isEqualTo(PUBLISHED);
+        assertThat(eventTypes.publishedTypes()).isEqualTo(PUBLISHED);
     }
 
     @Test
     void anUnknownTypeIsRejected() {
-        assertThatThrownBy(() -> registry.classFor("bogus.event"))
+        assertThatThrownBy(() -> eventTypes.classFor("bogus.event"))
                 .isInstanceOf(UnknownEventTypeException.class)
                 .hasMessageContaining("bogus.event");
     }

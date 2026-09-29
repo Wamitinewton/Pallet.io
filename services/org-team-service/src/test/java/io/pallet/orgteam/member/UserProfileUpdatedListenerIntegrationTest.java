@@ -9,8 +9,8 @@ import io.pallet.common.events.UserProfileUpdated;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
-import io.pallet.orgteam.outbox.TopicProbe;
 import io.pallet.orgteam.security.OrgFixtures;
+import io.pallet.orgteam.support.TopicProbe;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Import(RedisTestContainerConfiguration.class)
 @TestPropertySource(
         properties = {
-            "pallet.orgteam.outbox.enabled=true",
+            "pallet.outbox.enabled=true",
             "pallet.messaging.retry.max-attempts=6",
             "pallet.messaging.retry.initial-interval=500ms",
             "pallet.messaging.retry.max-interval=1s"

@@ -5,14 +5,6 @@ import java.util.Set;
 
 public final class MetricsCatalog {
 
-    public static final String OUTBOX_PENDING = "orgteam.outbox.pending";
-    public static final String OUTBOX_OLDEST_PENDING_AGE = "orgteam.outbox.oldest_pending_age_seconds";
-    public static final String OUTBOX_HELD_BACK = "orgteam.outbox.held_back";
-    public static final String OUTBOX_PARKED = "orgteam.outbox.parked";
-    public static final String OUTBOX_PUBLISHED = "orgteam.outbox.published";
-    public static final String OUTBOX_PUBLISH_FAILURES = "orgteam.outbox.publish_failures";
-    public static final String OUTBOX_RELAY_ACTIVE = "orgteam.outbox.relay.active";
-
     public static final String EVENTS_PROCESSED = "orgteam.events.processed";
     public static final String EVENTS_DROPPED = "orgteam.events.dropped";
     public static final String EVENTS_FAILED = "orgteam.events.failed";
@@ -49,12 +41,7 @@ public final class MetricsCatalog {
 
     public static final String TAG_LISTENER = "listener";
     public static final String TAG_REASON = "reason";
-    public static final String TAG_KIND = "kind";
     public static final String TAG_SWEEP = "sweep";
-    public static final String TAG_EVENT_TYPE = "eventType";
-
-    public static final String KIND_BROKER = "broker";
-    public static final String KIND_ROW = "row";
 
     public static final String DENIED_NO_MEMBERSHIP = "no_membership";
     public static final String DENIED_ORG_NOT_FOUND = "org_not_found";

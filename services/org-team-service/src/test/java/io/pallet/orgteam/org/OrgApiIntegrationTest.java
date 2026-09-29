@@ -12,11 +12,11 @@ import io.pallet.common.events.Topics;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.orgteam.invite.InviteAcceptanceService;
-import io.pallet.orgteam.outbox.TopicProbe;
-import io.pallet.orgteam.outbox.TopicProbe.Received;
 import io.pallet.orgteam.security.OrgFixtures;
 import io.pallet.orgteam.security.OrgTeamTestTokens;
 import io.pallet.orgteam.security.SignedTokenTestConfiguration;
+import io.pallet.orgteam.support.TopicProbe;
+import io.pallet.orgteam.support.TopicProbe.Received;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +39,7 @@ import tools.jackson.databind.json.JsonMapper;
 @IntegrationTest
 @AutoConfigureMockMvc
 @Import({RedisTestContainerConfiguration.class, SignedTokenTestConfiguration.class})
-@TestPropertySource(properties = "pallet.orgteam.outbox.enabled=true")
+@TestPropertySource(properties = "pallet.outbox.enabled=true")
 class OrgApiIntegrationTest {
 
     private static final String COLLECTION = "/api/v1/org-team/orgs";

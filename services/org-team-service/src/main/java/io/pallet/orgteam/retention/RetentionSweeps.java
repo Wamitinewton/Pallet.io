@@ -1,5 +1,9 @@
 package io.pallet.orgteam.retention;
 
+import io.pallet.common.inbox.InboxProperties;
+import io.pallet.common.inbox.TransactionalInbox;
+import io.pallet.common.outbox.OutboxProperties;
+import io.pallet.common.outbox.OutboxRepository;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
@@ -11,32 +15,41 @@ import org.springframework.stereotype.Component;
 public class RetentionSweeps {
 
     private final SweepRunner runner;
-    private final RetentionRepository retention;
+    private final OutboxRepository outbox;
+    private final TransactionalInbox inbox;
     private final InviteRepository invites;
     private final MembershipRepository memberships;
     private final OrgTeamProperties properties;
+    private final OutboxProperties outboxProperties;
+    private final InboxProperties inboxProperties;
 
     RetentionSweeps(
             SweepRunner runner,
-            RetentionRepository retention,
+            OutboxRepository outbox,
+            TransactionalInbox inbox,
             InviteRepository invites,
             MembershipRepository memberships,
-            OrgTeamProperties properties) {
+            OrgTeamProperties properties,
+            OutboxProperties outboxProperties,
+            InboxProperties inboxProperties) {
         this.runner = runner;
-        this.retention = retention;
+        this.outbox = outbox;
+        this.inbox = inbox;
         this.invites = invites;
         this.memberships = memberships;
         this.properties = properties;
+        this.outboxProperties = outboxProperties;
+        this.inboxProperties = inboxProperties;
     }
 
     public long sweepPublishedOutbox() {
-        double window = seconds(properties.outbox().retention());
-        return runner.run(Sweep.OUTBOX_RETENTION, batch -> retention.deletePublishedOutbox(window, batch));
+        Duration window = outboxProperties.retention();
+        return runner.run(Sweep.OUTBOX_RETENTION, batch -> outbox.deletePublishedOlderThan(window, batch));
     }
 
     public void sweepProcessedEvents() {
-        double window = seconds(properties.inbox().retention());
-        runner.run(Sweep.INBOX_RETENTION, batch -> retention.deleteProcessedEvents(window, batch));
+        Duration window = inboxProperties.retention();
+        runner.run(Sweep.INBOX_RETENTION, batch -> inbox.deleteProcessedOlderThan(window, batch));
     }
 
     public void sweepTerminalInvites() {

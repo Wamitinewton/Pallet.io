@@ -27,11 +27,6 @@ class OrgTeamPropertiesTest {
         assertThat(properties.invites().maxSends()).isEqualTo(4);
         assertThat(properties.limits().maxAppsPerOrg()).isEqualTo(200);
         assertThat(properties.security().recentAuthWindow()).isEqualTo(Duration.ofMinutes(10));
-        assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofMillis(250));
-        assertThat(properties.outbox().batchSize()).isEqualTo(100);
-        assertThat(properties.outbox().maxAttempts()).isEqualTo(10);
-        assertThat(properties.outbox().retention()).isEqualTo(Duration.ofDays(7));
-        assertThat(properties.inbox().retention()).isEqualTo(Duration.ofDays(14));
         assertThat(properties.retention().removedMemberships()).isEqualTo(Duration.ofDays(365));
         assertThat(properties.retention().enabled()).isTrue();
         assertThat(properties.retention().inviteExpiryInterval()).isEqualTo(Duration.ofMinutes(1));
@@ -42,18 +37,8 @@ class OrgTeamPropertiesTest {
     }
 
     @Test
-    void aZeroPollIntervalFailsValidation() {
-        assertBindFails("pallet.orgteam.outbox.poll-interval", "PT0S");
-    }
-
-    @Test
     void aNegativeInviteTtlFailsValidation() {
         assertBindFails("pallet.orgteam.invites.ttl", "-PT1H");
-    }
-
-    @Test
-    void aZeroBatchSizeFailsValidation() {
-        assertBindFails("pallet.orgteam.outbox.batch-size", "0");
     }
 
     @Test

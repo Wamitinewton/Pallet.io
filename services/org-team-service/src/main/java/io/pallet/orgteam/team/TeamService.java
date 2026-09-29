@@ -2,6 +2,7 @@ package io.pallet.orgteam.team;
 
 import io.pallet.common.api.PageQuery;
 import io.pallet.common.api.PageResponse;
+import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.config.ConstraintViolations;
 import io.pallet.orgteam.config.OrgTeamProperties;
@@ -13,7 +14,6 @@ import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
-import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.OrgGuard;
 import io.pallet.orgteam.support.PageSorting;
 import io.pallet.orgteam.support.Slugs;

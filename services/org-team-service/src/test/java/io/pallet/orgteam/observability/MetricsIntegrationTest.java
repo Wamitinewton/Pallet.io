@@ -14,10 +14,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.pallet.common.events.OrgInviteAccepted;
 import io.pallet.common.events.OrgInviteRejected;
+import io.pallet.common.outbox.OutboxMetrics;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.orgteam.invite.InviteAcceptanceService;
-import io.pallet.orgteam.outbox.OutboxMetrics;
 import io.pallet.orgteam.security.SignedTokenTestConfiguration;
 import java.time.Instant;
 import java.util.UUID;
@@ -32,6 +32,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 @Import({RedisTestContainerConfiguration.class, SignedTokenTestConfiguration.class})
 class MetricsIntegrationTest extends ObservabilityIntegrationSupport {
+
+    private static final String OUTBOX_PENDING = "orgteam.outbox.pending";
+    private static final String OUTBOX_OLDEST_PENDING_AGE = "orgteam.outbox.oldest_pending_age_seconds";
+    private static final String OUTBOX_HELD_BACK = "orgteam.outbox.held_back";
+    private static final String OUTBOX_PARKED = "orgteam.outbox.parked";
+    private static final String OUTBOX_RELAY_ACTIVE = "orgteam.outbox.relay.active";
 
     @Autowired
     private MeterRegistry registry;
@@ -209,8 +215,8 @@ class MetricsIntegrationTest extends ObservabilityIntegrationSupport {
     void theOutboxGaugesReflectSeededPendingAndParkedRows() {
         TestOrg org = newTeamOrg();
         outboxMetrics.refresh();
-        double pending = gauge(MetricsCatalog.OUTBOX_PENDING);
-        double parked = gauge(MetricsCatalog.OUTBOX_PARKED);
+        double pending = gauge(OUTBOX_PENDING);
+        double parked = gauge(OUTBOX_PARKED);
 
         for (int i = 0; i < 2; i++) {
             insertOutboxRow(org.orgId(), "PENDING", "now() - interval '90 seconds'");
@@ -218,18 +224,19 @@ class MetricsIntegrationTest extends ObservabilityIntegrationSupport {
         insertOutboxRow(org.orgId(), "PARKED", "now()");
         outboxMetrics.refresh();
 
-        assertThat(gauge(MetricsCatalog.OUTBOX_PENDING)).isEqualTo(pending + 2);
-        assertThat(gauge(MetricsCatalog.OUTBOX_PARKED)).isEqualTo(parked + 1);
-        assertThat(gauge(MetricsCatalog.OUTBOX_OLDEST_PENDING_AGE)).isGreaterThanOrEqualTo(90);
+        assertThat(gauge(OUTBOX_PENDING)).isEqualTo(pending + 2);
+        assertThat(gauge(OUTBOX_PARKED)).isEqualTo(parked + 1);
+        assertThat(gauge(OUTBOX_OLDEST_PENDING_AGE)).isGreaterThanOrEqualTo(90);
     }
 
     @Test
     void everyMeterTheArchitectureNamesIsRegistered() {
         for (String name : java.util.List.of(
-                MetricsCatalog.OUTBOX_PENDING,
-                MetricsCatalog.OUTBOX_OLDEST_PENDING_AGE,
-                MetricsCatalog.OUTBOX_PARKED,
-                MetricsCatalog.OUTBOX_RELAY_ACTIVE,
+                OUTBOX_PENDING,
+                OUTBOX_OLDEST_PENDING_AGE,
+                OUTBOX_HELD_BACK,
+                OUTBOX_PARKED,
+                OUTBOX_RELAY_ACTIVE,
                 MetricsCatalog.INVITES_CREATED,
                 MetricsCatalog.INVITES_RESENT,
                 MetricsCatalog.INVITES_REVOKED,

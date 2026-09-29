@@ -27,10 +27,13 @@ pallet:
       send-timeout: 3s
   invites:
     signing-key: test-only-signing-key-not-used-in-production
+  outbox:
+    schema: org_team
+    metrics-prefix: orgteam
+    advisory-lock-key: 7305121408
+    enabled: false
+    max-attempts: 3
   orgteam:
-    outbox:
-      enabled: false
-      max-attempts: 3
     retention:
       enabled: false
       sweep-batch-size: 10

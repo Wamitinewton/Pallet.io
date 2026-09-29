@@ -12,6 +12,20 @@ spring:
       group-id: org-team-service
 
 pallet:
+  outbox:
+    schema: org_team
+    metrics-prefix: orgteam
+    advisory-lock-key: 7305121408
+    poll-interval: PT0.25S
+    batch-size: 100
+    max-attempts: 10
+    retention: P7D
+    broker-backoff-initial: PT1S
+    broker-backoff-max: PT30S
+    row-backoff-max: PT60S
+    lock-timeout: PT5S
+  inbox:
+    retention: P14D
   invites:
     signing-key: ${PALLET_INVITES_SIGNING_KEY:caedd236b6a4d38e06869bb5d6d9a0ef17f631b786b805e9bcf31505711f93aa}
   orgteam:
@@ -31,18 +45,6 @@ pallet:
         gcp: [us-central1, us-east1, europe-west1, europe-west4, asia-southeast1, africa-south1]
     security:
       recent-auth-window: PT10M
-    outbox:
-      poll-interval: PT0.25S
-      batch-size: 100
-      max-attempts: 10
-      retention: P7D
-      advisory-lock-key: 7305121408
-      broker-backoff-initial: PT1S
-      broker-backoff-max: PT30S
-      row-backoff-max: PT60S
-      lock-timeout: PT5S
-    inbox:
-      retention: P14D
     retention:
       enabled: true
       terminal-invites: P90D

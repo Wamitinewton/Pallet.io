@@ -1,6 +1,6 @@
 package io.pallet.orgteam.org;
 
-import io.pallet.orgteam.inbox.NonRetryableEventException;
+import io.pallet.common.inbox.NonRetryableEventException;
 
 class OrgSlugConflictException extends NonRetryableEventException {
 

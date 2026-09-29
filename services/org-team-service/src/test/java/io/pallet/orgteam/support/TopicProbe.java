@@ -1,4 +1,4 @@
-package io.pallet.orgteam.outbox;
+package io.pallet.orgteam.support;
 
 import io.pallet.common.events.EventHeaders;
 import java.nio.charset.StandardCharsets;

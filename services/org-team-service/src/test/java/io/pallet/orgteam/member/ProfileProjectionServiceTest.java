@@ -12,9 +12,9 @@ import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pallet.common.events.UserProfileUpdated;
+import io.pallet.common.inbox.MalformedEventException;
+import io.pallet.common.inbox.NonRetryableEventException;
 import io.pallet.common.test.annotations.UnitTest;
-import io.pallet.orgteam.inbox.MalformedEventException;
-import io.pallet.orgteam.inbox.NonRetryableEventException;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import java.time.Instant;
 import java.util.Optional;

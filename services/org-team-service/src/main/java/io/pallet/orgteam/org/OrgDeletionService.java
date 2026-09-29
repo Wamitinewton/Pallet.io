@@ -2,6 +2,7 @@ package io.pallet.orgteam.org;
 
 import io.pallet.common.events.AppDeleted;
 import io.pallet.common.events.OrgDeleted;
+import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.orgteam.app.AppRef;
 import io.pallet.orgteam.app.AppRepository;
 import io.pallet.orgteam.audit.AuditEvents;
@@ -9,7 +10,6 @@ import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
-import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.OrgNotFoundException;
 import io.pallet.orgteam.team.TeamMemberRepository;

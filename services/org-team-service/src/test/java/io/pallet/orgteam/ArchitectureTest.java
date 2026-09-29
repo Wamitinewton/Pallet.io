@@ -55,10 +55,8 @@ class ArchitectureTest {
     }
 
     @Test
-    void onlyTheOutboxTouchesTheKafkaPublishingPath() {
+    void nothingInTheServicePublishesToKafkaExceptThroughTheOutbox() {
         noClasses()
-                .that()
-                .resideOutsideOfPackage("..outbox..")
                 .should()
                 .dependOnClassesThat()
                 .haveFullyQualifiedName("io.pallet.common.messaging.PlatformEventPublisher")
@@ -104,12 +102,22 @@ class ArchitectureTest {
     }
 
     @Test
-    void onlyObservabilityAndTheOutboxTouchTheMeterRegistry() {
+    void onlyTheRetentionSweepsDeleteOutboxRows() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackage("..retention..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("io.pallet.common.outbox.OutboxRepository")
+                .allowEmptyShould(true)
+                .check(classes);
+    }
+
+    @Test
+    void onlyObservabilityTouchesTheMeterRegistry() {
         noClasses()
                 .that()
                 .resideOutsideOfPackage("..observability..")
-                .and()
-                .resideOutsideOfPackage("..outbox..")
                 .should()
                 .dependOnClassesThat()
                 .haveFullyQualifiedName("io.micrometer.core.instrument.MeterRegistry")

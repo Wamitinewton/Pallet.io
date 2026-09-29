@@ -18,7 +18,7 @@ WHERE status <> 'PUBLISHED'
 GROUP BY status;
 ```
 
-`PENDING` rows are waiting for the relay, `PARKED` rows exhausted `pallet.orgteam.outbox.max-attempts` and are holding
+`PENDING` rows are waiting for the relay, `PARKED` rows exhausted `pallet.outbox.max-attempts` and are holding
 their organization's later events behind them. `GET /actuator/health` shows the same numbers under `outbox` and never
 turns readiness `DOWN`: a lagging outbox must alert, not restart the pod.
 
@@ -51,7 +51,7 @@ account stays enabled.
    go to procedure 2.
 
 **Fix**: restore the broker or database, or end the long-running transaction. The relay drains in `id` order by itself, with backoff capped at
-`pallet.orgteam.outbox.broker-backoff-max`. Do not restart pods for this.
+`pallet.outbox.broker-backoff-max`. Do not restart pods for this.
 
 **Verify**: `orgteam_outbox_oldest_pending_age_seconds` returns to 0 and the alert resolves.
 

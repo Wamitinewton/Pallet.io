@@ -14,6 +14,7 @@ import io.pallet.common.events.AppCreated;
 import io.pallet.common.events.AppDeleted;
 import io.pallet.common.events.AuditEventRecorded;
 import io.pallet.common.events.PlatformEvent;
+import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.app.AppExceptions.AppNotFoundException;
 import io.pallet.orgteam.app.AppExceptions.InvalidRegionException;
@@ -27,7 +28,6 @@ import io.pallet.orgteam.observability.OrgTeamMetrics;
 import io.pallet.orgteam.org.OrgKind;
 import io.pallet.orgteam.org.Organization;
 import io.pallet.orgteam.org.OrganizationRepository;
-import io.pallet.orgteam.outbox.OutboxWriter;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
 import io.pallet.orgteam.security.AccessExceptions.NotAMemberException;
 import io.pallet.orgteam.security.OrgGuard;
@@ -72,8 +72,6 @@ class AppServiceTest {
                 new OrgTeamProperties.Limits(100, 2),
                 new OrgTeamProperties.Apps(
                         new OrgTeamProperties.Apps.Regions(List.of("us-east-1"), List.of("us-central1"))),
-                null,
-                null,
                 null,
                 null);
         service = new AppService(
