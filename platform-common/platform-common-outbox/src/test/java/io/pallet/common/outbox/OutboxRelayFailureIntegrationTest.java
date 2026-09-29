@@ -7,12 +7,16 @@ import com.github.dockerjava.api.DockerClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.events.OrgMemberAdded;
 import io.pallet.common.outbox.TopicProbe.Received;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.CannotAcquireLockException;
 
 @OutboxIntegrationTest
 class OutboxRelayFailureIntegrationTest extends OutboxIntegrationSupport {
@@ -181,6 +185,53 @@ class OutboxRelayFailureIntegrationTest extends OutboxIntegrationSupport {
                     .containsExactly(delayed.eventId(), behindDelayed.eventId());
             assertThat(probe.observe(waiting, QUIET)).hasSize(2);
         }
+    }
+
+    @Test
+    void aTickThatTimesOutWaitingForALockGivesUpAndPublishesOnTheNextTick() throws SQLException {
+        OrgMemberAdded event = memberAdded(newOrgId());
+        commit(event);
+        OutboxRelay relay = newRelay();
+
+        try (Connection holder = holdLock("LOCK TABLE " + OUTBOX + " IN ACCESS EXCLUSIVE MODE")) {
+            relay.tick();
+
+            assertThat(relayActive()).isZero();
+            holder.rollback();
+        }
+        assertThat(statusOf(event.eventId())).isEqualTo("PENDING");
+
+        relay.tick();
+
+        assertThat(statusOf(event.eventId())).isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void aLockTimeoutReachesCallersAsALockFailure() throws SQLException {
+        OrgMemberAdded event = memberAdded(newOrgId());
+        commit(event);
+        newRelay().tick();
+        jdbc.update(
+                "UPDATE " + OUTBOX + " SET published_at = now() - interval '30 days' WHERE event_id = ?",
+                event.eventId());
+
+        try (Connection holder = holdLock("SELECT 1 FROM " + OUTBOX + " FOR UPDATE")) {
+            assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+                        repository.applyLockTimeout(Duration.ofMillis(200));
+                        repository.deletePublishedOlderThan(Duration.ofDays(7), 100);
+                    }))
+                    .isInstanceOf(CannotAcquireLockException.class);
+            holder.rollback();
+        }
+    }
+
+    private Connection holdLock(String sql) throws SQLException {
+        Connection connection = dataSource.getConnection();
+        connection.setAutoCommit(false);
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
+        return connection;
     }
 
     private double relayActive() {

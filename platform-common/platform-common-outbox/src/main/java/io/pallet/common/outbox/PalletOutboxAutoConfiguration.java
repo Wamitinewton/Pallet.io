@@ -19,7 +19,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -42,6 +44,8 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableConfigurationProperties({OutboxProperties.class, InboxProperties.class})
 public class PalletOutboxAutoConfiguration {
 
+    private static final String POSTGRES = "PostgreSQL";
+
     @Bean
     @ConditionalOnMissingBean
     OutboxEventTypes outboxEventTypes() {
@@ -51,7 +55,7 @@ public class PalletOutboxAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     OutboxRepository outboxRepository(DataSource dataSource, OutboxProperties properties) {
-        return new OutboxRepository(JdbcClient.create(dataSource), properties);
+        return new OutboxRepository(postgresJdbcClient(dataSource), properties);
     }
 
     @Bean
@@ -100,7 +104,7 @@ public class PalletOutboxAutoConfiguration {
     @ConditionalOnMissingBean
     TransactionalInbox transactionalInbox(
             DataSource dataSource, MeterRegistry meterRegistry, OutboxProperties properties) {
-        return new TransactionalInbox(JdbcClient.create(dataSource), meterRegistry, properties);
+        return new TransactionalInbox(postgresJdbcClient(dataSource), meterRegistry, properties);
     }
 
     @Bean
@@ -108,6 +112,16 @@ public class PalletOutboxAutoConfiguration {
     @ConditionalOnBean(CommonErrorHandler.class)
     ListenerErrorClassification listenerErrorClassification(CommonErrorHandler errorHandler) {
         return new ListenerErrorClassification(errorHandler);
+    }
+
+    /**
+     * A plain {@code JdbcTemplate} translates by SQL state class only, which leaves a lock timeout ({@code 55P03}) as
+     * an {@code UncategorizedSQLException}; Postgres's error codes turn it into a {@code CannotAcquireLockException}.
+     */
+    static JdbcClient postgresJdbcClient(DataSource dataSource) {
+        JdbcTemplate template = new JdbcTemplate(dataSource);
+        template.setExceptionTranslator(new SQLErrorCodeSQLExceptionTranslator(POSTGRES));
+        return JdbcClient.create(template);
     }
 
     @Configuration(proxyBeanMethods = false)
