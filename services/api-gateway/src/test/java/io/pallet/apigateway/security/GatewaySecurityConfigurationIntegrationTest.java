@@ -13,6 +13,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.pallet.common.test.containers.KeycloakTestContainerConfiguration;
 import io.pallet.common.test.containers.KeycloakTestTokens;
+import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -31,7 +32,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(KeycloakTestContainerConfiguration.class)
+@Import({KeycloakTestContainerConfiguration.class, RedisTestContainerConfiguration.class})
 @Tag("integration")
 class GatewaySecurityConfigurationIntegrationTest {
 
