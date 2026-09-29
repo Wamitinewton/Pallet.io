@@ -118,6 +118,24 @@ class NotificationRequestedTest {
     }
 
     @Test
+    void forOrgAdminsAddressesTheOrgAdminsWithNoRecipientOrChannel() {
+        NotificationRequested event = NotificationRequested.forOrgAdmins(
+                "org_9k2j7f", "GIT_CONNECTION_LOST", "git-lost:42", Map.of("accountLogin", "acme"));
+
+        assertThat(event.audience()).isEqualTo("ORG_ADMINS").isEqualTo(NotificationRequested.AUDIENCE_ORG_ADMINS);
+        assertThat(event.recipient()).isNull();
+        assertThat(event.channel()).isNull();
+        assertThat(event.eventType()).isEqualTo(NotificationRequested.TYPE);
+        assertThat(event.orgId()).isEqualTo("org_9k2j7f");
+        assertThat(event.notificationType()).isEqualTo("GIT_CONNECTION_LOST");
+        assertThat(event.dedupeKey()).isEqualTo("git-lost:42");
+        assertThat(event.variables()).containsEntry("accountLogin", "acme");
+        assertThat(mapper.readValue(mapper.writeValueAsString(event), NotificationRequested.class)
+                        .audience())
+                .isEqualTo(NotificationRequested.AUDIENCE_ORG_ADMINS);
+    }
+
+    @Test
     void audienceSurvivesAJsonRoundTrip() {
         NotificationRequested event =
                 NotificationRequested.broadcast("org_9k2j7f", "ORG_ANNOUNCEMENT", "announce:1", Map.of("title", "Hi"));

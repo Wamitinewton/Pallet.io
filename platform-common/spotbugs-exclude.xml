@@ -35,6 +35,22 @@
         <Class name="io.pallet.common.resilience.ExternalCallExecutor"/>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
+    <!-- OutboxRelay.publish rethrows the caught RuntimeException unchanged after recording it on
+         the span, so the broker-vs-row classification sees the original type. -->
+    <Match>
+        <Class name="io.pallet.common.outbox.OutboxRelay"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- OutboxSchemaAssertions runs the classpath reference-schema.sql in a schema whose name it
+         generates itself; the compared schema name is checked against [a-z_][a-z0-9_]{0,62}
+         before use and is only ever bound as a parameter. -->
+    <Match>
+        <Class name="io.pallet.common.test.assertions.OutboxSchemaAssertions"/>
+        <Or>
+            <Bug pattern="SQL_INJECTION_JDBC"/>
+            <Bug pattern="SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"/>
+        </Or>
+    </Match>
     <!-- palletSecurityFilterChain declares throws Exception only because HttpSecurity.build()
          does; that signature is fixed by Spring Security, so it can't be narrowed. -->
     <Match>

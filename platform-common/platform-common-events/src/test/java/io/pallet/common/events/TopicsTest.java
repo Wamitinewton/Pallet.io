@@ -63,4 +63,21 @@ class TopicsTest {
                     .isTrue();
         });
     }
+
+    @Test
+    void theMembershipStateTopicIsCataloguedAndIsTheOnlyCompactedOne() {
+        assertThat(Topics.all()).contains(Topics.ORG_MEMBERSHIP_CHANGED);
+        assertThat(Topics.ORG_MEMBERSHIP_CHANGED).isEqualTo("org.membership.changed");
+        assertThat(Topics.isCompacted(Topics.ORG_MEMBERSHIP_CHANGED)).isTrue();
+        assertThat(Topics.isCompacted(Topics.deadLetter(Topics.ORG_MEMBERSHIP_CHANGED)))
+                .isFalse();
+        assertThat(Topics.all())
+                .filteredOn(topic -> !topic.equals(Topics.ORG_MEMBERSHIP_CHANGED))
+                .allSatisfy(topic -> {
+                    assertThat(Topics.isCompacted(topic)).as(topic).isFalse();
+                    assertThat(Topics.isCompacted(Topics.deadLetter(topic)))
+                            .as(topic + ".DLT")
+                            .isFalse();
+                });
+    }
 }

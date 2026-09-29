@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.search.RequiredSearch;
@@ -11,12 +12,17 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pallet.common.error.ExternalServiceException;
 import io.pallet.common.events.DeployStateChanged;
 import io.pallet.common.events.EventHeaders;
+import io.pallet.common.events.OrgMembershipChanged;
+import io.pallet.common.events.Topics;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -38,7 +44,8 @@ class DefaultPlatformEventPublisherTest {
                 true,
                 (short) 1,
                 3,
-                new MessagingProperties.DltMonitor(true));
+                new MessagingProperties.DltMonitor(true),
+                new MessagingProperties.Compaction(Duration.ofHours(1)));
     }
 
     private static String header(ProducerRecord<String, Object> record, String key) {
@@ -113,6 +120,72 @@ class DefaultPlatformEventPublisherTest {
         assertThatThrownBy(() -> publisher.publish(event))
                 .isInstanceOf(ExternalServiceException.class)
                 .hasMessageContaining("topic=deploy.state.changed");
+        assertThat(published("failure")).isEqualTo(1.0);
+    }
+
+    @Test
+    void explicitKeyOverloadSendsUnderThatKeyAndKeepsTheOrgIdHeader() {
+        when(template.send(any(ProducerRecord.class))).thenReturn(ackedFuture());
+        OrgMembershipChanged event =
+                OrgMembershipChanged.of("org_9k2j7f", "usr_1", "developer", OrgMembershipChanged.STATUS_ACTIVE, 3);
+
+        publisher.publish(event, OrgMembershipChanged.key("org_9k2j7f", "usr_1"));
+
+        ProducerRecord<String, Object> sent = captureSent();
+        assertThat(sent.topic()).isEqualTo(Topics.ORG_MEMBERSHIP_CHANGED);
+        assertThat(sent.key()).isEqualTo("org_9k2j7f:usr_1");
+        assertThat(sent.value()).isEqualTo(event);
+        assertThat(header(sent, EventHeaders.ORG_ID)).isEqualTo("org_9k2j7f");
+        assertThat(header(sent, EventHeaders.EVENT_ID))
+                .isEqualTo(event.eventId().toString());
+        assertThat(published("success")).isEqualTo(1.0);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    void aBlankExplicitKeyIsRejectedBeforeAnythingIsSent(String key) {
+        OrgMembershipChanged event =
+                OrgMembershipChanged.of("org_9k2j7f", "usr_1", "developer", OrgMembershipChanged.STATUS_ACTIVE, 1);
+
+        assertThatThrownBy(() -> publisher.publish(event, key)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> publisher.publishTombstone(Topics.ORG_MEMBERSHIP_CHANGED, key))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(template);
+    }
+
+    @Test
+    void aTombstoneOnADeletePolicyTopicIsRejected() {
+        assertThatThrownBy(() -> publisher.publishTombstone(Topics.GIT_PUSH_RECEIVED, "org_x:usr_1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(Topics.GIT_PUSH_RECEIVED);
+        assertThatThrownBy(() ->
+                        publisher.publishTombstone(Topics.deadLetter(Topics.ORG_MEMBERSHIP_CHANGED), "org_x:usr_1"))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(template);
+    }
+
+    @Test
+    void aTombstoneOnTheCompactedTopicSendsANullValueUnderTheKey() {
+        when(template.send(any(ProducerRecord.class))).thenReturn(ackedFuture());
+
+        publisher.publishTombstone(Topics.ORG_MEMBERSHIP_CHANGED, "org_x:usr_1");
+
+        ProducerRecord<String, Object> sent = captureSent();
+        assertThat(sent.topic()).isEqualTo(Topics.ORG_MEMBERSHIP_CHANGED);
+        assertThat(sent.key()).isEqualTo("org_x:usr_1");
+        assertThat(sent.value()).isNull();
+        assertThat(published("success")).isEqualTo(1.0);
+    }
+
+    @Test
+    void aFailedTombstoneSurfacesAsExternalServiceException() {
+        when(template.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker down")));
+
+        assertThatThrownBy(() -> publisher.publishTombstone(Topics.ORG_MEMBERSHIP_CHANGED, "org_x:usr_1"))
+                .isInstanceOf(ExternalServiceException.class)
+                .hasMessageContaining("topic=org.membership.changed");
         assertThat(published("failure")).isEqualTo(1.0);
     }
 

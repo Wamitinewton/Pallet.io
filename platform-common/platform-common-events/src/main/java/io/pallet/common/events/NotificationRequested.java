@@ -30,6 +30,7 @@ public record NotificationRequested(
     public static final String TYPE = Topics.NOTIFICATION_REQUESTED;
     public static final String AUDIENCE_SINGLE = "SINGLE";
     public static final String AUDIENCE_ORG = "ORG";
+    public static final String AUDIENCE_ORG_ADMINS = "ORG_ADMINS";
 
     public NotificationRequested {
         variables = variables == null ? Map.of() : Map.copyOf(variables);
@@ -69,5 +70,20 @@ public record NotificationRequested(
                 dedupeKey,
                 variables,
                 AUDIENCE_ORG);
+    }
+
+    public static NotificationRequested forOrgAdmins(
+            String orgId, String notificationType, String dedupeKey, Map<String, Object> variables) {
+        return new NotificationRequested(
+                UUID.randomUUID(),
+                TYPE,
+                orgId,
+                Instant.now(),
+                notificationType,
+                null,
+                null,
+                dedupeKey,
+                variables,
+                AUDIENCE_ORG_ADMINS);
     }
 }

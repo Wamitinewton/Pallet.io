@@ -35,6 +35,7 @@
         <module>platform-common-resilience</module>
         <module>platform-common-test</module>
         <module>platform-common-openapi</module>
+        <module>platform-common-outbox</module>
     </modules>
 
     <properties>
@@ -117,6 +118,11 @@
             <dependency>
                 <groupId>io.pallet</groupId>
                 <artifactId>platform-common-openapi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pallet</groupId>
+                <artifactId>platform-common-outbox</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

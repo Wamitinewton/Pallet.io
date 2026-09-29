@@ -5,16 +5,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Maps Spring's data-access exceptions to the {@link ErrorResponse} shape. Registered only
  * when {@code spring-tx} is on the classpath (see {@link PalletErrorHandlingAutoConfiguration}).
+ * An unreachable database is {@code 503}, not {@code 500}: the request was fine, so a caller that
+ * retries (GitHub's redelivery, a client backing off) should.
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -40,5 +46,20 @@ public class PersistenceExceptionHandler {
                 "[DATA_INTEGRITY_VIOLATION] {} {} — {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
         return HandlerSupport.render(
                 HttpStatus.CONFLICT, "This request conflicts with existing data.", "DATA_INTEGRITY_VIOLATION", request);
+    }
+
+    @ExceptionHandler({
+        DataAccessResourceFailureException.class,
+        TransientDataAccessResourceException.class,
+        QueryTimeoutException.class,
+        CannotCreateTransactionException.class
+    })
+    public ResponseEntity<ErrorResponse> handleDatabaseUnavailable(Exception ex, HttpServletRequest request) {
+        log.error("[SERVICE_UNAVAILABLE] {} {}", request.getMethod(), request.getRequestURI(), ex);
+        return HandlerSupport.render(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "The service is temporarily unavailable. Please try again later.",
+                "SERVICE_UNAVAILABLE",
+                request);
     }
 }
