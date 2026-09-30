@@ -37,18 +37,20 @@ public class CheckRunRepository {
     record Target(long installationId, long repoId, String appSlug) {}
 
     /** @return whether the row was created; false when the app already has one for the commit, in any org */
-    boolean insertIfAbsent(String orgId, UUID appId, String commitSha, DesiredCheck desired) {
+    boolean insertIfAbsent(String orgId, UUID appId, String commitSha, DesiredCheck desired, String traceparent) {
         return jdbc.sql("""
                         INSERT INTO git_integration.check_runs
                             (app_id, commit_sha, org_id, desired_state, desired_conclusion, desired_details_url,
-                             desired_summary, desired_phase, desired_revision, attempts, next_attempt_at, updated_at)
+                             desired_summary, desired_phase, desired_revision, attempts, next_attempt_at, updated_at,
+                             traceparent)
                         VALUES (:appId, :commitSha, :orgId, :state, :conclusion, :detailsUrl, :summary, :phase, 1, 0,
-                                now(), now())
+                                now(), now(), :traceparent)
                         ON CONFLICT (app_id, commit_sha) DO NOTHING
                         """)
                         .param("orgId", orgId)
                         .param("appId", appId)
                         .param("commitSha", commitSha)
+                        .param("traceparent", traceparent)
                         .params(desiredParams(desired))
                         .update()
                 == 1;
@@ -81,18 +83,19 @@ public class CheckRunRepository {
     }
 
     /** Replaces the desire, makes the row due now, and starts its attempts over. */
-    void updateDesired(String orgId, UUID appId, String commitSha, DesiredCheck desired) {
+    void updateDesired(String orgId, UUID appId, String commitSha, DesiredCheck desired, String traceparent) {
         jdbc.sql("""
                         UPDATE git_integration.check_runs
                            SET desired_state = :state, desired_conclusion = :conclusion,
                                desired_details_url = :detailsUrl, desired_summary = :summary, desired_phase = :phase,
                                desired_revision = desired_revision + 1, attempts = 0, next_attempt_at = now(),
-                               updated_at = now()
+                               updated_at = now(), traceparent = :traceparent
                          WHERE org_id = :orgId AND app_id = :appId AND commit_sha = :commitSha
                         """)
                 .param("orgId", orgId)
                 .param("appId", appId)
                 .param("commitSha", commitSha)
+                .param("traceparent", traceparent)
                 .params(desiredParams(desired))
                 .update();
     }
@@ -240,7 +243,8 @@ public class CheckRunRepository {
                 rs.getInt("desired_revision"),
                 reported == null ? null : CheckState.fromWireName(reported),
                 rs.getObject("reported_revision", Integer.class),
-                rs.getInt("attempts"));
+                rs.getInt("attempts"),
+                rs.getString("traceparent"));
     }
 
     private static Target target(ResultSet rs) throws SQLException {

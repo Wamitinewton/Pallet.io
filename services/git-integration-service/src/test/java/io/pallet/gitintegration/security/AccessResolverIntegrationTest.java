@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.error.AppException;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.security.AccessExceptions.NotAMemberException;
 import io.pallet.gitintegration.security.AccessExceptions.OrgNotFoundException;
 import io.pallet.gitintegration.support.ReadModelFixtures;
@@ -185,8 +186,8 @@ class AccessResolverIntegrationTest {
     }
 
     private double deniedCount(String reason) {
-        Counter counter = meters.find(AccessResolver.DENIED)
-                .tag(AccessResolver.TAG_REASON, reason)
+        Counter counter = meters.find(MetricsCatalog.AUTHZ_DENIED)
+                .tag(MetricsCatalog.TAG_REASON, reason)
                 .counter();
         return counter == null ? 0 : counter.count();
     }

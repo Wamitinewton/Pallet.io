@@ -16,6 +16,7 @@ import io.pallet.gitintegration.installation.InstallationRepository;
 import io.pallet.gitintegration.push.BranchHead;
 import io.pallet.gitintegration.push.BranchHeadRepository;
 import io.pallet.gitintegration.push.PushEventFactory;
+import io.pallet.gitintegration.push.PushMetrics;
 import io.pallet.gitintegration.repolink.ManualBuildRequestRepository.RecentBuilds;
 import io.pallet.gitintegration.repolink.RepoLinkExceptions.RepoLinkNotFoundException;
 import io.pallet.gitintegration.repolink.dto.ManualBuildRequestDto;
@@ -53,6 +54,7 @@ public class ManualBuildService {
     private final ManualBuildRequestRepository requests;
     private final BranchHeadRepository heads;
     private final PushEventFactory pushes;
+    private final PushMetrics metrics;
     private final OutboxWriter outbox;
     private final TransactionTemplate transaction;
     private final Clock clock;
@@ -66,6 +68,7 @@ public class ManualBuildService {
             ManualBuildRequestRepository requests,
             BranchHeadRepository heads,
             PushEventFactory pushes,
+            PushMetrics metrics,
             OutboxWriter outbox,
             PlatformTransactionManager transactionManager,
             Clock clock,
@@ -77,6 +80,7 @@ public class ManualBuildService {
         this.requests = requests;
         this.heads = heads;
         this.pushes = pushes;
+        this.metrics = metrics;
         this.outbox = outbox;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
@@ -126,6 +130,7 @@ public class ManualBuildService {
                 return replay(requests.findRequest(orgId, appId, idempotencyKey).orElseThrow(), requestHash);
             }
             outbox.append(event);
+            metrics.published(GitPushReceived.TRIGGER_MANUAL);
             outbox.append(AuditEvents.buildRequested(orgId, sub, appId, branch, sha, event.eventId(), clock.instant()));
             return new ManualBuildResultDto(event.eventId(), sha, branch);
         }));

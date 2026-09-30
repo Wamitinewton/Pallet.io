@@ -93,6 +93,8 @@ final class GitHubResponseClassifier {
                 new AppCredentialRejectedException("GitHub answered 401 to the app JWT");
             case GitHubCredential.OAuthClient ignored ->
                 new AppCredentialRejectedException("GitHub answered 401 to the app's OAuth client credentials");
+            case GitHubCredential.Anonymous ignored ->
+                new AppCredentialRejectedException("GitHub answered 401 to an unauthenticated request");
         };
     }
 

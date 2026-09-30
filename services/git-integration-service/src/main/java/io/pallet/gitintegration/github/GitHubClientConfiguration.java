@@ -26,8 +26,9 @@ class GitHubClientConfiguration {
     }
 
     @Bean
-    InstallationTokenCache installationTokenCache(GitIntegrationProperties properties, Clock clock) {
-        return new InstallationTokenCache(properties, clock);
+    InstallationTokenCache installationTokenCache(
+            GitIntegrationProperties properties, Clock clock, MeterRegistry meters) {
+        return new InstallationTokenCache(properties, clock, meters);
     }
 
     @Bean

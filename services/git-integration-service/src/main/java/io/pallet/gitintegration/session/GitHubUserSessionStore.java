@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.session;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.error.ExternalServiceException;
@@ -29,8 +31,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public class GitHubUserSessionStore {
-
-    public static final String UNDECRYPTABLE = "git.sessions.undecryptable";
 
     static final String SESSION_KEY_PREFIX = "git:user-session:";
     static final String INDEX_KEY_PREFIX = "git:user-session-by-github:";
@@ -67,6 +67,7 @@ public class GitHubUserSessionStore {
         this.clock = clock;
         this.meters = meters;
         this.maxTtl = properties.userSession().maxTtl();
+        meters.counter(SESSIONS_UNDECRYPTABLE);
     }
 
     /** Stores the session for the shorter of {@code max-ttl} and the time left until it expires. */
@@ -138,7 +139,7 @@ public class GitHubUserSessionStore {
         }
         Optional<StoredSession> stored = cipher.decrypt(value, key).flatMap(this::parse);
         if (stored.isEmpty()) {
-            meters.counter(UNDECRYPTABLE).increment();
+            meters.counter(SESSIONS_UNDECRYPTABLE).increment();
             return Optional.empty();
         }
         return stored.filter(session -> session.expiresAtEpochMilli() > clock.millis());

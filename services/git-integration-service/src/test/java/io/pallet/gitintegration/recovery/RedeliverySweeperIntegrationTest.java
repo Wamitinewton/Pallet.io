@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.recovery.RedeliverySweeper.Run;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.GitHubApiStub.LoggedDelivery;
@@ -27,12 +28,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 
 @IntegrationTest
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 @TestPropertySource(properties = "pallet.git.redelivery.max-per-run=" + RedeliverySweeperIntegrationTest.CAP)
 class RedeliverySweeperIntegrationTest {
 
@@ -40,11 +39,6 @@ class RedeliverySweeperIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private RedeliverySweeper sweeper;
@@ -229,7 +223,7 @@ class RedeliverySweeperIntegrationTest {
     }
 
     private double requestedCount() {
-        return meters.counter(RecoveryMetrics.REDELIVERY_REQUESTED).count();
+        return meters.counter(MetricsCatalog.REDELIVERY_REQUESTED).count();
     }
 
     private Instant minutesAgo(int minutes) {

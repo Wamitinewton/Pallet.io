@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.installation;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -14,9 +16,6 @@ import org.springframework.stereotype.Component;
 @Component
 class UnusedInstallationMetrics {
 
-    static final String UNUSED = "git.installations.unused";
-    static final String UNINSTALLED = "git.installations.uninstalled";
-
     private static final Logger log = LoggerFactory.getLogger(UnusedInstallationMetrics.class);
 
     private final InstallationRepository installations;
@@ -25,10 +24,10 @@ class UnusedInstallationMetrics {
 
     UnusedInstallationMetrics(MeterRegistry registry, InstallationRepository installations) {
         this.installations = installations;
-        this.uninstalled = Counter.builder(UNINSTALLED)
+        this.uninstalled = Counter.builder(INSTALLATIONS_UNINSTALLED)
                 .description("Installations Pallet uninstalled from GitHub after their grace period unused")
                 .register(registry);
-        Gauge.builder(UNUSED, unused, AtomicLong::get)
+        Gauge.builder(INSTALLATIONS_UNUSED, unused, AtomicLong::get)
                 .description("Active installations no org links, waiting out their grace period")
                 .register(registry);
     }

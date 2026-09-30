@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.access;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -20,11 +22,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReverifyMetrics {
 
-    public static final String CHECKED = "git.reverify.checked";
-    public static final String DISCONNECTED = "git.reverify.disconnected";
-    public static final String OLDEST_CHECK_AGE = "git.reverify.oldest_check_age_seconds";
-    public static final String RUN_DURATION = "git.reverify.run_duration";
-
     private static final Logger log = LoggerFactory.getLogger(ReverifyMetrics.class);
 
     private final MeterRegistry registry;
@@ -36,13 +33,13 @@ public class ReverifyMetrics {
     ReverifyMetrics(MeterRegistry registry, RepoLinkRepository links) {
         this.registry = registry;
         this.links = links;
-        this.disconnected = Counter.builder(DISCONNECTED)
+        this.disconnected = Counter.builder(REVERIFY_DISCONNECTED)
                 .description("Repo links disconnected because their verifier lost access on GitHub")
                 .register(registry);
-        this.runDuration = Timer.builder(RUN_DURATION)
+        this.runDuration = Timer.builder(REVERIFY_RUN_DURATION)
                 .description("Duration of one access re-verification run")
                 .register(registry);
-        Gauge.builder(OLDEST_CHECK_AGE, oldestCheckAge, AtomicReference::get)
+        Gauge.builder(REVERIFY_OLDEST_CHECK_AGE, oldestCheckAge, AtomicReference::get)
                 .description("Time since the least recently re-verified active link was checked against GitHub")
                 .baseUnit("seconds")
                 .register(registry);
@@ -75,9 +72,9 @@ public class ReverifyMetrics {
     }
 
     private Counter checkedCounter(ReverifyOutcome.Kind kind) {
-        return Counter.builder(CHECKED)
+        return Counter.builder(REVERIFY_CHECKED)
                 .description("Verifier permissions read from GitHub, by what GitHub's answer meant")
-                .tag("outcome", kind.tag())
+                .tag(TAG_OUTCOME, kind.tag())
                 .register(registry);
     }
 }

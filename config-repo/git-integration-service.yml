@@ -11,6 +11,12 @@ spring:
     consumer:
       group-id: git-integration-service
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
 pallet:
   outbox:
     schema: git_integration
@@ -57,6 +63,7 @@ pallet:
     user-session:
       encryption-key: ${PALLET_GIT_USER_SESSION_KEY}
       max-ttl: PT1H
+      metrics-interval: PT1M
     link:
       min-repo-permission: push
       max-installation-pages: 10
@@ -85,6 +92,8 @@ pallet:
       max-body: 25MB
       github-ip-allowlist:
         enabled: false
+        refresh-interval: P1D
+        retry-interval: PT5M
     delivery:
       enabled: true
       poll-interval: PT0.25S

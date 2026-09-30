@@ -6,6 +6,7 @@ import io.pallet.common.inbox.EventPayloads;
 import io.pallet.common.inbox.MalformedEventException;
 import io.pallet.common.inbox.TransactionalInbox;
 import io.pallet.gitintegration.checks.CheckRunMetrics.DropReason;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import java.util.regex.Pattern;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -23,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class DeployEventListener {
 
-    static final String CONSUMER = "check-run-deploy-state";
+    static final String CONSUMER = MetricsCatalog.LISTENER_DEPLOY_STATE;
 
     private static final Pattern STATE = Pattern.compile("[A-Z][A-Z_]{0,31}");
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.MutableClock;
 import java.time.Duration;
 import java.time.Instant;
@@ -106,13 +107,15 @@ class GitHubRateLimitGuardTest {
         guard.record(3, headers(4000, RESET));
         guard.record(4, headers(0, NOW.plusSeconds(60)));
 
-        assertThat(meters.get(GitHubRateLimitGuard.LOW_INSTALLATIONS).gauge().value())
+        assertThat(meters.get(MetricsCatalog.GITHUB_RATELIMIT_LOW_INSTALLATIONS)
+                        .gauge()
+                        .value())
                 .isEqualTo(3.0);
 
         clock.advance(Duration.ofMinutes(1));
 
         assertThat(guard.lowInstallations()).isEqualTo(2);
-        assertThat(meters.get(GitHubRateLimitGuard.LOW_INSTALLATIONS)
+        assertThat(meters.get(MetricsCatalog.GITHUB_RATELIMIT_LOW_INSTALLATIONS)
                         .gauge()
                         .getId()
                         .getTags())

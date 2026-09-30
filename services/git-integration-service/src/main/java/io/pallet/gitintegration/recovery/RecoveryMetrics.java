@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.recovery;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -13,12 +15,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class RecoveryMetrics {
-
-    public static final String REDELIVERY_REQUESTED = "git.redelivery.requested";
-    public static final String REDELIVERY_FAILED = "git.redelivery.failed";
-    public static final String RECONCILER_CHECKED = "git.reconciler.checked";
-    public static final String RECONCILER_PUSHES_FOUND = "git.reconciler.pushes_found";
-    public static final String RECONCILER_RUN_DURATION = "git.reconciler.run_duration";
 
     /** What one fetch of a repository branch found, across every link that shares it. */
     public enum Checked {
@@ -79,7 +75,7 @@ public class RecoveryMetrics {
     private Counter checkedCounter(Checked result) {
         return Counter.builder(RECONCILER_CHECKED)
                 .description("Repository branches the head reconciler read from GitHub, by what it found")
-                .tag("result", result.tag())
+                .tag(TAG_RESULT, result.tag())
                 .register(registry);
     }
 }

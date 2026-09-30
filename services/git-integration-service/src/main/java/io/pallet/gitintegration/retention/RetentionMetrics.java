@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.retention;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -12,10 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 class RetentionMetrics {
 
-    static final String DELETED = "git.retention.deleted";
-    static final String NULLED = "git.retention.nulled";
-    static final String RUN_DURATION = "git.retention.run_duration";
-
     private final MeterRegistry registry;
     private final Map<Sweep, Counter> rows = new EnumMap<>(Sweep.class);
     private final Map<Sweep, Timer> durations = new EnumMap<>(Sweep.class);
@@ -25,15 +23,15 @@ class RetentionMetrics {
         for (Sweep sweep : Sweep.values()) {
             rows.put(
                     sweep,
-                    Counter.builder(sweep.nulls() ? NULLED : DELETED)
+                    Counter.builder(sweep.nulls() ? RETENTION_NULLED : RETENTION_DELETED)
                             .description(sweep.nulls() ? "Rows retention nulled" : "Rows retention deleted")
-                            .tag("table", sweep.table())
+                            .tag(TAG_TABLE, sweep.table())
                             .register(registry));
             durations.put(
                     sweep,
-                    Timer.builder(RUN_DURATION)
+                    Timer.builder(RETENTION_RUN_DURATION)
                             .description("Duration of one retention sweep run")
-                            .tag("sweep", sweep.tag())
+                            .tag(TAG_SWEEP, sweep.tag())
                             .register(registry));
         }
     }

@@ -12,6 +12,7 @@ import io.pallet.common.test.assertions.PalletAssertions;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.gitintegration.delivery.DeliveryStore;
 import io.pallet.gitintegration.delivery.SubscribedEvents;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.ProbeController;
 import io.pallet.gitintegration.support.TestSecrets;
 import io.pallet.gitintegration.support.Tokens;
@@ -171,7 +172,7 @@ class WebhookIngestionIntegrationTest {
     @Test
     void aBadSignatureIs401WithAGenericBodyAndStoresNothing() throws Exception {
         Delivery forged = track(WebhookFixtures.delivery("push-main.json").secret(TestSecrets.hex(32)));
-        double failuresBefore = counter(WebhookMetrics.SIGNATURE_FAILURES);
+        double failuresBefore = counter(MetricsCatalog.WEBHOOK_SIGNATURE_FAILURES);
         double rejectedBefore = received("push", WebhookMetrics.REJECTED);
 
         MockHttpServletResponse response = forged.post(mvc);
@@ -181,7 +182,7 @@ class WebhookIngestionIntegrationTest {
                 .hasMessage("The webhook signature is invalid.");
         assertThat(response.getContentAsString()).doesNotContainIgnoringCase("secret");
         assertThat(count(forged.deliveryId())).isZero();
-        assertThat(counter(WebhookMetrics.SIGNATURE_FAILURES)).isEqualTo(failuresBefore + 1);
+        assertThat(counter(MetricsCatalog.WEBHOOK_SIGNATURE_FAILURES)).isEqualTo(failuresBefore + 1);
         assertThat(received("push", WebhookMetrics.REJECTED)).isEqualTo(rejectedBefore + 1);
     }
 
@@ -287,7 +288,7 @@ class WebhookIngestionIntegrationTest {
     void aNulEscapeInACommitMessageIsStoredAsTheReplacementCharacter() {
         Delivery delivery =
                 track(WebhookFixtures.delivery("push-main.json").with("/head_commit/message", "fix\u0000bug"));
-        double sanitizedBefore = counter(WebhookMetrics.PAYLOAD_SANITIZED);
+        double sanitizedBefore = counter(MetricsCatalog.WEBHOOK_PAYLOAD_SANITIZED);
 
         assertThat(delivery.post(mvc).getStatus()).isEqualTo(202);
 
@@ -297,7 +298,7 @@ class WebhookIngestionIntegrationTest {
                         String.class,
                         delivery.deliveryId()))
                 .isEqualTo("fix�bug");
-        assertThat(counter(WebhookMetrics.PAYLOAD_SANITIZED)).isEqualTo(sanitizedBefore + 1);
+        assertThat(counter(MetricsCatalog.WEBHOOK_PAYLOAD_SANITIZED)).isEqualTo(sanitizedBefore + 1);
     }
 
     @Test
@@ -364,16 +365,16 @@ class WebhookIngestionIntegrationTest {
     }
 
     private double received(String event, String result) {
-        Counter counter = meters.find(WebhookMetrics.RECEIVED)
-                .tag(WebhookMetrics.TAG_EVENT, event)
-                .tag(WebhookMetrics.TAG_RESULT, result)
+        Counter counter = meters.find(MetricsCatalog.WEBHOOKS_RECEIVED)
+                .tag(MetricsCatalog.TAG_EVENT, event)
+                .tag(MetricsCatalog.TAG_RESULT, result)
                 .counter();
         return counter == null ? 0 : counter.count();
     }
 
     private double signatureVerified(String secret) {
-        Counter counter = meters.find(WebhookMetrics.SIGNATURE_VERIFIED)
-                .tag(WebhookMetrics.TAG_SECRET, secret)
+        Counter counter = meters.find(MetricsCatalog.WEBHOOK_SIGNATURE_VERIFIED)
+                .tag(MetricsCatalog.TAG_SECRET, secret)
                 .counter();
         return counter == null ? 0 : counter.count();
     }

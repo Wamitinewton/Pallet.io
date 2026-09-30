@@ -483,6 +483,7 @@ erDiagram
         int attempts
         timestamptz next_attempt_at
         timestamptz updated_at
+        varchar traceparent "build or deploy event's trace"
     }
     MANUAL_BUILD_REQUESTS {
         uuid app_id PK
@@ -555,6 +556,7 @@ spend an attempt),
 `attempts`, `next_attempt_at` and `org_id` columns (the check run reporter's intent rows), and
 `check_runs.desired_revision` / `reported_revision` (a completed check can still change its conclusion,
 so equal states don't mean delivered; see [Check run reporting](#check-run-reporting)),
+`check_runs.traceparent` (the trace of the event that last changed the desire, which the reporter's write continues),
 `manual_build_requests` (manual-build idempotency and the per-app hourly limit),
 `repo_links.disconnected_at` and `installations.deleted_at` (retention),
 `installations.repositories_synced_at` (the periodic repository sync's oldest-first order; a `304`
@@ -1613,7 +1615,7 @@ Until Vault is wired, local development can let `build-service` read public repo
 | Bounded work | Batch sizes, per-run caps, page limits, body size limit, parser limits | Everywhere |
 | Single-active scheduled jobs | Postgres advisory lock: the relay's own, and `SchedulingLocks` (one `pg_try_advisory_xact_lock` key per job, held on a connection that locks no rows, so GitHub calls run outside it) | Relay, repository sync, sweeper, reconciler, re-verification, unused-installation sweep, retention |
 | Short-lived credentials at rest | User token encrypted in Redis with a TTL of at most an hour, refresh token discarded | GitHub user sessions |
-| Trace continuity across the async hops | `traceparent` stored on the delivery row and outbox row | Ingest → processor → Kafka → build-queue |
+| Trace continuity across the async hops | `traceparent` stored on the delivery row, the outbox row and the check run row | Ingest → processor → Kafka → build-queue; build event → check run write |
 
 ## Consistency and failure modes
 
@@ -1641,7 +1643,7 @@ interval plus the relay interval, both sub-second by default.
 | A member removed in `org-team-service` makes a request here | Allowed until the `REMOVED` record on `org.membership.changed` reaches the read model (sub-second normally), then `403`. |
 | A new member's first request before their membership record arrives | `404 ORG_NOT_FOUND` for that window; the dashboard retries. |
 | This service deployed, or its read model rebuilt, long after orgs were created | Consumes `org.membership.changed` from the beginning; compaction has kept the latest record of every membership. |
-| Redis down | No GitHub user sessions: linking, the repository picker and verifier handover return `503`. Webhooks, pushes, builds, check runs and reads keep working. Session revocation (ADR-0015) falls back as it does in every other service. |
+| Redis down | No GitHub user sessions: linking, the repository picker and verifier handover return `502 EXTERNAL_SERVICE_ERROR`, the same `ExternalServiceException` an unreachable GitHub raises, so a revocation webhook that meets it waits and retries without spending attempts. Webhooks, pushes, builds, check runs and reads keep working. Session revocation (ADR-0015) falls back as it does in every other service. |
 | A verifier loses push access on GitHub | The next daily re-verification disconnects the link (`VERIFIER_ACCESS_LOST`) and tells the org's admins. Up to a day of builds may still happen in that window. |
 | Two orgs share an installation and one unlinks it | Only that org's installation link and repo links change. The other org's pushes keep building. If no org is left, the unused-installation grace period starts. |
 | One push to a repository linked by apps in three orgs | Three `GitPushReceived` events, each on its own org's key, from one delivery and one transaction. |
@@ -1650,24 +1652,24 @@ interval plus the relay interval, both sub-second by default.
 
 ## Security and threat model
 
-| Threat | Mitigation |
-|---|---|
-| Forged webhook | HMAC-SHA256 over raw bytes, constant-time comparison, before any parsing or database access. Optional GitHub IP allowlist as a second layer. |
-| Replay of a captured, validly signed webhook | GitHub signatures carry no timestamp, so replay protection comes from the delivery GUID (kept 30 days) and, beyond that, from the chain rule, which turns a replayed old push into `STALE`. Deliveries arrive over TLS, which makes capture hard in the first place. |
-| Linking someone else's GitHub installation | Every link checked against `GET /user/installations` with the linking user's own token; signed, single-use, org-bound, user-bound `state` on the install redirect. |
-| Using a shared installation to reach a repository the user can't | Every repo link checked with the user's own token (`GET /repositories/{id}` succeeds only where user and installation overlap), at least `push` required, re-checked daily; the picker lists only what the user's token returns; one error code for "installation can't" and "you can't". |
-| Stealing a GitHub user session | Encrypted in Redis under a key from config, TTL at most an hour, never returned by the API, read-only use, deleted on `github_app_authorization.revoked`, no refresh token kept. |
-| Linking a repository through an installation this org hasn't linked | The org's installation link must be `ACTIVE`; composite foreign key `(installation_id, org_id) → installation_links` enforces it in the database. |
-| IDOR on org, app, installation or link ids | Membership gate with indistinguishable `404`; every query scoped by `orgId`; `appId` checked against the org's `apps` read model; ArchUnit rule on repository signatures. |
-| Private key or token leak | Key in Vault or env only, never logged; tokens memory-only, short-lived and scoped per call; redaction of `Authorization` headers and `code`/`state` query values in access logs and spans. |
-| Over-privileged credentials | GitHub App with three permissions; per-call `repository_ids` and permission narrowing on installation tokens; user tokens used only for read-only access checks and never persisted beyond an hour. |
-| Hostile payload after a valid signature (a compromised GitHub account can push anything) | Size limit, Jackson read limits, strict field validation (ids numeric, SHAs 40 hex characters, branch names checked against Git's ref rules and a length limit). `rootDirectory` is validated on write, never taken from a payload. |
-| Commit message and author as an injection vector | Truncated, carried as plain text, documented as untrusted in the event contract. The dashboard must escape it. Author email is dropped at ingestion. |
-| Webhook endpoint DoS | Signature check before any I/O costs one HMAC; body cap; the gateway still applies its global protections (connection limits, timeouts). |
-| SSRF | GitHub base URLs come from config only. No user-supplied URL is ever fetched. |
-| Stale authorization after removal | Local read model updated from `org.membership.changed`; ADR-0015 session revocation for session kills; GitHub-side removal caught by the daily re-verification. |
-| Secret rotation | Two webhook secrets accepted during rotation; several private keys active on GitHub during rotation. |
-| Mass assignment | `PATCH` DTOs contain only `productionBranch`, `rootDirectory`, `autoDeploy` and reject unknown properties. |
+| Threat | Mitigation | Proven by |
+|---|---|---|
+| Forged webhook | HMAC-SHA256 over raw bytes, constant-time comparison, before any parsing or database access. Optional GitHub IP allowlist as a second layer. | `WebhookSignatureVerifierTest`, `WebhookIngestionIntegrationTest`, `SecurityHardeningIntegrationTest` (forged burst touches no database), `GitHubIpAllowlistIntegrationTest` |
+| Replay of a captured, validly signed webhook | GitHub signatures carry no timestamp, so replay protection comes from the delivery GUID (kept 30 days) and, beyond that, from the chain rule, which turns a replayed old push into `STALE`. Deliveries arrive over TLS, which makes capture hard in the first place. | `WebhookIngestionIntegrationTest` (same GUID), `PushOrderingIntegrationTest`, `ChainRuleTest` (`STALE`) |
+| Linking someone else's GitHub installation | Every link checked against `GET /user/installations` with the linking user's own token; signed, single-use, org-bound, user-bound `state` on the install redirect. | `InstallationServiceIntegrationTest`, `InstallationRaceIntegrationTest`, `AuthorizationStateIntegrationTest`, `AuthorizationStateTokensTest` |
+| Using a shared installation to reach a repository the user can't | Every repo link checked with the user's own token (`GET /repositories/{id}` succeeds only where user and installation overlap), at least `push` required, re-checked daily; the picker lists only what the user's token returns; one error code for "installation can't" and "you can't". | `RepoLinkControllerIntegrationTest`, `RepoAccessVerifierIntegrationTest`, `RepositoryPickerIntegrationTest`, `AccessReverifierIntegrationTest` |
+| Stealing a GitHub user session | Encrypted in Redis under a key from config, TTL at most an hour, never returned by the API, read-only use, deleted on `github_app_authorization.revoked`, no refresh token kept. | `GitHubUserSessionStoreIntegrationTest`, `SessionCipherTest`, `AuthorizationRevokedHandlerIntegrationTest`, `RedactionIntegrationTest` |
+| Linking a repository through an installation this org hasn't linked | The org's installation link must be `ACTIVE`; composite foreign key `(installation_id, org_id) → installation_links` enforces it in the database. | `SchemaConstraintsIntegrationTest`, `RepoLinkControllerIntegrationTest` |
+| IDOR on org, app, installation or link ids | Membership gate with indistinguishable `404`; every query scoped by `orgId`; `appId` checked against the org's `apps` read model; ArchUnit rule on repository signatures. | `AuthorizationWebIntegrationTest`, `AccessResolverIntegrationTest`, `ArchitectureTest`, `SecurityHardeningIntegrationTest` |
+| Private key or token leak | Key in Vault or env only, never logged; tokens memory-only, short-lived and scoped per call; redaction of `Authorization` headers and `code`/`state` query values in access logs and spans. | `RedactionIntegrationTest`, `SecretMaterialValidatorTest`, `SecurityHardeningIntegrationTest` (no GitHub body in an error) |
+| Over-privileged credentials | GitHub App with three permissions; per-call `repository_ids` and permission narrowing on installation tokens; user tokens used only for read-only access checks and never persisted beyond an hour. | `GitHubClientIntegrationTest`, `RepoLinkControllerIntegrationTest` (narrowed mint body), `InstallationTokenCacheTest` |
+| Hostile payload after a valid signature (a compromised GitHub account can push anything) | Size limit, Jackson read limits, strict field validation (ids numeric, SHAs 40 hex characters, branch names checked against Git's ref rules and a length limit). `rootDirectory` is validated on write, never taken from a payload. | `PayloadParserTest`, `WebhookEnvelopeReaderTest`, `WebhookIngestionIntegrationTest`, `RootDirectoryTest` |
+| Commit message and author as an injection vector | Truncated, carried as plain text, documented as untrusted in the event contract. The dashboard must escape it. Author email is dropped at ingestion. | `PayloadParserTest`, `PushEventFactoryTest`, `RedactionIntegrationTest` (never logged) |
+| Webhook endpoint DoS | Signature check before any I/O costs one HMAC; body cap; the gateway still applies its global protections (connection limits, timeouts). | `WebhookIngestionIntegrationTest` (413 before reading), `SecurityHardeningIntegrationTest` |
+| SSRF | GitHub base URLs come from config only. No user-supplied URL is ever fetched. | `SecurityHardeningIntegrationTest` (base URLs fixed at runtime, no `env`/`refresh` actuator) |
+| Stale authorization after removal | Local read model updated from `org.membership.changed`; ADR-0015 session revocation for session kills; GitHub-side removal caught by the daily re-verification. | `MembershipStateListenerIntegrationTest`, `AccessResolverIntegrationTest`, `AccessReverifierIntegrationTest` |
+| Secret rotation | Two webhook secrets accepted during rotation; several private keys active on GitHub during rotation. | `WebhookSignatureVerifierTest`, `WebhookIngestionIntegrationTest` (previous secret, `secret` tag) |
+| Mass assignment | `PATCH` DTOs contain only `productionBranch`, `rootDirectory`, `autoDeploy` and reject unknown properties. | `SecurityHardeningIntegrationTest` (every request body, `PATCH` cannot re-point a link) |
 
 PII held: GitHub account logins and repository names (tenant metadata, not personal data in most
 cases), the GitHub login and id of each link's verifier, and user ids in the membership read
@@ -1676,39 +1678,54 @@ contain committer emails, are nulled after seven days.
 
 ## Observability and operations
 
-Metrics (Micrometer to Prometheus, `git.*`):
+Metrics (Micrometer to Prometheus, `git.*`), every name in `observability/MetricsCatalog`. A tag value is always a
+fixed code, never an org, app, installation, repository, login, SHA or delivery id, and counters with a fixed tag set
+are registered at startup so every series (and every alert over it) exists before its first event:
 
 - Ingestion: `webhooks.received{event, result}` (`stored`, `duplicate`, `ignored`, `rejected`,
   `failed` for a `503`), `webhook.signature_failures`, `webhook.signature_verified{secret}` (`current`,
   `previous`: when `previous` stops counting, a rotation is finished), `webhook.payload_sanitized`,
-  `webhook.ack_latency` histogram.
+  `webhook.ack_latency` histogram (SLO buckets at 50, 100, 200 and 500 ms), `webhook.ip_allowlist{result}`
+  (`allowed`, `rejected`, `unchecked` while GitHub's ranges have never loaded; only while the allowlist is on).
 - Processing: `deliveries.pending`, `deliveries.oldest_pending_age_seconds`, `deliveries.parked`,
   `deliveries.processed{event}` (every delivery that completes, `PROCESSED` or `IGNORED`),
   `deliveries.failures{kind}` (`malformed`, `rate_limited`, `github_unavailable`, `error`),
-  `pushes.published{trigger}`, `pushes.skipped{reason}`, `chain_rule.outcome{outcome}`.
+  `pushes.published{trigger}` (`WEBHOOK`, `MANUAL`, `LINKED`, `RECONCILED`), `pushes.skipped{reason}`,
+  `chain_rule.outcome{outcome}`, `push.to_outbox_latency` (a webhook push from `received_at` to its outbox append,
+  recorded once the delivery commits; SLO buckets at 250 ms, 500 ms, 1 s and 3 s).
 - Recovery: `redelivery.requested`, `reconciler.checked`, `reconciler.pushes_found`.
 - Check runs: `checks.desired{result}` (`applied`, `unchanged`), `checks.reported{outcome}`
   (`created`, `updated`, `recovered`), `checks.failures{kind}` (`rate_limited`, `github_unavailable`,
   `error`), `checks.dropped{reason}` (`unlinked`, `untracked`, `disconnected`, `max_attempts`).
-- Access: `sessions.created`, `sessions.active`, `link.access_denied{reason}`,
+- Access: `sessions.created`, `sessions.active` (a `SCAN` of the session keys every
+  `user-session.metrics-interval`, never `KEYS`: sessions live at most an hour, so the walk stays small; drop the
+  gauge if Redis ever holds much else), `link.access_denied{reason}` (`not_accessible`, `permission_too_low`),
   `reverify.checked{outcome}` (`confirmed`, `lost`, `unknown`), `reverify.disconnected`,
   `reverify.oldest_check_age_seconds` (the least recently checked `ACTIVE` link on an `ACTIVE`
   installation, refreshed on its own schedule so it keeps growing when the job stops),
   `reverify.run_duration`, `installations.unused`, `installations.uninstalled`.
 - GitHub: `github.calls{endpoint, outcome}`, `github.ratelimit.low_installations` (count of
   installations under `reserve`, never an installation id as a label),
-  `github.token_mints`, breaker state for `github-api` and `github-user` (from the existing
+  `github.token_mints` (one per installation token cache miss or expiry), breaker state for `github-api` and `github-user` (from the existing
   resilience binder).
 - Outbox and inbox: the same set `org-team-service` exports, under this service's prefix.
 - Authorization: `authz.denied{reason}`, `authz.projection_lag_seconds`.
 
 Tracing: one trace per webhook request. The processor's span links to it through the stored
-`traceparent`, the outbox row carries it on to Kafka, and `build-queue-service` continues it. A
+`traceparent`, the outbox row carries the `traceparent` captured at append time (inside the processing span, not the
+relay's thread) on to Kafka, and `build-queue-service` continues it. Check run reporting continues the trace of the build or deploy event that last changed the check: the listener stores
+its `traceparent` on the `check_runs` row and the reporter's `check run report` span is its child. The webhook's server
+span and the processing span carry `git.event`, `git.delivery_id` and `git.installation_id`: ids belong on spans, never on metrics. `SpanRedaction`,
+an `ObservationFilter`, strips query strings from every URL attribute and drops header, cookie and authorization
+attributes before any span is exported. A
 push reads in Jaeger as one causal chain from GitHub's POST to the build being queued, and later to
 the deploy, which is the end-to-end trace `PROJECT.md` promises.
 
-Logging: structured; correlation id, `orgId`, `installationId`, `deliveryId` in MDC. No payloads,
-no tokens, no commit messages above DEBUG.
+Logging: structured; correlation id, `orgId`, `installationId`, `deliveryId` in MDC, each accepted only in the shape
+a real id has, since the request is not yet authorized when they are read. No payloads, no tokens, no emails above
+DEBUG, and no commit messages at any level. `RedactingAccessLog` writes one `pallet.access` line per request with
+`code`, `state` and every token-shaped query value masked, and records only whether a bearer token came, never its
+value.
 
 Alerts:
 
@@ -1729,11 +1746,22 @@ availability; push to `git.push.received` on Kafka p99 under 3 s; API availabili
 
 Health: liveness is process-only. Readiness requires Postgres. Kafka is not a readiness condition:
 the webhook must keep accepting deliveries while Kafka is down, and the delivery table and the
-outbox exist so that it can. GitHub is never a readiness condition either.
+outbox exist so that it can. GitHub is never a readiness condition either, nor is Redis, which only backs sessions.
+The actuator exposes `health` and `prometheus` only.
 
-Runbooks (written with the observability checkpoint): re-queue a parked delivery; replay a
-delivery by GUID; force a reconcile of one app; rotate the webhook secret; rotate the private key;
-investigate an installation stuck `SUSPENDED`; rotate the user session encryption key (every session ends, users re-authorize without a prompt).
+Shutdown: readiness turns `REFUSING_TRAFFIC` first, in-flight requests finish (`server.shutdown: graceful`), and the
+scheduler lets a running job, the delivery processor's batch included, finish while the datasource is still open;
+advisory locks are transaction-scoped and go with their transactions; consumers stop with the context. The service
+declares its own `ThreadPoolTaskScheduler`: `platform-common-resilience` defines a `ScheduledExecutorService` for its
+time limiter, which makes Boot back off its own scheduler and would otherwise put every `@Scheduled` job on the pool
+that runs the GitHub calls those jobs wait on.
+
+Runbooks: [`RUNBOOK.md`](RUNBOOK.md), one section per alert in
+`deploy/local/prometheus/rules/git-integration-service.rules.yml` (each alert's `runbook_url` points at it, and
+`AlertRulesIntegrationTest` checks the links and runs `promtool`), plus re-queue a parked delivery; replay a
+delivery by GUID; force a reconcile of one app; rotate the webhook secret; rotate the private key; rotate the user
+session encryption key (every session ends, users re-authorize without a prompt); rebuild the membership read model;
+investigate an installation stuck `SUSPENDED`; find a long-running transaction holding back the outbox.
 
 ### Retention
 
@@ -1864,13 +1892,15 @@ scheduled jobs.
 services/git-integration-service/
 └── src/main/java/io/pallet/gitintegration/
     ├── GitIntegrationServiceApplication.java
-    ├── config/        GitIntegrationProperties (pallet.git.*), Clock bean, SchedulingLocks
+    ├── config/        GitIntegrationProperties (pallet.git.*), Clock bean, SchedulingLocks,
+    │                  SchedulingConfiguration
     ├── security/      AccessEvaluator (@access), AccessContext, AccessResolver (membership gate),
     │                  Role, ResourceScope,
     │                  SecurityConfiguration (public webhook path), AuthorizationStateTokens
     ├── session/       GitHubSessionController, GitHubUserSession, GitHubUserSessionStore,
     │                  SessionCipher
-    ├── webhook/       WebhookController, WebhookSignatureVerifier, WebhookHeaders
+    ├── webhook/       WebhookController, WebhookSignatureVerifier, WebhookHeaders,
+    │                  GitHubIpAllowlist, GitHubMetaRefresher
     ├── delivery/      WebhookDelivery, DeliveryRepository, DeliveryStore, DeliveryProcessor,
     │                  DeliveryStatus, PayloadParser
     ├── push/          PushProcessor, ChainRule, SkipRules, BranchHead, BranchHeadRepository
@@ -1888,7 +1918,9 @@ services/git-integration-service/
     │                  GitHubResponseClassifier, GitHubExceptions
     ├── recovery/      RedeliverySweeper, HeadReconciler
     ├── scm/           ScmProvider (port), GitHubScmProvider (adapter)
-    └── retention/     RetentionSweeps
+    ├── retention/     RetentionSweeps
+    └── observability/ MetricsCatalog, SpanAttributes, GitIntegrationMdcContributor,
+                       RedactingAccessLog, SpanRedaction
 ```
 
 `ScmProvider` is the seam for GitLab: webhook verification, payload normalization into a
@@ -1921,7 +1953,7 @@ third-party API with rate limits, which is exactly what `PROJECT.md` said it wou
 | `pallet.git.github.connect-timeout` / `read-timeout` | `PT5S` / `PT10S` | Socket timeouts under the `github-*` time limiter. |
 | `pallet.git.authorization.state-signing-key` / `state-ttl` | env / `PT10M` | Install and authorization state HMAC. |
 | `pallet.git.user-session.encryption-key` | `${PALLET_GIT_USER_SESSION_KEY}` | AES-256-GCM key for sessions in Redis. 32 bytes or startup fails. |
-| `pallet.git.user-session.max-ttl` | `PT1H` | Upper bound on a session, below the token's own lifetime. |
+| `pallet.git.user-session.max-ttl` / `metrics-interval` | `PT1H` / `PT1M` | Upper bound on a session, below the token's own lifetime; how often the `sessions.active` gauge is refreshed. |
 | `pallet.git.link.min-repo-permission` | `push` | Lowest GitHub permission that may vouch for a repo link. |
 | `pallet.git.link.max-installation-pages` / `max-picker-pages` | `10` / `10` | Pages of `GET /user/installations` walked to prove a caller can see an installation; pages the repository picker scans when `q` filters by name (GitHub has no name filter there). |
 | `pallet.git.repository-sync.max-pages` / `workers` / `queue-capacity` | `100` / `2` / `100` | Repository sync: pages per installation (a listing cut short upserts and deletes nothing), threads running after-commit syncs, and how many may wait; a sync that doesn't fit is dropped and the periodic sync catches up. |
@@ -1931,7 +1963,7 @@ third-party API with rate limits, which is exactly what `PROJECT.md` said it wou
 | `pallet.git.unused-installation.enabled` / `sweep-interval` / `max-per-run` / `metrics-interval` | `true` / `P1D` / `100` / `PT1M` | The unused-installation sweep: whether it runs, how often, how many installations one run uninstalls, longest unused first, and how often the `installations.unused` gauge is refreshed. |
 | `pallet.git.manual-builds-per-hour` | `30` | Per-app limit on manual builds. |
 | `pallet.git.webhook.max-body` | `25MB` | Body cap; at most `100MB`, since the body is buffered whole before it is verified. |
-| `pallet.git.webhook.github-ip-allowlist.enabled` | `false` | Optional second layer. |
+| `pallet.git.webhook.github-ip-allowlist.enabled` / `refresh-interval` / `retry-interval` | `false` / `P1D` / `PT5M` | Optional second layer: GitHub's `hooks` ranges from `GET /meta`, re-read every `refresh-interval`, and every `retry-interval` until a read succeeds. Fails open until the first read; a failed refresh keeps the ranges held. |
 | `pallet.git.delivery.enabled` / `poll-interval` / `batch-size` / `max-attempts` / `workers` | `true` / `PT0.25S` / `50` / `10` / `1` | Processor. `workers` threads share one cycle's batch. |
 | `pallet.git.delivery.backoff-base` / `backoff-max` / `unavailable-backoff-max` / `rate-limit-jitter` | `PT1S` / `PT10M` / `PT5M` / `PT5S` | Retry backoff (full jitter), its cap while GitHub is unavailable, and the spread added to a rate-limit reset. |
 | `pallet.git.delivery.lease` / `max-lookup-rounds` / `metrics-interval` | `PT30S` / `3` / `PT15S` | Row lease per GitHub lookup, lookup rounds before a failed attempt, delivery gauge refresh. |

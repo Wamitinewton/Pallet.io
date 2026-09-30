@@ -26,8 +26,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.kafka.KafkaContainer;
 import tools.jackson.databind.JsonNode;
@@ -35,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import({RedisTestContainerConfiguration.class, Tokens.LocalDecoder.class})
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class, Tokens.LocalDecoder.class})
 class RepoLinkControllerIntegrationTest {
 
     private static final long REPO = 4242;
@@ -49,11 +47,6 @@ class RepoLinkControllerIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private MockMvc mvc;

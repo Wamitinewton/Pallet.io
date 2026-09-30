@@ -13,6 +13,7 @@ import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.gitintegration.delivery.DeliveryTestConfiguration.CapturedSpans;
 import io.pallet.gitintegration.delivery.DeliveryTestConfiguration.ScriptedHandler;
 import io.pallet.gitintegration.delivery.NeedsGitHub.Lookup;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.scm.ScmProvider;
 import io.pallet.gitintegration.scm.ScmProvider.ScmInstallation;
 import io.pallet.gitintegration.support.GitHubApiStub;
@@ -32,13 +33,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
-@Import({RedisTestContainerConfiguration.class, DeliveryTestConfiguration.class})
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class, DeliveryTestConfiguration.class})
 class DeliveryProcessorIntegrationTest {
 
     private static final long INSTALLATION_ID = 41000001L;
@@ -48,11 +47,6 @@ class DeliveryProcessorIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private DeliveryProcessor processor;
@@ -100,7 +94,7 @@ class DeliveryProcessorIntegrationTest {
             return DeliveryOutcome.PROCESSED;
         });
         UUID id = rows.insert("repository-archived.json");
-        double processedBefore = counter(DeliveryMetrics.PROCESSED, "event", "repository");
+        double processedBefore = counter(MetricsCatalog.DELIVERIES_PROCESSED, "event", "repository");
 
         processUntilHandled(id);
 
@@ -109,7 +103,8 @@ class DeliveryProcessorIntegrationTest {
         assertThat(row.get("processed_at")).isNotNull();
         assertThat(outboxRows(id)).isOne();
         assertThat(handler.calls(id)).isOne();
-        assertThat(counter(DeliveryMetrics.PROCESSED, "event", "repository")).isEqualTo(processedBefore + 1);
+        assertThat(counter(MetricsCatalog.DELIVERIES_PROCESSED, "event", "repository"))
+                .isEqualTo(processedBefore + 1);
     }
 
     @Test
@@ -137,7 +132,7 @@ class DeliveryProcessorIntegrationTest {
             throw new IllegalStateException("still failing");
         });
         UUID id = rows.insert("repository-archived.json");
-        double errorsBefore = counter(DeliveryMetrics.FAILURES, "kind", DeliveryMetrics.KIND_ERROR);
+        double errorsBefore = counter(MetricsCatalog.DELIVERIES_FAILURES, "kind", DeliveryMetrics.KIND_ERROR);
 
         for (int attempt = 1; attempt <= 3; attempt++) {
             rows.makeDue(id);
@@ -146,10 +141,10 @@ class DeliveryProcessorIntegrationTest {
 
         assertThat(rows.row(id)).containsEntry("status", "PARKED").containsEntry("attempts", 3);
         assertThat(handler.calls(id)).isEqualTo(3);
-        assertThat(counter(DeliveryMetrics.FAILURES, "kind", DeliveryMetrics.KIND_ERROR))
+        assertThat(counter(MetricsCatalog.DELIVERIES_FAILURES, "kind", DeliveryMetrics.KIND_ERROR))
                 .isEqualTo(errorsBefore + 3);
         deliveryMetrics.refresh();
-        assertThat(meters.get(DeliveryMetrics.PARKED).gauge().value()).isGreaterThanOrEqualTo(1);
+        assertThat(meters.get(MetricsCatalog.DELIVERIES_PARKED).gauge().value()).isGreaterThanOrEqualTo(1);
     }
 
     @Test
@@ -173,7 +168,8 @@ class DeliveryProcessorIntegrationTest {
             throw new NeedsGitHub(new InstallationLookup(INSTALLATION_ID));
         });
         UUID id = rows.insert("repository-archived.json");
-        double rateLimitedBefore = counter(DeliveryMetrics.FAILURES, "kind", DeliveryMetrics.KIND_RATE_LIMITED);
+        double rateLimitedBefore =
+                counter(MetricsCatalog.DELIVERIES_FAILURES, "kind", DeliveryMetrics.KIND_RATE_LIMITED);
 
         processUntilHandled(id);
 
@@ -181,7 +177,7 @@ class DeliveryProcessorIntegrationTest {
         assertThat(row).containsEntry("status", "RECEIVED").containsEntry("attempts", 0);
         assertThat(((Timestamp) row.get("next_attempt_at")).toInstant()).isBetween(resetAt, resetAt.plusSeconds(5));
         assertThat((String) row.get("last_error")).startsWith("GitHubRateLimitedException");
-        assertThat(counter(DeliveryMetrics.FAILURES, "kind", DeliveryMetrics.KIND_RATE_LIMITED))
+        assertThat(counter(MetricsCatalog.DELIVERIES_FAILURES, "kind", DeliveryMetrics.KIND_RATE_LIMITED))
                 .isEqualTo(rateLimitedBefore + 1);
     }
 

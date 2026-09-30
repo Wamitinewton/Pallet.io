@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.installation;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.github.GitHubClient;
@@ -13,6 +15,7 @@ import io.pallet.gitintegration.scm.ScmProvider.RepositoryListing;
 import io.pallet.gitintegration.scm.ScmProvider.ScmRepository;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -42,8 +45,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class RepositorySync implements AutoCloseable {
-
-    public static final String RUNS = "git.repository_sync.runs";
 
     static final String CURSOR_PREFIX = "repo-sync:";
 
@@ -97,6 +98,12 @@ public class RepositorySync implements AutoCloseable {
         this.notifier = notifier;
         this.transaction = new TransactionTemplate(transactionManager);
         this.meters = meters;
+        for (String outcome : List.of(FAILED, DROPPED)) {
+            meters.counter(REPOSITORY_SYNC_RUNS, TAG_OUTCOME, outcome);
+        }
+        for (Result result : Result.values()) {
+            meters.counter(REPOSITORY_SYNC_RUNS, TAG_OUTCOME, result.name().toLowerCase(Locale.ROOT));
+        }
         GitIntegrationProperties.RepositorySync sync = properties.repositorySync();
         this.maxPages = sync.maxPages();
         this.executor = new ThreadPoolExecutor(
@@ -222,7 +229,7 @@ public class RepositorySync implements AutoCloseable {
             });
         } catch (RejectedExecutionException e) {
             queued.remove(installationId);
-            meters.counter(RUNS, "outcome", DROPPED).increment();
+            meters.counter(REPOSITORY_SYNC_RUNS, TAG_OUTCOME, DROPPED).increment();
             log.warn("Repository sync not queued, the queue is full installationId={}", installationId);
         }
     }
@@ -231,7 +238,7 @@ public class RepositorySync implements AutoCloseable {
         try {
             sync(installationId);
         } catch (RuntimeException e) {
-            meters.counter(RUNS, "outcome", FAILED).increment();
+            meters.counter(REPOSITORY_SYNC_RUNS, TAG_OUTCOME, FAILED).increment();
             log.warn(
                     "Repository sync failed installationId={}: {}: {}",
                     installationId,
@@ -258,7 +265,8 @@ public class RepositorySync implements AutoCloseable {
     }
 
     private Result counted(Result result) {
-        meters.counter(RUNS, "outcome", result.name().toLowerCase(Locale.ROOT)).increment();
+        meters.counter(REPOSITORY_SYNC_RUNS, TAG_OUTCOME, result.name().toLowerCase(Locale.ROOT))
+                .increment();
         return result;
     }
 

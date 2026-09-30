@@ -27,8 +27,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.util.UriComponents;
@@ -38,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import({RedisTestContainerConfiguration.class, Tokens.LocalDecoder.class})
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class, Tokens.LocalDecoder.class})
 class GitHubSessionControllerIntegrationTest {
 
     private static final String BASE = "/api/v1/git-integration/github";
@@ -47,11 +45,6 @@ class GitHubSessionControllerIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private MockMvc mvc;

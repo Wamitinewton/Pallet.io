@@ -69,4 +69,32 @@
         </Or>
         <Bug pattern="IMPROPER_UNICODE"/>
     </Match>
+    <!-- Marks the reporter's span failed and rethrows the GitHub failure unchanged: its type decides whether the check
+         run waits for a rate limit, backs off while GitHub is down, or spends an attempt. -->
+    <Match>
+        <Class name="io.pallet.gitintegration.checks.CheckRunReporter"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+    <!-- Observability reads request input only to record or redact it: the delivery header reaches the MDC only in the
+         canonical UUID shape, the Authorization header is checked for presence and never read further, and the query
+         string is logged with every credential-shaped value masked. -->
+    <Match>
+        <Or>
+            <Class name="io.pallet.gitintegration.observability.GitIntegrationMdcContributor"/>
+            <Class name="io.pallet.gitintegration.observability.RedactingAccessLog"/>
+        </Or>
+        <Or>
+            <Bug pattern="SERVLET_HEADER"/>
+            <Bug pattern="SERVLET_QUERY_STRING"/>
+        </Or>
+    </Match>
+    <!-- Query parameter names and span attribute keys are folded to match a fixed ASCII set; the result only decides
+         what to mask or drop and is never used as an identifier. -->
+    <Match>
+        <Or>
+            <Class name="io.pallet.gitintegration.observability.RedactingAccessLog"/>
+            <Class name="io.pallet.gitintegration.observability.SpanRedaction"/>
+        </Or>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
 </FindBugsFilter>

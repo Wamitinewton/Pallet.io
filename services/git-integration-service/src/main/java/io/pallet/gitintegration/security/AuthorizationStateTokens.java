@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.security;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
@@ -10,10 +12,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -26,8 +30,6 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class AuthorizationStateTokens {
 
-    public static final String REJECTED = "git.authorization.state_rejected";
-
     static final int MAX_STATE_LENGTH = 512;
 
     private static final String HMAC = "HmacSHA256";
@@ -37,7 +39,7 @@ public class AuthorizationStateTokens {
     public record IssuedState(String state, Instant expiresAt) {
 
         @Override
-        public String toString() {
+        public @NonNull String toString() {
             return "IssuedState[state=<redacted>, expiresAt=" + expiresAt + "]";
         }
     }
@@ -50,6 +52,9 @@ public class AuthorizationStateTokens {
             @JsonProperty("o") String orgId,
             @JsonProperty("s") String userId,
             @JsonProperty("e") long expiresAtEpochSecond) {}
+
+    private static final List<String> REJECTION_REASONS =
+            List.of("expired", "purpose", "user", "org", "consumed", "malformed", "signature");
 
     private final AuthorizationStateRepository states;
     private final SecretKeySpec key;
@@ -73,6 +78,7 @@ public class AuthorizationStateTokens {
         this.clock = clock;
         this.json = json;
         this.meters = meters;
+        REJECTION_REASONS.forEach(reason -> meters.counter(AUTHORIZATION_STATE_REJECTED, TAG_REASON, reason));
     }
 
     public IssuedState issue(AuthorizationPurpose purpose, String userId, String orgId) {
@@ -158,7 +164,7 @@ public class AuthorizationStateTokens {
     }
 
     private InvalidAuthorizationStateException rejected(String reason) {
-        meters.counter(REJECTED, "reason", reason).increment();
+        meters.counter(AUTHORIZATION_STATE_REJECTED, TAG_REASON, reason).increment();
         return new InvalidAuthorizationStateException();
     }
 }

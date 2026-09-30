@@ -2,6 +2,7 @@ package io.pallet.gitintegration.delivery;
 
 import io.pallet.gitintegration.delivery.NeedsGitHub.Lookup;
 import io.pallet.gitintegration.delivery.payload.DeliveryPayload;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -9,7 +10,13 @@ import java.util.UUID;
 
 /** What a handler sees of one delivery: the parsed payload, and the answers to GitHub lookups from earlier rounds. */
 public record DeliveryContext(
-        UUID deliveryId, String event, String action, Long installationId, DeliveryPayload payload, Lookups lookups) {
+        UUID deliveryId,
+        String event,
+        String action,
+        Long installationId,
+        Instant receivedAt,
+        DeliveryPayload payload,
+        Lookups lookups) {
 
     public <T extends DeliveryPayload> T payload(Class<T> type) {
         return type.cast(payload);

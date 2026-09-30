@@ -36,6 +36,9 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.test.context.DynamicPropertyRegistry;
 
 /**
@@ -43,8 +46,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
  * context that points at it can be cached; stubs and the request journal are reset before each test.
  *
  * <pre>
+ * &#64;Import(GitHubApiStub.Properties.class)
  * &#64;RegisterExtension static final GitHubApiStub github = new GitHubApiStub();
- * &#64;DynamicPropertySource static void github(DynamicPropertyRegistry registry) { GitHubApiStub.register(registry); }
  * </pre>
  */
 public final class GitHubApiStub implements BeforeEachCallback {
@@ -58,6 +61,7 @@ public final class GitHubApiStub implements BeforeEachCallback {
     public static final String USER_INSTALLATIONS_PATH = "/user/installations";
     public static final String INSTALLATION_REPOSITORIES_PATH = "/installation/repositories";
     public static final String HOOK_DELIVERIES_PATH = "/app/hook/deliveries";
+    public static final String META_PATH = "/meta";
     public static final int PAGE_SIZE = 100;
 
     /** One entry of the app's webhook delivery log. */
@@ -113,6 +117,19 @@ public final class GitHubApiStub implements BeforeEachCallback {
             server.start();
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
             return server;
+        }
+    }
+
+    /**
+     * Points the GitHub base URLs at the stub. Imported rather than declared per class with
+     * {@code @DynamicPropertySource}, so test classes with the same setup share one cached context.
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    public static class Properties {
+
+        @Bean
+        static DynamicPropertyRegistrar gitHubApiStubProperties() {
+            return GitHubApiStub::register;
         }
     }
 
@@ -403,6 +420,13 @@ public final class GitHubApiStub implements BeforeEachCallback {
 
     public static String userInstallationRepositoriesPath(long installationId) {
         return USER_INSTALLATIONS_PATH + "/" + installationId + "/repositories";
+    }
+
+    public void stubMeta(List<String> hooks) {
+        String ranges = hooks.stream().map(range -> "\"" + range + "\"").collect(Collectors.joining(","));
+        Server.INSTANCE.stubFor(get(urlPathEqualTo(META_PATH))
+                .willReturn(json("{\"verifiable_password_authentication\":false,\"hooks\":[" + ranges
+                        + "],\"web\":[\"140.82.112.0/20\"]}")));
     }
 
     public void stubUnauthorized(String path) {

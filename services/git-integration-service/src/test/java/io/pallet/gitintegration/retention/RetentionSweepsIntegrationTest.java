@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.retention.RetentionSweeps.Run;
 import io.pallet.gitintegration.retention.RetentionSweeps.Sweep;
 import io.pallet.gitintegration.support.ReadModelFixtures;
@@ -295,7 +296,7 @@ class RetentionSweepsIntegrationTest {
         assertThat(run.complete()).isTrue();
         assertThat(old).noneMatch(rows::deliveryExists);
         assertThat(deleted("webhook_deliveries") - deletedBefore).isEqualTo(3_500);
-        assertThat(meters.find(RetentionMetrics.RUN_DURATION)
+        assertThat(meters.find(MetricsCatalog.RETENTION_RUN_DURATION)
                         .tag("sweep", "deliveries")
                         .timer()
                         .count())
@@ -311,7 +312,7 @@ class RetentionSweepsIntegrationTest {
     }
 
     private double deleted(String table) {
-        return meters.find(RetentionMetrics.DELETED)
+        return meters.find(MetricsCatalog.RETENTION_DELETED)
                 .tag("table", table)
                 .counter()
                 .count();

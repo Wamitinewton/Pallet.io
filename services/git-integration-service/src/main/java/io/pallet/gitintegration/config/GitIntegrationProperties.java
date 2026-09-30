@@ -74,13 +74,15 @@ public record GitIntegrationProperties(
         }
     }
 
+    /** {@code metricsInterval} refreshes the active session gauge. */
     public record UserSession(
             String encryptionKey,
-            @NotNull @PositiveDuration @DefaultValue("PT1H") Duration maxTtl) {
+            @NotNull @PositiveDuration @DefaultValue("PT1H") Duration maxTtl,
+            @NotNull @PositiveDuration @DefaultValue("PT1M") Duration metricsInterval) {
 
         @Override
         public @NonNull String toString() {
-            return "UserSession[maxTtl=" + maxTtl + "]";
+            return "UserSession[maxTtl=" + maxTtl + ", metricsInterval=" + metricsInterval + "]";
         }
     }
 
@@ -141,8 +143,18 @@ public record GitIntegrationProperties(
             @NotNull @DefaultValue("25MB") DataSize maxBody,
             @Valid @NotNull @DefaultValue GithubIpAllowlist githubIpAllowlist) {
 
+        /**
+         * When enabled, GitHub's hook ranges are read from {@code GET /meta} every {@code refreshInterval}, and every
+         * {@code retryInterval} while no read has succeeded yet.
+         */
         public record GithubIpAllowlist(
-                @DefaultValue("false") boolean enabled) {}
+                @DefaultValue("false") boolean enabled,
+
+                @NotNull @PositiveDuration @DefaultValue("P1D")
+                Duration refreshInterval,
+
+                @NotNull @PositiveDuration @DefaultValue("PT5M")
+                Duration retryInterval) {}
 
         /** The handler buffers the whole body in one array before verifying it, so the cap bounds heap per request. */
         public static final DataSize MAX_BODY_CEILING = DataSize.ofMegabytes(100);

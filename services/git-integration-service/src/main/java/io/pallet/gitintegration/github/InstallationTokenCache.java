@@ -1,5 +1,9 @@
 package io.pallet.gitintegration.github;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.github.GitHubExceptions.InstallationTokenRejectedException;
 import java.time.Clock;
@@ -30,9 +34,13 @@ public class InstallationTokenCache {
     private final Duration refreshSkew;
     private final ReentrantLock lock = new ReentrantLock();
     private final LeastRecentlyUsed entries;
+    private final Counter mints;
 
-    public InstallationTokenCache(GitIntegrationProperties properties, Clock clock) {
+    public InstallationTokenCache(GitIntegrationProperties properties, Clock clock, MeterRegistry meters) {
         this.clock = clock;
+        this.mints = Counter.builder(GITHUB_TOKEN_MINTS)
+                .description("Installation tokens minted, one per cache miss or expiry")
+                .register(meters);
         this.refreshSkew = properties.tokens().refreshSkew();
         this.entries = new LeastRecentlyUsed(properties.tokens().maxCached());
     }
@@ -115,6 +123,7 @@ public class InstallationTokenCache {
     private InstallationToken mint(Key key, CompletableFuture<InstallationToken> claimed, Minter minter) {
         try {
             InstallationToken token = minter.mint(key.installationId(), key.scope());
+            mints.increment();
             claimed.complete(token);
             return token;
         } catch (RuntimeException | Error failure) {

@@ -1,8 +1,7 @@
 package io.pallet.gitintegration.webhook;
 
+import io.micrometer.common.KeyValue;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.tracing.Span;
-import io.micrometer.tracing.TraceContext;
 import io.micrometer.tracing.Tracer;
 import io.pallet.common.api.ApiResponse;
 import io.pallet.common.error.AppException;
@@ -10,17 +9,21 @@ import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.delivery.DeliveryStore;
 import io.pallet.gitintegration.delivery.DeliveryStore.NewDelivery;
 import io.pallet.gitintegration.delivery.SubscribedEvents;
+import io.pallet.gitintegration.observability.SpanAttributes;
+import io.pallet.gitintegration.observability.Traceparents;
 import io.pallet.gitintegration.webhook.WebhookEnvelopeReader.WebhookEnvelope;
 import io.pallet.gitintegration.webhook.WebhookExceptions.UnsupportedWebhookContentTypeException;
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookBodyUnreadableException;
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookPayloadTooLargeException;
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookSignatureInvalidException;
+import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookSourceNotAllowedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.InvalidMediaTypeException;
@@ -28,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /**
  * GitHub's webhook endpoint (ARCHITECTURE.md §Webhook ingestion): verify, parse the envelope, store, answer. The body
@@ -37,12 +41,14 @@ import org.springframework.web.bind.annotation.RestController;
 class WebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
+    private static final String MDC_INSTALLATION_ID = "installationId";
 
     private final WebhookSignatureVerifier verifier;
     private final WebhookEnvelopeReader envelopeReader;
     private final DeliveryStore store;
     private final WebhookMetrics metrics;
     private final ObjectProvider<Tracer> tracer;
+    private final GitHubIpAllowlist allowlist;
     private final int maxBody;
 
     WebhookController(
@@ -51,12 +57,14 @@ class WebhookController {
             DeliveryStore store,
             WebhookMetrics metrics,
             ObjectProvider<Tracer> tracer,
+            GitHubIpAllowlist allowlist,
             GitIntegrationProperties properties) {
         this.verifier = verifier;
         this.envelopeReader = envelopeReader;
         this.store = store;
         this.metrics = metrics;
         this.tracer = tracer;
+        this.allowlist = allowlist;
         this.maxBody = Math.toIntExact(properties.webhook().maxBody().toBytes());
     }
 
@@ -74,10 +82,12 @@ class WebhookController {
             throw rejected;
         } finally {
             metrics.handled(sample, eventLabel, result);
+            MDC.remove(MDC_INSTALLATION_ID);
         }
     }
 
     private Outcome handle(HttpServletRequest request) {
+        requireAllowedSource(request.getRemoteAddr());
         byte[] body = readBounded(request);
         Optional<String> secret = verifier.verify(body, request.getHeader(WebhookHeaders.SIGNATURE));
         if (secret.isEmpty()) {
@@ -92,6 +102,10 @@ class WebhookController {
             return Outcome.PONG;
         }
         WebhookEnvelope envelope = envelopeReader.read(body);
+        describeSpan(request, headers, envelope.installationId());
+        if (envelope.installationId() != null) {
+            MDC.put(MDC_INSTALLATION_ID, envelope.installationId().toString());
+        }
         if (envelope.sanitized()) {
             metrics.payloadSanitized();
         }
@@ -101,7 +115,7 @@ class WebhookController {
                 envelope.action(),
                 envelope.installationId(),
                 envelope.payload(),
-                currentTraceparent()));
+                Traceparents.current(tracer.getIfAvailable())));
         log.debug(
                 "Webhook delivery {} event {} installation {} {}",
                 headers.deliveryId(),
@@ -112,6 +126,20 @@ class WebhookController {
             return Outcome.DUPLICATE;
         }
         return SubscribedEvents.contains(headers.event()) ? Outcome.STORED : Outcome.IGNORED;
+    }
+
+    private void requireAllowedSource(String address) {
+        if (!allowlist.enabled()) {
+            return;
+        }
+        switch (allowlist.check(address)) {
+            case ALLOWED -> metrics.source(WebhookMetrics.SOURCE_ALLOWED);
+            case UNCHECKED -> metrics.source(WebhookMetrics.SOURCE_UNCHECKED);
+            case REJECTED -> {
+                metrics.source(WebhookMetrics.SOURCE_REJECTED);
+                throw new WebhookSourceNotAllowedException();
+            }
+        }
     }
 
     private byte[] readBounded(HttpServletRequest request) {
@@ -141,16 +169,18 @@ class WebhookController {
         }
     }
 
-    /** The W3C {@code traceparent} of this request's server span, so the processor can link its span to it. */
-    private String currentTraceparent() {
-        Tracer available = tracer.getIfAvailable();
-        Span span = available == null ? null : available.currentSpan();
-        if (span == null) {
-            return null;
-        }
-        TraceContext context = span.context();
-        return String.join(
-                "-", "00", context.traceId(), context.spanId(), Boolean.TRUE.equals(context.sampled()) ? "01" : "00");
+    /** High-cardinality, so the ids reach the server span and never the request metrics. */
+    private static void describeSpan(HttpServletRequest request, WebhookHeaders headers, Long installationId) {
+        ServerHttpObservationFilter.findObservationContext(request).ifPresent(observation -> {
+            observation.addHighCardinalityKeyValue(
+                    KeyValue.of(SpanAttributes.EVENT, SubscribedEvents.metricLabel(headers.event())));
+            observation.addHighCardinalityKeyValue(
+                    KeyValue.of(SpanAttributes.DELIVERY_ID, headers.deliveryId().toString()));
+            if (installationId != null) {
+                observation.addHighCardinalityKeyValue(
+                        KeyValue.of(SpanAttributes.INSTALLATION_ID, installationId.toString()));
+            }
+        });
     }
 
     private enum Outcome {

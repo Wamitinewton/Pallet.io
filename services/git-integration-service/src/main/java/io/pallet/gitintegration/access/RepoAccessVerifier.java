@@ -1,5 +1,9 @@
 package io.pallet.gitintegration.access;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.access.RepoAccessExceptions.BranchNotFoundException;
 import io.pallet.gitintegration.access.RepoAccessExceptions.RepositoryArchivedException;
 import io.pallet.gitintegration.access.RepoAccessExceptions.RepositoryNotAccessibleException;
@@ -31,15 +35,26 @@ public class RepoAccessVerifier {
             String githubLogin,
             RepoPermission permission) {}
 
+    static final String DENIED_NOT_ACCESSIBLE = "not_accessible";
+    static final String DENIED_PERMISSION_TOO_LOW = "permission_too_low";
+
     private final GitHubAuthorizationService authorizations;
     private final ScmProvider scm;
     private final RepoPermission minPermission;
+    private final MeterRegistry meters;
 
     RepoAccessVerifier(
-            GitHubAuthorizationService authorizations, ScmProvider scm, GitIntegrationProperties properties) {
+            GitHubAuthorizationService authorizations,
+            ScmProvider scm,
+            GitIntegrationProperties properties,
+            MeterRegistry meters) {
         this.authorizations = authorizations;
         this.scm = scm;
         this.minPermission = properties.link().minRepoPermission();
+        this.meters = meters;
+        for (String reason : new String[] {DENIED_NOT_ACCESSIBLE, DENIED_PERMISSION_TOO_LOW}) {
+            deniedCounter(reason);
+        }
     }
 
     /**
@@ -55,13 +70,16 @@ public class RepoAccessVerifier {
         RepositoryAccess repository = authorizations
                 .repository(sub, session, repoId)
                 .filter(seen -> seen.ownerId() == accountId)
-                .orElseThrow(RepositoryNotAccessibleException::new);
+                .orElseThrow(this::notAccessible);
         if (repository.archived()) {
             throw new RepositoryArchivedException();
         }
         RepoPermission permission = RepoPermission.fromWireName(repository.permission())
                 .filter(held -> held.atLeast(minPermission))
-                .orElseThrow(() -> new RepositoryPermissionTooLowException(minPermission));
+                .orElseThrow(() -> {
+                    deniedCounter(DENIED_PERMISSION_TOO_LOW).increment();
+                    return new RepositoryPermissionTooLowException(minPermission);
+                });
         String checked = branch == null ? repository.defaultBranch() : branch;
         String headSha = branchHead(installationId, repoId, checked);
         return new VerifiedAccess(
@@ -84,7 +102,19 @@ public class RepoAccessVerifier {
         try {
             return scm.branchHead(installationId, repoId, branch).orElseThrow(BranchNotFoundException::new);
         } catch (GitHubNotFoundException | GitHubForbiddenException e) {
-            throw new RepositoryNotAccessibleException();
+            throw notAccessible();
         }
+    }
+
+    private RepositoryNotAccessibleException notAccessible() {
+        deniedCounter(DENIED_NOT_ACCESSIBLE).increment();
+        return new RepositoryNotAccessibleException();
+    }
+
+    private Counter deniedCounter(String reason) {
+        return Counter.builder(LINK_ACCESS_DENIED)
+                .description("Repository access checks GitHub answered with a denial, by why")
+                .tag(TAG_REASON, reason)
+                .register(meters);
     }
 }

@@ -14,6 +14,7 @@ import io.pallet.gitintegration.delivery.DeliveryProcessor;
 import io.pallet.gitintegration.installation.LifecycleScenario.Notice;
 import io.pallet.gitintegration.installation.UnusedInstallationSweep.Outcome;
 import io.pallet.gitintegration.installation.UnusedInstallationSweep.Run;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.Tokens;
 import java.sql.Timestamp;
@@ -31,14 +32,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import({RedisTestContainerConfiguration.class, Tokens.LocalDecoder.class})
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class, Tokens.LocalDecoder.class})
 class UnusedInstallationIntegrationTest {
 
     private static final Duration WAIT = Duration.ofSeconds(30);
@@ -46,11 +45,6 @@ class UnusedInstallationIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private UnusedInstallationSweep sweep;
@@ -293,6 +287,6 @@ class UnusedInstallationIntegrationTest {
     }
 
     private double uninstalled() {
-        return meters.counter(UnusedInstallationMetrics.UNINSTALLED).count();
+        return meters.counter(MetricsCatalog.INSTALLATIONS_UNINSTALLED).count();
     }
 }

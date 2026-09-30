@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.github;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
@@ -15,8 +17,6 @@ import org.springframework.http.HttpHeaders;
  * response. Background jobs ask it before spending budget that user-facing work may need.
  */
 public final class GitHubRateLimitGuard {
-
-    public static final String LOW_INSTALLATIONS = "git.github.ratelimit.low_installations";
 
     private record Budget(long remaining, Instant resetAt) {
 
@@ -39,7 +39,7 @@ public final class GitHubRateLimitGuard {
     public GitHubRateLimitGuard(GitIntegrationProperties properties, Clock clock, MeterRegistry meters) {
         this.reserve = properties.ratelimit().reserve();
         this.clock = clock;
-        Gauge.builder(LOW_INSTALLATIONS, this, GitHubRateLimitGuard::lowInstallations)
+        Gauge.builder(GITHUB_RATELIMIT_LOW_INSTALLATIONS, this, GitHubRateLimitGuard::lowInstallations)
                 .description("Installations whose GitHub budget is below the background-work reserve")
                 .register(meters);
     }

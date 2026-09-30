@@ -18,6 +18,7 @@ import io.pallet.gitintegration.github.GitHubExceptions.GitHubNotFoundException;
 import io.pallet.gitintegration.github.GitHubExceptions.GitHubRateLimitedException;
 import io.pallet.gitintegration.github.TokenScope.Access;
 import io.pallet.gitintegration.github.dto.Installation;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.TestSecrets;
 import java.security.interfaces.RSAPublicKey;
@@ -30,13 +31,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class GitHubClientIntegrationTest {
 
     private static final String REPOSITORIES = "/installation/repositories";
@@ -44,11 +43,6 @@ class GitHubClientIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private GitHubClient client;
@@ -93,7 +87,7 @@ class GitHubClientIntegrationTest {
         assertThat(jwt.verify(new RSASSAVerifier((RSAPublicKey) TestSecrets.APP_KEY.getPublic())))
                 .isTrue();
         assertThat(jwt.getJWTClaimsSet().getIssuer()).isEqualTo("test-client-id");
-        assertThat(meters.get(GitHubHttp.CALLS)
+        assertThat(meters.get(MetricsCatalog.GITHUB_CALLS)
                         .tag("endpoint", "installation.get")
                         .tag("outcome", "success")
                         .timer()
