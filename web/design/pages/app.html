@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Checkout API · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .app-title .app-icon {
+            display: grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
+            flex: none;
+            border-radius: var(--r-lg);
+            background: var(--blue-soft);
+            color: var(--blue-text);
+        }
+
+        .app-title .app-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .app-meta {
+            display: flex;
+            gap: 6px 14px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13.5px;
+        }
+
+        .app-meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .app-meta svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .detail {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+            margin-top: 24px;
+        }
+
+        .repo-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .repo-head .gh {
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            flex: none;
+            border-radius: var(--r-md);
+            background: var(--ink);
+            color: var(--bg);
+        }
+
+        .repo-head .gh svg {
+            width: 19px;
+            height: 19px;
+        }
+
+        .repo-head a {
+            color: var(--ink);
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }
+
+        .head-commit {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-radius: var(--r-md);
+            background: var(--surface-2);
+        }
+
+        .head-commit svg {
+            width: 18px;
+            height: 18px;
+            flex: none;
+            color: var(--muted);
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .verified {
+            display: flex;
+            gap: 12px;
+        }
+
+        .verified .avatar {
+            background: var(--green-soft);
+            color: var(--green-text);
+        }
+
+        .verified svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        fieldset[disabled] {
+            opacity: 0.55;
+        }
+
+        @media (max-width: 960px) {
+            .detail {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body data-states="connected:Connected,archived:Archived repo,disconnected:Disconnected,unlinked:No repository">
+    <div class="app" data-nav="apps">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Apps|apps.html;Checkout API"></header>
+            <main class="page">
+                <div class="page-head" style="margin-bottom:16px">
+                    <div class="app-title">
+                        <span class="app-icon"><i data-icon="apps"></i></span>
+                        <div>
+                            <h1>Checkout API</h1>
+                            <div class="app-meta">
+                                <span class="mono">checkout-api</span>
+                                <span><i data-icon="cloud"></i>AWS · af-south-1</span>
+                                <span><i data-icon="teams"></i>Payments</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-primary" type="button" data-open="modal-build" data-state="connected archived"><i data-icon="play"></i>Start a build</button>
+                        <div style="position:relative" data-menu>
+                            <button class="btn btn-secondary btn-icon" type="button" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" data-menu-button><i data-icon="more"></i></button>
+                            <div class="menu" role="menu" style="right:0;top:calc(100% + 6px)" hidden>
+                                <button type="button" data-hash="settings" onclick="document.getElementById('tab-settings').click()"><i data-icon="settings" style="width:16px;height:16px"></i>App settings</button>
+                                <button type="button" data-copy="6f1c2a9e-4b7d-4e21-9a0c-3d5b8e7f1a24"><i data-icon="copy" style="width:16px;height:16px"></i>Copy app ID</button>
+                                <hr>
+                                <button type="button" class="danger" data-open="modal-delete-app"><i data-icon="trash" style="width:16px;height:16px"></i>Delete app</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabs" role="tablist" aria-label="App sections">
+                    <button type="button" role="tab" id="tab-repo" aria-selected="true" aria-controls="panel-repo"><i data-icon="github" style="width:16px;height:16px"></i>Repository</button>
+                    <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="panel-settings"><i data-icon="settings" style="width:16px;height:16px"></i>Settings</button>
+                </div>
+
+                <!-- Repository tab -->
+                <div id="panel-repo" role="tabpanel" aria-labelledby="tab-repo">
+
+                    <!-- No repository linked -->
+                    <section class="panel" style="margin-top:24px" data-state="unlinked" hidden>
+                        <div class="empty" style="padding-block:56px">
+                            <span class="glyph"><i data-icon="github"></i></span>
+                            <h2>Link a repository to start building</h2>
+                            <p>Pick a GitHub repository and the branch that counts as production. Every push to that branch will start a build.</p>
+                            <a class="btn btn-primary" href="connect-repo.html" style="margin-top:6px"><i data-icon="link"></i>Link a repository</a>
+                            <span class="small faint">Needs an admin, and push access to the repository on GitHub.</span>
+                        </div>
+                    </section>
+
+                    <div class="detail" data-state="connected archived disconnected">
+                        <div class="section-gap">
+                            <div class="callout callout-red" data-state="disconnected" hidden>
+                                <i data-icon="unlink"></i>
+                                <div class="stack-sm">
+                                    <span><strong>Pallet can't reach kilima-labs/receipts.</strong> The Pallet GitHub App no longer has access to it. This usually means someone removed it from the app's repository list on GitHub, or the repository was renamed or moved. Pushes won't build until this is fixed.</span>
+                                    <div class="row" style="gap:8px">
+                                        <a class="btn btn-secondary btn-sm" href="#">Update access on GitHub<i data-icon="external"></i></a>
+                                        <button class="btn btn-ghost btn-sm" type="button" data-toast="Still no access. We'll keep checking daily.">Check again</button>
+                                        <a class="btn btn-ghost btn-sm" href="connect-repo.html">Link a different repository</a>
+                                    </div>
+                                    <span class="tiny muted">Disconnected on 27 September at 09:12.</span>
+                                </div>
+                            </div>
+
+                            <div class="callout callout-amber" data-state="archived" hidden>
+                                <i data-icon="archive"></i>
+                                <span><strong>This repository is archived on GitHub.</strong> The link still works, but archived repositories are read-only, so there won't be new pushes to build. Unarchive it on GitHub, or link the repository that replaced it.</span>
+                            </div>
+
+                            <section class="panel" aria-labelledby="repo-h">
+                                <div class="panel-head">
+                                    <div class="repo-head">
+                                        <span class="gh"><i data-icon="github"></i></span>
+                                        <div style="min-width:0">
+                                            <h2 id="repo-h" class="sr-only">Repository</h2>
+                                            <a href="#" data-state="connected archived">kilima-labs/checkout-api</a>
+                                            <a href="#" data-state="disconnected" hidden>kilima-labs/receipts</a>
+                                            <div class="tiny muted">Through the kilima-labs GitHub installation</div>
+                                        </div>
+                                    </div>
+                                    <span class="badge badge-green" data-state="connected archived"><span class="dot"></span>Connected</span>
+                                    <span class="badge badge-red" data-state="disconnected" hidden>Disconnected</span>
+                                </div>
+                                <div class="panel-body stack">
+                                    <div>
+                                        <div class="eyebrow" style="margin-bottom:8px">Latest push Pallet picked up</div>
+                                        <div class="head-commit">
+                                            <i data-icon="commit"></i>
+                                            <div style="min-width:0;flex:1">
+                                                <div><span class="sha">3f9c2e1</span> <span class="muted">on</span> <span class="badge badge-outline mono">main</span></div>
+                                                <div class="tiny muted" style="margin-top:2px">30 September 2026 at 14:06, 14 minutes ago</div>
+                                            </div>
+                                            <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Copy commit SHA" data-copy="3f9c2e1b7d04a8c95e21f06d3b4a7c8e9f1d2a05"><i data-icon="copy"></i></button>
+                                        </div>
+                                    </div>
+
+                                    <form class="stack" data-fake-submit="Build settings saved" novalidate>
+                                        <fieldset class="stack" style="border:0;margin:0;padding:0" data-lockable>
+                                            <div class="field-grid">
+                                                <div class="field">
+                                                    <label for="branch">Production branch</label>
+                                                    <input class="input mono" id="branch" value="main" spellcheck="false">
+                                                    <span class="hint">Pushes to this branch start builds.</span>
+                                                </div>
+                                                <div class="field">
+                                                    <label for="root">Root directory</label>
+                                                    <input class="input mono" id="root" value="/" spellcheck="false">
+                                                    <span class="hint">Where the app lives, for monorepos.</span>
+                                                </div>
+                                            </div>
+                                            <div class="setting-row">
+                                                <div>
+                                                    <div class="label">Build every push</div>
+                                                    <div class="hint" style="margin-top:2px">Turn this off to start builds by hand only.</div>
+                                                </div>
+                                                <label class="switch"><input type="checkbox" id="auto" checked aria-label="Build every push"><span></span></label>
+                                            </div>
+                                        </fieldset>
+                                        <div class="row" style="justify-content:flex-end">
+                                            <button class="btn btn-primary" type="submit" data-state="connected archived">Save changes</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="section-gap">
+                            <section class="panel" aria-labelledby="access-h">
+                                <div class="panel-head"><h2 id="access-h">GitHub access</h2></div>
+                                <div class="panel-body stack">
+                                    <div class="verified">
+                                        <span class="avatar"><i data-icon="shield"></i></span>
+                                        <div>
+                                            <div class="person-name">Linked by Amani Otieno</div>
+                                            <div class="person-meta">As <span class="mono">@amani-otieno</span>, who has <strong style="color:var(--ink);font-weight:500">admin</strong> access to this repository.</div>
+                                        </div>
+                                    </div>
+                                    <dl class="kv" style="grid-template-columns:120px 1fr">
+                                        <dt>Access confirmed</dt>
+                                        <dd>2 August 2026</dd>
+                                        <dt>Last checked</dt>
+                                        <dd data-state="connected archived">Today at 08:00</dd>
+                                        <dd data-state="disconnected" hidden><span style="color:var(--red-text)">Failed today at 08:00</span></dd>
+                                    </dl>
+                                    <p class="small muted">Pallet checks every day that the person who linked the repository can still push to it. If they lose access, an admin needs to confirm the link again.</p>
+                                </div>
+                                <div class="panel-foot">
+                                    <span>Admins only</span>
+                                    <button class="btn btn-secondary btn-sm" type="button" data-toast="Access confirmed as @amani-otieno (admin)"><i data-icon="refresh"></i>Check now</button>
+                                </div>
+                            </section>
+
+                            <section class="panel panel-danger" aria-labelledby="unlink-h">
+                                <div class="panel-head"><h2 id="unlink-h">Unlink repository</h2></div>
+                                <div class="panel-body stack">
+                                    <p class="small muted">Pushes stop building this app. The app and its settings stay, and you can link a repository again at any time.</p>
+                                    <div><button class="btn btn-danger-outline btn-sm" type="button" data-open="modal-unlink"><i data-icon="unlink"></i>Unlink repository</button></div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings tab -->
+                <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+                    <div class="section-gap" style="margin-top:24px;max-width:720px">
+                        <form class="panel" data-fake-submit="App updated" novalidate>
+                            <div class="panel-head"><div><h2>General</h2><p>Developers and above can change these.</p></div></div>
+                            <div class="panel-body stack">
+                                <div class="field-grid">
+                                    <div class="field">
+                                        <label for="set-name">App name</label>
+                                        <input class="input" id="set-name" value="Checkout API">
+                                    </div>
+                                    <div class="field">
+                                        <label for="set-team">Team</label>
+                                        <select class="select" id="set-team">
+                                            <option>No team</option>
+                                            <option selected>Payments</option>
+                                            <option>Web</option>
+                                            <option>Platform</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-foot"><span>Changes apply right away.</span><button class="btn btn-primary btn-sm" type="submit">Save</button></div>
+                        </form>
+
+                        <section class="panel">
+                            <div class="panel-head"><div><h2>Fixed at creation</h2><p>To move an app to another cloud or region, create a new app there.</p></div></div>
+                            <div class="panel-body">
+                                <dl class="kv">
+                                    <dt>Slug</dt><dd class="mono">checkout-api</dd>
+                                    <dt>Cloud</dt><dd>Amazon Web Services</dd>
+                                    <dt>Region</dt><dd class="mono">af-south-1</dd>
+                                    <dt>App ID</dt><dd><span class="copyable">6f1c2a9e-4b7d-4e21-9a0c-3d5b8e7f1a24<button type="button" aria-label="Copy app ID" data-copy="6f1c2a9e-4b7d-4e21-9a0c-3d5b8e7f1a24"><i data-icon="copy"></i></button></span></dd>
+                                    <dt>Created</dt><dd>14 March 2026 by Amani Otieno</dd>
+                                </dl>
+                            </div>
+                        </section>
+
+                        <section class="panel panel-danger">
+                            <div class="panel-head"><div><h2>Delete app</h2><p>Admins only. This removes the app and its repository link.</p></div></div>
+                            <div class="panel-body"><button class="btn btn-danger-outline" type="button" data-open="modal-delete-app"><i data-icon="trash"></i>Delete Checkout API</button></div>
+                        </section>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-build" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="build-title" data-fake-submit="Build started for 3f9c2e1 on main" novalidate>
+            <div class="modal-head">
+                <div><h2 id="build-title">Start a build</h2><p>Pallet builds the latest commit on the branch you choose.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label for="build-branch">Branch</label>
+                    <input class="input mono" id="build-branch" value="main" spellcheck="false">
+                    <span class="hint">Leave it as main to build production. Any other branch works too.</span>
+                </div>
+                <p class="small muted">You can start up to 30 builds an hour for each app.</p>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit"><i data-icon="play"></i>Start build</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-unlink" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="unlink-title" data-fake-submit="Repository unlinked" novalidate>
+            <div class="modal-head">
+                <div><h2 id="unlink-title">Unlink kilima-labs/checkout-api?</h2><p>Pushes to main will stop building Checkout API. Nothing changes on GitHub.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Keep it linked</button>
+                <button class="btn btn-danger" type="submit">Unlink repository</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-delete-app" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="del-app-title" data-fake-submit="Checkout API deleted" data-next="apps.html" novalidate>
+            <div class="modal-head">
+                <div><h2 id="del-app-title">Delete Checkout API?</h2><p>The app and its repository link are removed for everyone in Kilima Labs. You can't undo this.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label for="confirm-slug">Type <span class="mono">checkout-api</span> to confirm</label>
+                    <input class="input mono" id="confirm-slug" autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Delete app</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Each preview state stands in for a different sample app; the disconnected one locks its settings.
+        new MutationObserver(() => {
+            const off = document.body.dataset.state === "disconnected";
+            document.querySelectorAll("[data-lockable]").forEach((f) => (f.disabled = off));
+            const names = { disconnected: "Receipts worker", unlinked: "Docs" };
+            document.querySelector(".app-title h1").textContent = names[document.body.dataset.state] || "Checkout API";
+        }).observe(document.body, { attributes: true, attributeFilter: ["data-state"] });
+    </script>
+</body>
+</html>

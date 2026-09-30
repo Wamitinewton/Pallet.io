@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Create your organization · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+</head>
+<body data-states="ok:Slug available,taken:Slug taken">
+    <div class="auth">
+        <main class="auth-main">
+            <a class="brand" href="landing.html"><img src="../assets/pallet-mark.svg" alt=""><span>Pallet</span></a>
+
+            <form class="auth-form" data-fake-submit="Account created" data-next="verify-email.html" novalidate>
+                <div>
+                    <h1>Create your organization</h1>
+                    <p class="lede">Your organization holds your apps and your team. You'll be its owner, and you can invite everyone else once you're in.</p>
+                </div>
+
+                <div class="stack">
+                    <div class="field">
+                        <label for="org-name">Organization name</label>
+                        <input class="input" id="org-name" value="Kilima Labs" autocomplete="organization">
+                    </div>
+
+                    <div class="field" data-state="ok">
+                        <label for="org-slug">Organization URL</label>
+                        <div class="input-group"><span class="addon">pallet.dev/</span><input class="input mono" id="org-slug" value="kilima-labs" autocomplete="off" spellcheck="false"></div>
+                        <span class="ok-text row" style="gap:6px"><i data-icon="check" style="width:14px;height:14px"></i>kilima-labs is available</span>
+                    </div>
+
+                    <div class="field has-error" data-state="taken" hidden>
+                        <label for="org-slug-taken">Organization URL</label>
+                        <div class="input-group"><span class="addon">pallet.dev/</span><input class="input mono" id="org-slug-taken" value="kilima" autocomplete="off" spellcheck="false" aria-describedby="slug-taken-msg"></div>
+                        <span class="error-text" id="slug-taken-msg">Someone already uses kilima. Try kilima-labs or kilima-hq.</span>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label for="name">Your name</label>
+                            <input class="input" id="name" value="Amani Otieno" autocomplete="name">
+                        </div>
+                        <div class="field">
+                            <label for="email">Work email</label>
+                            <input class="input" id="email" type="email" value="amani@kilimalabs.co" autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input class="input" id="password" type="password" value="correct-horse-battery" autocomplete="new-password" aria-describedby="pw-hint">
+                        <div class="strength" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div>
+                        <span class="hint" id="pw-hint">At least 12 characters. A short sentence is easier to remember than symbols.</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg btn-block" type="submit">Create organization</button>
+
+                <p class="small muted">
+                    By creating an account you agree to the <a href="#">terms</a> and <a href="#">privacy policy</a>.
+                    Already on Pallet? <a href="login.html">Sign in</a>.
+                </p>
+            </form>
+
+            <div class="auth-foot"><span>© 2026 Pallet</span><a href="landing.html">Back to pallet.dev</a></div>
+        </main>
+
+        <aside class="auth-side" aria-label="What happens next">
+            <div class="eyebrow">After you sign up</div>
+            <ol class="list" style="max-width:420px">
+                <li style="padding-inline:0;align-items:flex-start">
+                    <span class="avatar avatar-sm" style="margin-top:1px">1</span>
+                    <div><div class="person-name">Confirm your email</div><div class="person-meta">We email you an 8-character code. You can sign in once it's confirmed.</div></div>
+                </li>
+                <li style="padding-inline:0;align-items:flex-start">
+                    <span class="avatar avatar-sm" style="margin-top:1px">2</span>
+                    <div><div class="person-name">Connect GitHub</div><div class="person-meta">Install the Pallet GitHub App and choose which repositories it can see.</div></div>
+                </li>
+                <li style="padding-inline:0;align-items:flex-start">
+                    <span class="avatar avatar-sm" style="margin-top:1px">3</span>
+                    <div><div class="person-name">Create your first app</div><div class="person-meta">Pick a cloud and region, link a repository, then push.</div></div>
+                </li>
+            </ol>
+        </aside>
+    </div>
+</body>
+</html>

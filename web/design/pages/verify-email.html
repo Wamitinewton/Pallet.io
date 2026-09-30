@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Confirm your email · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+</head>
+<body data-states="enter:Enter code,wrong:Wrong code,resent:Code resent">
+    <div class="auth">
+        <main class="auth-main">
+            <a class="brand" href="landing.html"><img src="../assets/pallet-mark.svg" alt=""><span>Pallet</span></a>
+
+            <form class="auth-form" data-fake-submit="Email confirmed" data-next="login.html" novalidate>
+                <div>
+                    <span class="avatar avatar-lg" style="border-radius:var(--r-lg)"><i data-icon="mail"></i></span>
+                    <h1 style="margin-top:20px">Check your inbox</h1>
+                    <p class="lede">We sent a code to <strong style="color:var(--ink)">amani@kilimalabs.co</strong>. Enter it below to confirm this is your address.</p>
+                </div>
+
+                <div class="callout callout-green" data-state="resent" hidden>
+                    <i data-icon="check-circle"></i><span>We sent a new code. The old one no longer works.</span>
+                </div>
+
+                <div class="field">
+                    <label for="c1">Verification code</label>
+                    <div class="code-input" role="group" aria-label="8-character code">
+                        <input class="input" id="c1" maxlength="1" value="K" aria-label="Character 1">
+                        <input class="input" id="c2" maxlength="1" value="7" aria-label="Character 2">
+                        <input class="input" id="c3" maxlength="1" value="Q" aria-label="Character 3">
+                        <input class="input" id="c4" maxlength="1" value="M" aria-label="Character 4">
+                        <input class="input" id="c5" maxlength="1" value="3" aria-label="Character 5">
+                        <input class="input" id="c6" maxlength="1" value="W" aria-label="Character 6">
+                        <input class="input" id="c7" maxlength="1" value="" aria-label="Character 7">
+                        <input class="input" id="c8" maxlength="1" value="" aria-label="Character 8">
+                    </div>
+                    <span class="hint" data-state="enter resent">Letters and numbers, not case sensitive. You can paste the whole code.</span>
+                    <span class="error-text" data-state="wrong" hidden>That code doesn't match. Check the latest email from us, or send a new code.</span>
+                </div>
+
+                <button class="btn btn-primary btn-lg btn-block" type="submit">Confirm email</button>
+
+                <div class="row-between small">
+                    <span class="muted">Didn't get it? Check spam, or</span>
+                    <button class="btn btn-ghost btn-sm" type="button" data-set-state="resent"><i data-icon="refresh"></i>Send a new code</button>
+                </div>
+
+                <p class="small muted">Signed up with the wrong address? <a href="signup.html">Start again</a>.</p>
+            </form>
+
+            <div class="auth-foot"><span>© 2026 Pallet</span><a href="login.html">Sign in instead</a></div>
+        </main>
+
+        <aside class="auth-side" aria-label="Email preview">
+            <div class="eyebrow">What the email looks like</div>
+            <div class="preview-window" style="max-width:440px">
+                <div class="preview-bar"><i></i><i></i><i></i><span>Verify your Pallet email</span></div>
+                <div class="panel-body stack">
+                    <div class="row" style="gap:8px"><img src="../assets/pallet-mark.svg" alt="" style="width:22px"><strong style="color:var(--ink)">Pallet</strong><span class="tiny faint" style="margin-left:auto">no-reply@pallet.dev</span></div>
+                    <p>Hi Amani, here's your code:</p>
+                    <div class="mono" style="padding:14px;border-radius:var(--r-md);background:var(--surface-2);color:var(--ink);font-size:22px;letter-spacing:0.2em;text-align:center">K7QM 3WZP</div>
+                    <p class="small muted">It works once and expires soon. If you didn't sign up for Pallet, you can ignore this email.</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</body>
+</html>

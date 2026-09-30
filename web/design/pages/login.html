@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Sign in · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+</head>
+<body data-states="default:Default,wrong:Wrong password,unverified:Email not confirmed,limited:Too many tries,expired:Session expired">
+    <div class="auth">
+        <main class="auth-main">
+            <a class="brand" href="landing.html"><img src="../assets/pallet-mark.svg" alt=""><span>Pallet</span></a>
+
+            <form class="auth-form" data-fake-submit="Signed in" data-next="overview.html" novalidate>
+                <div>
+                    <h1>Sign in to Pallet</h1>
+                    <p class="lede">Welcome back. Use the email you signed up with.</p>
+                </div>
+
+                <div class="callout callout-red" data-state="wrong" hidden>
+                    <i data-icon="alert"></i><span>That email and password don't match. Check for typos, or <a href="forgot-password.html">reset your password</a>.</span>
+                </div>
+
+                <div class="callout callout-amber" data-state="unverified" hidden>
+                    <i data-icon="mail"></i>
+                    <div class="stack-sm">
+                        <span><strong>Confirm your email first.</strong> We sent a code to amani@kilimalabs.co when you signed up.</span>
+                        <div class="row" style="gap:8px">
+                            <a class="btn btn-secondary btn-sm" href="verify-email.html">Enter code</a>
+                            <button class="btn btn-ghost btn-sm" type="button" data-toast="New code sent to amani@kilimalabs.co">Send a new code</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="callout callout-amber" data-state="limited" hidden>
+                    <i data-icon="clock"></i><span><strong>Too many attempts.</strong> Wait a minute before trying again. This protects your account from password guessing.</span>
+                </div>
+
+                <div class="callout callout-blue" data-state="expired" hidden>
+                    <i data-icon="info"></i><span>You were signed out, either because the session ended or because it was signed out from another device. Sign in again to pick up where you left off.</span>
+                </div>
+
+                <div class="stack">
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input class="input" id="email" type="email" value="amani@kilimalabs.co" autocomplete="email">
+                    </div>
+                    <div class="field">
+                        <div class="label-row"><label for="password">Password</label><a href="forgot-password.html">Forgot password?</a></div>
+                        <input class="input" id="password" type="password" value="correct-horse-battery" autocomplete="current-password">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in</button>
+
+                <div class="divider">New to Pallet?</div>
+                <a class="btn btn-secondary btn-lg btn-block" href="signup.html">Create an organization</a>
+                <p class="small muted" style="text-align:center">Got an invite from your team? Open the link in the email instead.</p>
+            </form>
+
+            <div class="auth-foot"><span>© 2026 Pallet</span><a href="landing.html">Back to pallet.dev</a></div>
+        </main>
+
+        <aside class="auth-side" aria-label="Product preview">
+            <div style="max-width:460px" class="stack">
+                <div class="eyebrow">Kilima Labs · Apps</div>
+                <div class="preview-window">
+                    <ul class="list">
+                        <li>
+                            <span class="avatar avatar-org" style="background:var(--blue-soft);color:var(--blue-text)"><i data-icon="apps"></i></span>
+                            <div style="flex:1;min-width:0"><div class="person-name">Checkout API</div><div class="person-meta mono">kilima-labs/checkout-api · main</div></div>
+                            <span class="badge badge-green"><span class="dot"></span>Connected</span>
+                        </li>
+                        <li>
+                            <span class="avatar avatar-org" style="background:var(--blue-soft);color:var(--blue-text)"><i data-icon="apps"></i></span>
+                            <div style="flex:1;min-width:0"><div class="person-name">Merchant dashboard</div><div class="person-meta mono">kilima-labs/web · main</div></div>
+                            <span class="badge badge-green"><span class="dot"></span>Connected</span>
+                        </li>
+                        <li>
+                            <span class="avatar avatar-org" style="background:var(--blue-soft);color:var(--blue-text)"><i data-icon="apps"></i></span>
+                            <div style="flex:1;min-width:0"><div class="person-name">Receipts worker</div><div class="person-meta mono">kilima-labs/receipts · release</div></div>
+                            <span class="badge badge-amber">Needs attention</span>
+                        </li>
+                    </ul>
+                </div>
+                <p class="muted">Every app, repository and teammate in one place. Pallet tells you when a link breaks and how to fix it.</p>
+            </div>
+        </aside>
+    </div>
+</body>
+</html>

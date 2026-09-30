@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Members · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .role-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .role-options .choice {
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .role-options .choice input {
+            position: static;
+            opacity: 1;
+            margin-top: 3px;
+            accent-color: var(--blue);
+        }
+
+        .you {
+            margin-left: 6px;
+            color: var(--faint);
+            font-size: 12px;
+            font-weight: 400;
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="members">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Members"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>Members</h1>
+                        <p>Everyone in Kilima Labs and what they can do. Admins can invite people and change roles.</p>
+                    </div>
+                    <button class="btn btn-primary" type="button" data-open="modal-invite" data-hash="invite"><i data-icon="mail"></i>Invite people</button>
+                </div>
+
+                <div class="tabs" role="tablist" aria-label="Members and invites" style="margin-bottom:20px">
+                    <button type="button" role="tab" id="tab-members" aria-selected="true" aria-controls="panel-members">Members <span class="count num">6</span></button>
+                    <button type="button" role="tab" id="tab-invites" aria-selected="false" aria-controls="panel-invites" data-hash="invites">Invites <span class="count num">2</span></button>
+                </div>
+
+                <section class="panel" id="panel-members" role="tabpanel" aria-labelledby="tab-members">
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead><tr><th>Name</th><th>Role</th><th class="hide-sm">Joined</th><th class="actions"><span class="sr-only">Actions</span></th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">AO</span><div><div class="person-name">Amani Otieno<span class="you">you</span></div><div class="person-meta">amani@kilimalabs.co</div></div></div></td>
+                                    <td><span class="role role-owner">Owner</span></td>
+                                    <td class="hide-sm small">12 Mar 2026</td>
+                                    <td class="actions"></td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">WK</span><div><div class="person-name">Wanjiru Kamau</div><div class="person-meta">wanjiru@kilimalabs.co</div></div></div></td>
+                                    <td><span class="role">Admin</span></td>
+                                    <td class="hide-sm small">12 Mar 2026</td>
+                                    <td class="actions">
+                                        <div style="position:relative;display:inline-block" data-menu>
+                                            <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for Wanjiru Kamau" aria-haspopup="menu" aria-expanded="false" data-menu-button><i data-icon="more"></i></button>
+                                            <div class="menu" role="menu" style="right:0;top:calc(100% + 4px)" hidden>
+                                                <button type="button" data-open="modal-role"><i data-icon="shield" style="width:16px;height:16px"></i>Change role</button>
+                                                <button type="button" data-open="modal-transfer"><i data-icon="key" style="width:16px;height:16px"></i>Make owner</button>
+                                                <hr>
+                                                <button type="button" class="danger" data-open="modal-remove"><i data-icon="trash" style="width:16px;height:16px"></i>Remove from Kilima Labs</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">GN</span><div><div class="person-name">Grace Njeri</div><div class="person-meta">grace.njeri@kilimalabs.co</div></div></div></td>
+                                    <td><span class="role">Admin</span></td>
+                                    <td class="hide-sm small">18 Mar 2026</td>
+                                    <td class="actions"><button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for Grace Njeri" data-open="modal-role"><i data-icon="more"></i></button></td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">FH</span><div><div class="person-name">Fatuma Hassan</div><div class="person-meta">fatuma@kilimalabs.co</div></div></div></td>
+                                    <td><span class="role">Developer</span></td>
+                                    <td class="hide-sm small">2 Apr 2026</td>
+                                    <td class="actions"><button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for Fatuma Hassan" data-open="modal-role"><i data-icon="more"></i></button></td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">BM</span><div><div class="person-name">Brian Mwangi</div><div class="person-meta">brian@kilimalabs.co</div></div></div></td>
+                                    <td><span class="role">Developer</span></td>
+                                    <td class="hide-sm small">Today</td>
+                                    <td class="actions"><button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for Brian Mwangi" data-open="modal-role"><i data-icon="more"></i></button></td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person"><span class="avatar">KO</span><div><div class="person-name">Kevin Ochieng</div><div class="person-meta">kevin.ochieng@gmail.com</div></div></div></td>
+                                    <td><span class="role">Viewer</span></td>
+                                    <td class="hide-sm small">9 Jun 2026</td>
+                                    <td class="actions"><button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for Kevin Ochieng" data-open="modal-role"><i data-icon="more"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="panel-foot"><span class="num">6 members</span><span>Kilima Labs has one owner. Hand over ownership from a member's menu.</span></div>
+                </section>
+
+                <section class="panel" id="panel-invites" role="tabpanel" aria-labelledby="tab-invites" hidden>
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead><tr><th>Email</th><th>Role</th><th>Status</th><th class="hide-sm">Sent</th><th class="actions"><span class="sr-only">Actions</span></th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><div class="person-name">david.kariuki@kilimalabs.co</div><div class="person-meta">Invited by Grace Njeri</div></td>
+                                    <td><span class="role">Developer</span></td>
+                                    <td><span class="badge badge-amber">Expires tomorrow</span></td>
+                                    <td class="hide-sm small">2 of 4 emails</td>
+                                    <td class="actions">
+                                        <div class="row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">
+                                            <button class="btn btn-secondary btn-sm" type="button" data-toast="Invite sent again to david.kariuki@kilimalabs.co">Resend</button>
+                                            <button class="btn btn-ghost btn-sm" type="button" data-open="modal-revoke">Revoke</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person-name">lucy@wambui.dev</div><div class="person-meta">Invited by you</div></td>
+                                    <td><span class="role">Viewer</span></td>
+                                    <td><span class="badge badge-blue">Pending</span></td>
+                                    <td class="hide-sm small">1 of 4 emails</td>
+                                    <td class="actions">
+                                        <div class="row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">
+                                            <button class="btn btn-secondary btn-sm is-disabled" type="button" title="You can resend in 3 minutes" aria-disabled="true">Resend in 3 min</button>
+                                            <button class="btn btn-ghost btn-sm" type="button" data-open="modal-revoke">Revoke</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><div class="person-name" style="color:var(--muted)">otieno.j@savannapay.com</div><div class="person-meta">Invited by Wanjiru Kamau</div></td>
+                                    <td><span class="role">Developer</span></td>
+                                    <td><span class="badge">Expired</span></td>
+                                    <td class="hide-sm small">4 of 4 emails</td>
+                                    <td class="actions"><button class="btn btn-secondary btn-sm" type="button" data-open="modal-invite">Invite again</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="panel-foot"><span>Invites last 3 days. Each one can be emailed up to 4 times, 5 minutes apart.</span></div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-invite" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="invite-title" data-fake-submit="Invite sent to mercy@kilimalabs.co" novalidate>
+            <div class="modal-head">
+                <div><h2 id="invite-title">Invite someone to Kilima Labs</h2><p>They'll get an email with a link. It works for 3 days.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label for="inv-email">Email address</label>
+                    <input class="input" id="inv-email" type="email" value="mercy@kilimalabs.co" autocomplete="off">
+                </div>
+                <fieldset class="field" style="border:0;margin:0;padding:0">
+                    <legend class="label" style="margin-bottom:6px">Role</legend>
+                    <div class="role-options">
+                        <label class="choice"><input type="radio" name="inv-role" id="inv-admin"><span><strong>Admin</strong><br><span class="small muted">Invite people, manage teams, connect GitHub, link repositories.</span></span></label>
+                        <label class="choice"><input type="radio" name="inv-role" id="inv-dev" checked><span><strong>Developer</strong><br><span class="small muted">Create and edit apps, change build settings, start builds.</span></span></label>
+                        <label class="choice"><input type="radio" name="inv-role" id="inv-viewer"><span><strong>Viewer</strong><br><span class="small muted">See everything, change nothing.</span></span></label>
+                    </div>
+                </fieldset>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit"><i data-icon="send"></i>Send invite</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-role" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="role-title" data-fake-submit="Wanjiru Kamau is now a developer" novalidate>
+            <div class="modal-head">
+                <div><h2 id="role-title">Change Wanjiru Kamau's role</h2><p>Pick what Wanjiru should be able to do in Kilima Labs.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="role-options">
+                    <label class="choice"><input type="radio" name="role" id="r-admin" checked><span><strong>Admin</strong><br><span class="small muted">Invite people, manage teams, connect GitHub, link repositories.</span></span></label>
+                    <label class="choice"><input type="radio" name="role" id="r-dev"><span><strong>Developer</strong><br><span class="small muted">Create and edit apps, change build settings, start builds.</span></span></label>
+                    <label class="choice"><input type="radio" name="role" id="r-viewer"><span><strong>Viewer</strong><br><span class="small muted">See everything, change nothing.</span></span></label>
+                </div>
+                <p class="small muted">To make someone the owner, use Make owner instead.</p>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit">Save role</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-transfer" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-title" data-fake-submit="Wanjiru Kamau now owns Kilima Labs" novalidate>
+            <div class="modal-head">
+                <div><h2 id="transfer-title">Make Wanjiru Kamau the owner?</h2><p>An organization has one owner. You'll become an admin, and only Wanjiru can give ownership back.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="callout callout-blue"><i data-icon="lock"></i><span>For your security, confirm your password. You signed in more than 10 minutes ago.</span></div>
+                <div class="field">
+                    <label for="t-pw">Your password</label>
+                    <input class="input" id="t-pw" type="password" autocomplete="current-password">
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Transfer ownership</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-remove" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="rm-title" data-fake-submit="Wanjiru Kamau removed from Kilima Labs" novalidate>
+            <div class="modal-head">
+                <div><h2 id="rm-title">Remove Wanjiru Kamau?</h2><p>They lose access to Kilima Labs straight away and are taken off every team. Their Pallet account and other organizations aren't affected.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Remove member</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-revoke" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="revoke-title" data-fake-submit="Invite revoked" novalidate>
+            <div class="modal-head">
+                <div><h2 id="revoke-title">Revoke this invite?</h2><p>The link in the email stops working. You can invite the same address again later.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Keep it</button>
+                <button class="btn btn-danger" type="submit">Revoke invite</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

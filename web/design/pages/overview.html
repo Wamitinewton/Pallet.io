@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Overview · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .overview {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .app-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 4px 16px;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--line);
+            color: inherit;
+        }
+
+        .app-row:last-child {
+            border-bottom: 0;
+        }
+
+        .app-row:hover {
+            background: var(--surface-2);
+            text-decoration: none;
+        }
+
+        .app-row .name {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .app-row .meta {
+            display: flex;
+            gap: 6px 14px;
+            flex-wrap: wrap;
+            grid-column: 1 / -1;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .app-row .meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .app-row .meta svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .attention li {
+            align-items: flex-start;
+        }
+
+        .attention .glyph {
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            flex: none;
+            border-radius: var(--r-md);
+        }
+
+        .attention .glyph svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        @media (max-width: 960px) {
+            .overview {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="overview">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Overview"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>Kilima Labs</h1>
+                        <p>Team organization at <span class="mono">pallet.dev/kilima-labs</span>. Created 12 March 2026.</p>
+                    </div>
+                    <div class="row">
+                        <a class="btn btn-secondary" href="members.html#invite"><i data-icon="mail"></i>Invite people</a>
+                        <a class="btn btn-primary" href="apps.html#new"><i data-icon="plus"></i>New app</a>
+                    </div>
+                </div>
+
+                <div class="section-gap">
+                    <div class="stats">
+                        <a class="stat" href="apps.html"><span class="value">4</span><span class="label">Apps</span></a>
+                        <a class="stat" href="members.html"><span class="value">6</span><span class="label">Members</span></a>
+                        <a class="stat" href="teams.html"><span class="value">3</span><span class="label">Teams</span></a>
+                    </div>
+
+                    <div class="overview">
+                        <section class="panel" aria-labelledby="apps-h">
+                            <div class="panel-head">
+                                <h2 id="apps-h">Apps</h2>
+                                <a class="btn btn-ghost btn-sm" href="apps.html">View all<i data-icon="chevron-right"></i></a>
+                            </div>
+                            <a class="app-row" href="app.html">
+                                <span class="name">Checkout API</span>
+                                <span class="badge badge-green"><span class="dot"></span>Connected</span>
+                                <span class="meta"><span><i data-icon="github"></i>kilima-labs/checkout-api</span><span><i data-icon="commit"></i><span class="sha">3f9c2e1</span> on main, 14 min ago</span></span>
+                            </a>
+                            <a class="app-row" href="app.html">
+                                <span class="name">Merchant dashboard</span>
+                                <span class="badge badge-green"><span class="dot"></span>Connected</span>
+                                <span class="meta"><span><i data-icon="github"></i>kilima-labs/web</span><span><i data-icon="folder"></i>apps/merchant</span><span><i data-icon="commit"></i><span class="sha">a71d0c4</span> on main, yesterday</span></span>
+                            </a>
+                            <a class="app-row" href="app.html#disconnected">
+                                <span class="name">Receipts worker</span>
+                                <span class="badge badge-red">Disconnected</span>
+                                <span class="meta"><span><i data-icon="github"></i>kilima-labs/receipts</span><span>Pallet lost access to this repository on 27 September</span></span>
+                            </a>
+                            <a class="app-row" href="app.html#unlinked">
+                                <span class="name">Docs</span>
+                                <span class="badge">No repository</span>
+                                <span class="meta"><span>Link a repository to start building this app</span></span>
+                            </a>
+                        </section>
+
+                        <div class="section-gap">
+                            <section class="panel" aria-labelledby="att-h">
+                                <div class="panel-head"><h2 id="att-h">Needs your attention</h2><span class="badge badge-amber num">3</span></div>
+                                <ul class="list attention">
+                                    <li>
+                                        <span class="glyph" style="background:var(--red-soft);color:var(--red-text)"><i data-icon="unlink"></i></span>
+                                        <div class="stack-sm" style="gap:4px">
+                                            <span class="person-name">Receipts worker can't reach its repository</span>
+                                            <span class="person-meta">GitHub stopped giving Pallet access to kilima-labs/receipts. Pushes to it won't build.</span>
+                                            <a class="small" href="app.html#disconnected">Fix the link</a>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="glyph" style="background:var(--amber-soft);color:var(--amber-text)"><i data-icon="github"></i></span>
+                                        <div class="stack-sm" style="gap:4px">
+                                            <span class="person-name">A GitHub installation isn't being used</span>
+                                            <span class="person-meta">amani-otieno has no linked apps. Pallet removes it on 14 October unless an app uses it.</span>
+                                            <a class="small" href="github.html">Review installations</a>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="glyph" style="background:var(--blue-soft);color:var(--blue-text)"><i data-icon="mail"></i></span>
+                                        <div class="stack-sm" style="gap:4px">
+                                            <span class="person-name">2 invites haven't been accepted</span>
+                                            <span class="person-meta">One of them expires tomorrow.</span>
+                                            <a class="small" href="members.html#invites">See invites</a>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </section>
+
+                            <section class="panel" aria-labelledby="setup-h">
+                                <div class="panel-head"><h2 id="setup-h">Latest notifications</h2><a class="btn btn-ghost btn-sm" href="notifications.html">All<i data-icon="chevron-right"></i></a></div>
+                                <ul class="list">
+                                    <li><span class="dot" style="color:var(--blue)" aria-label="Unread"></span><div style="min-width:0"><div class="person-name">Brian Mwangi joined Kilima Labs</div><div class="person-meta">Accepted your invite as a developer · 2 hours ago</div></div></li>
+                                    <li><span class="dot" style="color:var(--blue)" aria-label="Unread"></span><div style="min-width:0"><div class="person-name">Receipts worker was disconnected</div><div class="person-meta">Pallet can no longer read kilima-labs/receipts · 3 days ago</div></div></li>
+                                    <li><span class="dot" style="color:transparent" aria-hidden="true"></span><div style="min-width:0"><div class="person-name">You're now the owner of Kilima Labs</div><div class="person-meta">Wanjiru Kamau transferred ownership to you · 2 weeks ago</div></div></li>
+                                </ul>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

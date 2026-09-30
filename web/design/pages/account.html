@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Your account · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .device {
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            flex: none;
+            border-radius: var(--r-md);
+            background: var(--surface-2);
+            color: var(--muted);
+        }
+
+        .device svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .this-device .device {
+            background: var(--green-soft);
+            color: var(--green-text);
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="account">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Your account"></header>
+            <main class="page page-narrow">
+                <div class="page-head">
+                    <div class="row" style="gap:16px">
+                        <span class="avatar avatar-lg">AO</span>
+                        <div>
+                            <h1>Amani Otieno</h1>
+                            <p style="margin-top:4px">amani@kilimalabs.co</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabs" role="tablist" aria-label="Account sections" style="margin-bottom:24px">
+                    <button type="button" role="tab" id="tab-profile" aria-selected="true" aria-controls="panel-profile">Profile</button>
+                    <button type="button" role="tab" id="tab-security" aria-selected="false" aria-controls="panel-security" data-hash="security">Password and sessions</button>
+                </div>
+
+                <div id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" class="section-gap">
+                    <form class="panel" data-fake-submit="Profile updated" novalidate>
+                        <div class="panel-head"><div><h2>Profile</h2><p>Your name appears to everyone in your organizations.</p></div></div>
+                        <div class="panel-body stack">
+                            <div class="field">
+                                <label for="display-name">Name</label>
+                                <input class="input" id="display-name" value="Amani Otieno" autocomplete="name">
+                            </div>
+                            <div class="field">
+                                <label for="acct-email">Email</label>
+                                <input class="input" id="acct-email" value="amani@kilimalabs.co" readonly>
+                                <span class="hint row" style="gap:6px"><i data-icon="check-circle" style="width:14px;height:14px;color:var(--green-text)"></i>Confirmed. This is also the address you sign in with.</span>
+                            </div>
+                        </div>
+                        <div class="panel-foot"><span>Account created 12 March 2026</span><button class="btn btn-primary btn-sm" type="submit">Save</button></div>
+                    </form>
+                </div>
+
+                <div id="panel-security" role="tabpanel" aria-labelledby="tab-security" class="section-gap" hidden>
+                    <form class="panel" data-fake-submit="Password changed" novalidate>
+                        <div class="panel-head"><div><h2>Change password</h2><p>We check your current password before saving the new one.</p></div></div>
+                        <div class="panel-body stack">
+                            <div class="field">
+                                <label for="cur-pw">Current password</label>
+                                <input class="input" id="cur-pw" type="password" autocomplete="current-password">
+                            </div>
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="new-pw">New password</label>
+                                    <input class="input" id="new-pw" type="password" autocomplete="new-password">
+                                    <span class="hint">At least 12 characters.</span>
+                                </div>
+                                <div class="field">
+                                    <label for="new-pw2">Type it again</label>
+                                    <input class="input" id="new-pw2" type="password" autocomplete="new-password">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-foot"><a href="forgot-password.html">Forgot your current password?</a><button class="btn btn-primary btn-sm" type="submit">Update password</button></div>
+                    </form>
+
+                    <section class="panel" aria-labelledby="sess-h">
+                        <div class="panel-head">
+                            <div><h2 id="sess-h">Where you're signed in</h2><p>Sign out of anything you don't recognize, then change your password.</p></div>
+                            <button class="btn btn-danger-outline btn-sm" type="button" data-open="modal-signout-all">Sign out everywhere else</button>
+                        </div>
+                        <ul class="list">
+                            <li class="this-device">
+                                <span class="device"><i data-icon="monitor"></i></span>
+                                <div style="flex:1;min-width:0">
+                                    <div class="person-name">This device</div>
+                                    <div class="person-meta"><span class="mono">197.237.14.82</span> · signed in 29 Sep at 08:41 · active now</div>
+                                </div>
+                                <span class="badge badge-green">Current</span>
+                            </li>
+                            <li>
+                                <span class="device"><i data-icon="globe"></i></span>
+                                <div style="flex:1;min-width:0">
+                                    <div class="person-name">Another session</div>
+                                    <div class="person-meta"><span class="mono">41.90.64.211</span> · signed in 27 Sep at 19:02 · last active 3 hours ago</div>
+                                </div>
+                                <button class="btn btn-ghost btn-sm" type="button" data-toast="Session signed out">Sign out</button>
+                            </li>
+                            <li>
+                                <span class="device"><i data-icon="globe"></i></span>
+                                <div style="flex:1;min-width:0">
+                                    <div class="person-name">Another session</div>
+                                    <div class="person-meta"><span class="mono">102.68.77.5</span> · signed in 21 Sep at 10:15 · last active 6 days ago</div>
+                                </div>
+                                <button class="btn btn-ghost btn-sm" type="button" data-toast="Session signed out">Sign out</button>
+                            </li>
+                        </ul>
+                        <div class="panel-foot"><span>A signed-out session stops working immediately, even if a tab is still open.</span></div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-signout-all" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="soa-title" data-fake-submit="Signed out of 2 other sessions" novalidate>
+            <div class="modal-head">
+                <div><h2 id="soa-title">Sign out everywhere else?</h2><p>2 other sessions end right away. You stay signed in here.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Sign out 2 sessions</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Apps · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .app-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: inherit;
+        }
+
+        .app-name:hover {
+            text-decoration: none;
+        }
+
+        .app-name:hover .person-name {
+            color: var(--blue-text);
+        }
+
+        .app-icon {
+            display: grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            flex: none;
+            border-radius: var(--r-md);
+            background: var(--blue-soft);
+            color: var(--blue-text);
+        }
+
+        .app-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .search {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+            max-width: 320px;
+        }
+
+        .search svg {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            width: 16px;
+            height: 16px;
+            color: var(--faint);
+            transform: translateY(-50%);
+        }
+
+        .search .input {
+            padding-left: 34px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="apps">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Apps"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>Apps</h1>
+                        <p>Each app runs in one cloud region and builds from one repository.</p>
+                    </div>
+                    <button class="btn btn-primary" type="button" data-open="modal-new-app" data-hash="new"><i data-icon="plus"></i>New app</button>
+                </div>
+
+                <section class="panel">
+                    <div class="toolbar">
+                        <label class="search"><span class="sr-only">Search apps</span><i data-icon="search"></i><input class="input" id="app-search" placeholder="Search by name or repository"></label>
+                        <select class="select" id="team-filter" style="width:auto" aria-label="Filter by team">
+                            <option>All teams</option>
+                            <option>Payments</option>
+                            <option>Web</option>
+                            <option>Platform</option>
+                            <option>No team</option>
+                        </select>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr><th>App</th><th>Repository</th><th class="hide-sm">Runs on</th><th class="hide-sm">Team</th><th class="actions"><span class="sr-only">Actions</span></th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><a class="app-name" href="app.html"><span class="app-icon"><i data-icon="apps"></i></span><span><span class="person-name">Checkout API</span><br><span class="person-meta mono">checkout-api</span></span></a></td>
+                                    <td><div class="stack-sm" style="gap:4px"><span class="badge badge-green" style="align-self:flex-start"><span class="dot"></span>Connected</span><span class="small muted mono">kilima-labs/checkout-api</span></div></td>
+                                    <td class="hide-sm"><span class="row" style="gap:6px"><i data-icon="cloud" style="width:15px;height:15px;color:var(--faint)"></i>AWS · <span class="mono small">af-south-1</span></span></td>
+                                    <td class="hide-sm">Payments</td>
+                                    <td class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="app.html" aria-label="Open Checkout API"><i data-icon="chevron-right"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td><a class="app-name" href="app.html"><span class="app-icon"><i data-icon="apps"></i></span><span><span class="person-name">Merchant dashboard</span><br><span class="person-meta mono">merchant-dashboard</span></span></a></td>
+                                    <td><div class="stack-sm" style="gap:4px"><span class="badge badge-green" style="align-self:flex-start"><span class="dot"></span>Connected</span><span class="small muted mono">kilima-labs/web · apps/merchant</span></div></td>
+                                    <td class="hide-sm"><span class="row" style="gap:6px"><i data-icon="cloud" style="width:15px;height:15px;color:var(--faint)"></i>GCP · <span class="mono small">europe-west1</span></span></td>
+                                    <td class="hide-sm">Web</td>
+                                    <td class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="app.html" aria-label="Open Merchant dashboard"><i data-icon="chevron-right"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td><a class="app-name" href="app.html#disconnected"><span class="app-icon"><i data-icon="apps"></i></span><span><span class="person-name">Receipts worker</span><br><span class="person-meta mono">receipts-worker</span></span></a></td>
+                                    <td><div class="stack-sm" style="gap:4px"><span class="badge badge-red" style="align-self:flex-start">Disconnected</span><span class="small muted mono">kilima-labs/receipts</span></div></td>
+                                    <td class="hide-sm"><span class="row" style="gap:6px"><i data-icon="cloud" style="width:15px;height:15px;color:var(--faint)"></i>AWS · <span class="mono small">eu-west-1</span></span></td>
+                                    <td class="hide-sm">Payments</td>
+                                    <td class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="app.html#disconnected" aria-label="Open Receipts worker"><i data-icon="chevron-right"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td><a class="app-name" href="app.html#unlinked"><span class="app-icon"><i data-icon="apps"></i></span><span><span class="person-name">Docs</span><br><span class="person-meta mono">docs</span></span></a></td>
+                                    <td><a class="btn btn-secondary btn-sm" href="connect-repo.html"><i data-icon="link"></i>Link repository</a></td>
+                                    <td class="hide-sm"><span class="row" style="gap:6px"><i data-icon="cloud" style="width:15px;height:15px;color:var(--faint)"></i>GCP · <span class="mono small">africa-south1</span></span></td>
+                                    <td class="hide-sm"><span class="faint">No team</span></td>
+                                    <td class="actions"><a class="btn btn-ghost btn-sm btn-icon" href="app.html#unlinked" aria-label="Open Docs"><i data-icon="chevron-right"></i></a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="panel-foot"><span class="num">4 apps</span><span>Viewers can see apps. Developers and above can create them.</span></div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-new-app" hidden>
+        <form class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="new-app-title" data-fake-submit="Payments API created" novalidate>
+            <div class="modal-head">
+                <div><h2 id="new-app-title">New app</h2><p>You'll link a repository right after this. The cloud and region can't change once the app exists.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="field-grid">
+                    <div class="field">
+                        <label for="app-name">Name</label>
+                        <input class="input" id="app-name" value="Payments API" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label for="app-slug">Slug</label>
+                        <input class="input mono" id="app-slug" value="payments-api" autocomplete="off" spellcheck="false">
+                        <span class="hint">Used in URLs. Unique within Kilima Labs.</span>
+                    </div>
+                </div>
+                <fieldset class="field" style="border:0;margin:0;padding:0">
+                    <legend class="label" style="margin-bottom:6px">Cloud</legend>
+                    <div class="choice-grid">
+                        <label class="choice"><input type="radio" name="cloud" id="cloud-aws" checked><strong>Amazon Web Services</strong><span class="small muted">6 regions</span></label>
+                        <label class="choice"><input type="radio" name="cloud" id="cloud-gcp"><strong>Google Cloud</strong><span class="small muted">6 regions</span></label>
+                    </div>
+                </fieldset>
+                <div class="field-grid">
+                    <div class="field">
+                        <label for="region">Region</label>
+                        <select class="select" id="region">
+                            <option value="af-south-1" selected>af-south-1 · Cape Town</option>
+                            <option value="eu-west-1">eu-west-1 · Ireland</option>
+                            <option value="eu-central-1">eu-central-1 · Frankfurt</option>
+                            <option value="us-east-1">us-east-1 · N. Virginia</option>
+                            <option value="us-west-2">us-west-2 · Oregon</option>
+                            <option value="ap-southeast-1">ap-southeast-1 · Singapore</option>
+                        </select>
+                        <span class="hint">Pick the one closest to your users.</span>
+                    </div>
+                    <div class="field">
+                        <label for="team">Team <span class="faint">(optional)</span></label>
+                        <select class="select" id="team">
+                            <option>No team</option>
+                            <option selected>Payments</option>
+                            <option>Web</option>
+                            <option>Platform</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit">Create app</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
