@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Teams · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .team-card {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding: 18px 20px;
+            color: inherit;
+        }
+
+        .team-card:hover {
+            border-color: var(--line-strong);
+            text-decoration: none;
+        }
+
+        .team-card h2 {
+            font-size: 17px;
+        }
+
+        .team-card .foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: auto;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .team-card .apps {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 960px) {
+            .team-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .team-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="teams">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Teams"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>Teams</h1>
+                        <p>Group people by what they work on, and give each app a team that owns it. Someone can be on more than one team.</p>
+                    </div>
+                    <button class="btn btn-primary" type="button" data-open="modal-team"><i data-icon="plus"></i>New team</button>
+                </div>
+
+                <div class="team-grid">
+                    <a class="panel team-card" href="team.html">
+                        <div class="row-between"><h2>Payments</h2><span class="mono small faint">payments</span></div>
+                        <div class="apps"><span class="badge">Checkout API</span><span class="badge">Receipts worker</span></div>
+                        <div class="foot">
+                            <div class="avatar-stack"><span class="avatar avatar-sm">GN</span><span class="avatar avatar-sm">FH</span><span class="avatar avatar-sm">BM</span></div>
+                            <span class="num">3 people</span>
+                        </div>
+                    </a>
+                    <a class="panel team-card" href="team.html">
+                        <div class="row-between"><h2>Web</h2><span class="mono small faint">web</span></div>
+                        <div class="apps"><span class="badge">Merchant dashboard</span></div>
+                        <div class="foot">
+                            <div class="avatar-stack"><span class="avatar avatar-sm">WK</span><span class="avatar avatar-sm">KO</span></div>
+                            <span class="num">2 people</span>
+                        </div>
+                    </a>
+                    <a class="panel team-card" href="team.html">
+                        <div class="row-between"><h2>Platform</h2><span class="mono small faint">platform</span></div>
+                        <div class="apps"><span class="small faint">No apps yet</span></div>
+                        <div class="foot">
+                            <div class="avatar-stack"><span class="avatar avatar-sm">AO</span><span class="avatar avatar-sm">GN</span></div>
+                            <span class="num">2 people</span>
+                        </div>
+                    </a>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-team" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="team-title" data-fake-submit="Data team created" novalidate>
+            <div class="modal-head">
+                <div><h2 id="team-title">New team</h2><p>You can add people once it's created.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label for="team-name">Name</label>
+                    <input class="input" id="team-name" value="Data" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="team-slug">Slug</label>
+                    <input class="input mono" id="team-slug" value="data" autocomplete="off" spellcheck="false">
+                    <span class="hint">Lowercase letters, numbers and hyphens. It can't change later.</span>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit">Create team</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

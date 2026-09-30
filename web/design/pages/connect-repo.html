@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Link a repository · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .step-n {
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            flex: none;
+            border: 1px solid var(--line-strong);
+            border-radius: 50%;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .step-n svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .is-done .step-n {
+            border-color: transparent;
+            background: var(--green-soft);
+            color: var(--green-text);
+        }
+
+        .is-current .step-n {
+            border-color: var(--blue);
+            background: var(--blue);
+            color: #fff;
+        }
+
+        .is-waiting {
+            opacity: 0.6;
+        }
+
+        .step-summary {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 13.5px;
+        }
+
+        .pick {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--r-md);
+            background: var(--surface);
+            cursor: pointer;
+        }
+
+        .pick:hover {
+            border-color: var(--line-strong);
+        }
+
+        .pick input {
+            accent-color: var(--blue);
+        }
+
+        .pick:has(input:checked) {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 1px var(--blue);
+        }
+
+        .pick.is-blocked {
+            background: var(--surface-2);
+            cursor: not-allowed;
+        }
+
+        .pick .name {
+            color: var(--ink);
+            font-weight: 500;
+            overflow-wrap: anywhere;
+        }
+
+        .pick .sub {
+            display: flex;
+            gap: 4px 12px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 12.5px;
+        }
+
+        .pick .sub span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pick .sub svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        .repo-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+
+        .gh-mark {
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            flex: none;
+            border-radius: var(--r-md);
+            background: var(--ink);
+            color: var(--bg);
+        }
+
+        .gh-mark svg {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body data-states="picking:Choose repo,nosession:Not signed in to GitHub">
+    <div class="app" data-nav="apps">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Apps|apps.html;Docs|app.html#unlinked;Link a repository"></header>
+            <main class="page page-narrow">
+                <div class="page-head">
+                    <div>
+                        <h1>Link a repository to Docs</h1>
+                        <p>Pushes to the branch you pick here will start builds for Docs. You need push access to the repository on GitHub.</p>
+                    </div>
+                </div>
+
+                <div class="steps">
+                    <!-- Step 1: GitHub identity -->
+                    <section class="panel is-current" data-state="nosession" hidden>
+                        <div class="panel-head"><div class="step-head"><span class="step-n">1</span><h2>Confirm who you are on GitHub</h2></div></div>
+                        <div class="panel-body stack">
+                            <p class="muted">Pallet needs to know your GitHub account so it can show the repositories you can push to. We only read your repository access. The sign-in lasts up to an hour and is used for this setup only.</p>
+                            <div><a class="btn btn-primary" href="#" data-set-state="picking"><i data-icon="github"></i>Continue with GitHub</a></div>
+                        </div>
+                    </section>
+                    <section class="panel is-waiting" data-state="nosession" hidden>
+                        <div class="panel-head"><div class="step-head"><span class="step-n">2</span><h2>Choose a repository</h2></div></div>
+                    </section>
+                    <section class="panel is-waiting" data-state="nosession" hidden>
+                        <div class="panel-head"><div class="step-head"><span class="step-n">3</span><h2>Build settings</h2></div></div>
+                    </section>
+
+                    <section class="panel is-done" data-state="picking">
+                        <div class="panel-head">
+                            <div class="step-head"><span class="step-n"><i data-icon="check"></i></span><h2>GitHub account</h2></div>
+                            <div class="row" style="gap:8px">
+                                <span class="step-summary">Signed in as <span class="mono" style="color:var(--ink)">@amani-otieno</span></span>
+                                <button class="btn btn-ghost btn-sm" type="button" data-set-state="nosession">Sign out</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Step 2: installation + repository -->
+                    <section class="panel is-current" data-state="picking">
+                        <div class="panel-head"><div class="step-head"><span class="step-n">2</span><h2>Choose a repository</h2></div></div>
+                        <div class="panel-body stack">
+                            <div class="field">
+                                <label for="inst">GitHub account</label>
+                                <select class="select" id="inst">
+                                    <option selected>kilima-labs · organization · 12 repositories</option>
+                                    <option>amani-otieno · personal account · all repositories</option>
+                                </select>
+                                <span class="hint">Don't see the account you need? <a href="github.html">Install the Pallet GitHub App there</a> first.</span>
+                            </div>
+
+                            <label class="search" style="position:relative;display:block">
+                                <span class="sr-only">Filter repositories</span>
+                                <i data-icon="search" style="position:absolute;left:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--faint)"></i>
+                                <input class="input" id="repo-filter" placeholder="Filter repositories" style="padding-left:34px">
+                            </label>
+
+                            <div class="repo-list" role="radiogroup" aria-label="Repositories">
+                                <label class="pick">
+                                    <input type="radio" name="repo" id="r-docs" checked>
+                                    <div style="flex:1;min-width:0">
+                                        <div class="name">kilima-labs/docs</div>
+                                        <div class="sub"><span><i data-icon="lock"></i>Private</span><span><i data-icon="branch"></i>main</span><span>You: admin</span></div>
+                                    </div>
+                                </label>
+                                <label class="pick">
+                                    <input type="radio" name="repo" id="r-web">
+                                    <div style="flex:1;min-width:0">
+                                        <div class="name">kilima-labs/web</div>
+                                        <div class="sub"><span><i data-icon="lock"></i>Private</span><span><i data-icon="branch"></i>main</span><span>You: admin</span></div>
+                                    </div>
+                                    <span class="badge">Used by Merchant dashboard</span>
+                                </label>
+                                <label class="pick">
+                                    <input type="radio" name="repo" id="r-sdk">
+                                    <div style="flex:1;min-width:0">
+                                        <div class="name">kilima-labs/mpesa-sdk</div>
+                                        <div class="sub"><span><i data-icon="globe"></i>Public</span><span><i data-icon="branch"></i>develop</span><span>You: maintain</span></div>
+                                    </div>
+                                </label>
+                                <label class="pick is-blocked">
+                                    <input type="radio" name="repo" id="r-infra" disabled>
+                                    <div style="flex:1;min-width:0">
+                                        <div class="name">kilima-labs/infrastructure</div>
+                                        <div class="sub"><span><i data-icon="lock"></i>Private</span><span><i data-icon="branch"></i>main</span><span>You: triage</span></div>
+                                    </div>
+                                    <span class="small muted">Needs push access</span>
+                                </label>
+                                <label class="pick is-blocked">
+                                    <input type="radio" name="repo" id="r-old" disabled>
+                                    <div style="flex:1;min-width:0">
+                                        <div class="name">kilima-labs/checkout-v1</div>
+                                        <div class="sub"><span><i data-icon="lock"></i>Private</span><span><i data-icon="branch"></i>master</span><span>You: admin</span></div>
+                                    </div>
+                                    <span class="badge"><i data-icon="archive" style="width:12px;height:12px"></i>Archived</span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Step 3: settings -->
+                    <form class="panel is-current" data-state="picking" data-fake-submit="kilima-labs/docs linked to Docs" data-next="app.html" novalidate>
+                        <div class="panel-head"><div class="step-head"><span class="step-n">3</span><h2>Build settings</h2></div><span class="step-summary mono">kilima-labs/docs</span></div>
+                        <div class="panel-body stack">
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="prod-branch">Production branch</label>
+                                    <input class="input mono" id="prod-branch" value="main" spellcheck="false">
+                                    <span class="hint">Filled in from the repository's default branch.</span>
+                                </div>
+                                <div class="field">
+                                    <label for="root-dir">Root directory</label>
+                                    <input class="input mono" id="root-dir" value="/" spellcheck="false">
+                                    <span class="hint">Change it if Docs lives in a subfolder.</span>
+                                </div>
+                            </div>
+                            <label class="checkbox"><input type="checkbox" id="auto-build" checked><span><strong style="color:var(--ink);font-weight:500">Build every push to main</strong><br><span class="small muted">You can still start builds by hand either way.</span></span></label>
+                            <label class="checkbox"><input type="checkbox" id="build-now" checked><span><strong style="color:var(--ink);font-weight:500">Build the latest commit now</strong><br><span class="small muted">Otherwise the first build waits for your next push.</span></span></label>
+                        </div>
+                        <div class="panel-foot">
+                            <span>Pallet checks your push access before saving.</span>
+                            <div class="row" style="gap:8px">
+                                <a class="btn btn-secondary btn-sm" href="app.html#unlinked">Cancel</a>
+                                <button class="btn btn-primary btn-sm" type="submit"><i data-icon="link"></i>Link repository</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

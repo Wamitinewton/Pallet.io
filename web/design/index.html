@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Pallet screens</title>
+    <link rel="icon" href="assets/favicon.svg">
+    <link rel="stylesheet" href="assets/pallet.css">
+    <script src="assets/pallet.js"></script>
+    <style>
+        .wrap {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        .top {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+            padding-bottom: 32px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .top h1 {
+            margin-top: 18px;
+            font-size: 34px;
+        }
+
+        .top p {
+            max-width: 64ch;
+            margin-top: 8px;
+            color: var(--muted);
+        }
+
+        .group {
+            margin-top: 48px;
+        }
+
+        .group-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .group-head p {
+            color: var(--muted);
+        }
+
+        .screens {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .screen {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 16px 18px;
+            color: inherit;
+        }
+
+        .screen:hover {
+            border-color: var(--blue);
+            text-decoration: none;
+        }
+
+        .screen:hover h3 {
+            color: var(--blue-text);
+        }
+
+        .screen p {
+            color: var(--muted);
+            font-size: 13.5px;
+        }
+
+        .screen .eps {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+            color: var(--faint);
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            overflow-wrap: anywhere;
+        }
+
+        .screen .eps b {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .tokens {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 24px;
+        }
+
+        .swatches {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .swatch {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12.5px;
+        }
+
+        .swatch i {
+            display: block;
+            height: 56px;
+            border: 1px solid var(--line);
+            border-radius: var(--r-md);
+        }
+
+        .swatch strong {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .swatch span {
+            color: var(--muted);
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+        }
+
+        .type-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .type-row:last-child {
+            border-bottom: 0;
+        }
+
+        .type-row span:last-child {
+            color: var(--faint);
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 960px) {
+            .screens {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .tokens {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .wrap {
+                padding: 24px 16px 64px;
+            }
+
+            .screens {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .swatches {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body data-no-note>
+    <div class="wrap">
+        <header class="top">
+            <div>
+                <span class="brand"><img src="assets/pallet-mark.svg" alt=""><span>Pallet</span></span>
+                <h1>Web app screens</h1>
+                <p>
+                    Static designs for every screen the current backend can support: identity, org and team,
+                    git integration and notifications. Open any screen, switch the theme, and use the state
+                    buttons in the bottom corner to see its error and empty states.
+                </p>
+            </div>
+            <button class="btn btn-secondary" type="button" data-theme-toggle><i data-icon="moon"></i>Switch theme</button>
+        </header>
+
+        <section class="group">
+            <div class="group-head"><h2>Public</h2><p>Before sign-in</p></div>
+            <div class="screens">
+                <a class="panel screen" href="pages/landing.html">
+                    <h3>Landing page</h3>
+                    <p>What Pallet does, how linking works, roles, and what's built so far.</p>
+                    <div class="eps"><span>static</span></div>
+                </a>
+                <a class="panel screen" href="pages/signup.html">
+                    <h3>Sign up</h3>
+                    <p>Create an organization and its owner account. Live URL availability check.</p>
+                    <div class="eps"><span><b>POST</b> /identity/signup</span><span><b>GET</b> /identity/signup/slugs/{slug}/availability</span></div>
+                </a>
+                <a class="panel screen" href="pages/verify-email.html">
+                    <h3>Confirm email</h3>
+                    <p>8-character code entry, wrong code, and resend.</p>
+                    <div class="eps"><span><b>POST</b> /identity/auth/email/verify</span><span><b>POST</b> /identity/auth/email/resend-verification</span></div>
+                </a>
+                <a class="panel screen" href="pages/login.html">
+                    <h3>Sign in</h3>
+                    <p>Wrong password, unconfirmed email, rate limited and session expired states.</p>
+                    <div class="eps"><span><b>POST</b> /identity/auth/login</span><span><b>POST</b> /identity/auth/refresh</span></div>
+                </a>
+                <a class="panel screen" href="pages/forgot-password.html">
+                    <h3>Forgot password</h3>
+                    <p>Request a reset link. The response never reveals whether an account exists.</p>
+                    <div class="eps"><span><b>POST</b> /identity/auth/password/forgot</span></div>
+                </a>
+                <a class="panel screen" href="pages/reset-password.html">
+                    <h3>Reset password</h3>
+                    <p>Choose a new password from the emailed link, or recover from an expired one.</p>
+                    <div class="eps"><span><b>POST</b> /identity/auth/password/reset</span></div>
+                </a>
+                <a class="panel screen" href="pages/invite.html">
+                    <h3>Accept invite</h3>
+                    <p>Invite preview, account creation, existing account, expired and withdrawn.</p>
+                    <div class="eps"><span><b>GET</b> /org-team/invites/{token}</span><span><b>POST</b> /identity/invites/{token}/accept</span></div>
+                </a>
+            </div>
+        </section>
+
+        <section class="group">
+            <div class="group-head"><h2>Signed in</h2><p>Sample organization: Kilima Labs, viewed by its owner</p></div>
+            <div class="screens">
+                <a class="panel screen" href="pages/overview.html">
+                    <h3>Overview</h3>
+                    <p>Org counts, apps with their latest push, things that need attention.</p>
+                    <div class="eps"><span><b>GET</b> /org-team/orgs/{orgId}</span><span><b>GET</b> /notification/notifications</span></div>
+                </a>
+                <a class="panel screen" href="pages/apps.html">
+                    <h3>Apps</h3>
+                    <p>App list with repository status, plus the create app dialog.</p>
+                    <div class="eps"><span><b>GET POST</b> /org-team/orgs/{orgId}/apps</span></div>
+                </a>
+                <a class="panel screen" href="pages/app.html">
+                    <h3>App</h3>
+                    <p>Repository link, build settings, access check, manual build, settings, delete.</p>
+                    <div class="eps"><span><b>GET PATCH DELETE</b> …/apps/{appId}</span><span><b>GET PATCH DELETE</b> …/repo-link</span><span><b>POST</b> …/repo-link/verification, /builds</span></div>
+                </a>
+                <a class="panel screen" href="pages/connect-repo.html">
+                    <h3>Link a repository</h3>
+                    <p>GitHub sign-in, account and repository picker, build settings.</p>
+                    <div class="eps"><span><b>POST</b> /git-integration/github/authorizations</span><span><b>GET</b> …/installations/{id}/repositories</span><span><b>PUT</b> …/repo-link</span></div>
+                </a>
+                <a class="panel screen" href="pages/github.html">
+                    <h3>GitHub</h3>
+                    <p>Installations, install flow, removal, and your GitHub sign-in.</p>
+                    <div class="eps"><span><b>GET POST DELETE</b> …/github/installations</span><span><b>POST</b> …/github/install-sessions</span><span><b>GET DELETE</b> /git-integration/github/session</span></div>
+                </a>
+                <a class="panel screen" href="pages/members.html">
+                    <h3>Members and invites</h3>
+                    <p>Roles, invites, resend and revoke, remove, transfer ownership.</p>
+                    <div class="eps"><span><b>GET PATCH DELETE</b> …/members/{userId}</span><span><b>POST</b> …/members/{userId}/transfer-ownership</span><span><b>GET POST DELETE</b> …/invites, /resend</span></div>
+                </a>
+                <a class="panel screen" href="pages/teams.html">
+                    <h3>Teams</h3>
+                    <p>Team cards and the new team dialog.</p>
+                    <div class="eps"><span><b>GET POST</b> /org-team/orgs/{orgId}/teams</span></div>
+                </a>
+                <a class="panel screen" href="pages/team.html">
+                    <h3>Team</h3>
+                    <p>People, apps, rename and delete.</p>
+                    <div class="eps"><span><b>GET PATCH DELETE</b> …/teams/{teamId}</span><span><b>GET POST DELETE</b> …/teams/{teamId}/members</span></div>
+                </a>
+                <a class="panel screen" href="pages/org-settings.html">
+                    <h3>Organization settings</h3>
+                    <p>Rename, details, your organizations, new organization, delete.</p>
+                    <div class="eps"><span><b>GET POST</b> /org-team/orgs</span><span><b>GET PATCH DELETE</b> /org-team/orgs/{orgId}</span></div>
+                </a>
+                <a class="panel screen" href="pages/account.html">
+                    <h3>Your account</h3>
+                    <p>Profile, password change, and every signed-in session.</p>
+                    <div class="eps"><span><b>GET PATCH</b> /identity/users/me</span><span><b>POST</b> /identity/users/me/password</span><span><b>GET DELETE</b> /identity/users/me/sessions</span></div>
+                </a>
+                <a class="panel screen" href="pages/notifications.html">
+                    <h3>Notifications</h3>
+                    <p>All or unread, mark one or all as read, empty state.</p>
+                    <div class="eps"><span><b>GET</b> /notification/notifications, /unread-count</span><span><b>PATCH</b> …/{deliveryId}/read</span><span><b>POST</b> …/read-all</span></div>
+                </a>
+            </div>
+        </section>
+
+        <section class="group">
+            <div class="group-head"><h2>Design tokens</h2><p>Defined once in <span class="mono">assets/pallet.css</span></p></div>
+            <div class="tokens">
+                <div class="panel panel-body stack">
+                    <div class="eyebrow">Color</div>
+                    <div class="swatches">
+                        <div class="swatch"><i style="background:var(--blue)"></i><strong>Blue</strong><span>#2665FC</span><span>Actions, links, focus</span></div>
+                        <div class="swatch"><i style="background:var(--green)"></i><strong>Green</strong><span>#3AD98B</span><span>Connected, success</span></div>
+                        <div class="swatch"><i style="background:var(--ink)"></i><strong>Ink</strong><span>--ink</span><span>Headings, strong text</span></div>
+                        <div class="swatch"><i style="background:var(--bg)"></i><strong>Ground</strong><span>--bg</span><span>Page background</span></div>
+                        <div class="swatch"><i style="background:var(--blue-soft)"></i><strong>Blue soft</strong><span>--blue-soft</span><span>Selected, info</span></div>
+                        <div class="swatch"><i style="background:var(--amber-soft)"></i><strong>Amber soft</strong><span>--amber-soft</span><span>Needs attention</span></div>
+                        <div class="swatch"><i style="background:var(--red)"></i><strong>Red</strong><span>--red</span><span>Destructive, errors</span></div>
+                        <div class="swatch"><i style="background:var(--surface)"></i><strong>Surface</strong><span>--surface</span><span>Panels</span></div>
+                    </div>
+                    <p class="small muted">Blue and green come from the logo. Green only ever means "connected" or "done", so it never shows up as decoration. No gradients anywhere.</p>
+                </div>
+                <div class="panel panel-body">
+                    <div class="eyebrow" style="margin-bottom:6px">Type</div>
+                    <div class="type-row"><span style="font-family:var(--font-display);font-size:26px;font-weight:600;color:var(--ink)">Outfit for headings</span><span>600</span></div>
+                    <div class="type-row"><span style="font-size:15px;color:var(--ink)">Onest for interface text</span><span>400 / 500</span></div>
+                    <div class="type-row"><span class="mono" style="color:var(--ink)">JetBrains Mono · 3f9c2e1</span><span>SHAs, slugs, IDs</span></div>
+                    <p class="small muted" style="margin-top:12px">Outfit's round geometry matches the wordmark in the logo.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

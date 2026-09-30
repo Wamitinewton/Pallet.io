@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Payments team · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .team-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 960px) {
+            .team-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app" data-nav="teams">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;Teams|teams.html;Payments"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>Payments</h1>
+                        <p><span class="mono">payments</span> · created 18 March 2026 · 3 people</p>
+                    </div>
+                    <button class="btn btn-primary" type="button" data-open="modal-add"><i data-icon="plus"></i>Add people</button>
+                </div>
+
+                <div class="team-layout">
+                    <section class="panel" aria-labelledby="people-h">
+                        <div class="panel-head"><h2 id="people-h">People</h2></div>
+                        <ul class="list">
+                            <li>
+                                <div class="person" style="flex:1"><span class="avatar">GN</span><div><div class="person-name">Grace Njeri</div><div class="person-meta">grace.njeri@kilimalabs.co</div></div></div>
+                                <span class="role hide-sm">Admin</span>
+                                <button class="btn btn-ghost btn-sm" type="button" data-toast="Grace Njeri removed from Payments">Remove</button>
+                            </li>
+                            <li>
+                                <div class="person" style="flex:1"><span class="avatar">FH</span><div><div class="person-name">Fatuma Hassan</div><div class="person-meta">fatuma@kilimalabs.co</div></div></div>
+                                <span class="role hide-sm">Developer</span>
+                                <button class="btn btn-ghost btn-sm" type="button" data-toast="Fatuma Hassan removed from Payments">Remove</button>
+                            </li>
+                            <li>
+                                <div class="person" style="flex:1"><span class="avatar">BM</span><div><div class="person-name">Brian Mwangi</div><div class="person-meta">brian@kilimalabs.co</div></div></div>
+                                <span class="role hide-sm">Developer</span>
+                                <button class="btn btn-ghost btn-sm" type="button" data-toast="Brian Mwangi removed from Payments">Remove</button>
+                            </li>
+                        </ul>
+                        <div class="panel-foot"><span>Roles come from the organization. A team doesn't change what someone can do.</span></div>
+                    </section>
+
+                    <div class="section-gap">
+                        <section class="panel" aria-labelledby="apps-h">
+                            <div class="panel-head"><h2 id="apps-h">Apps</h2></div>
+                            <ul class="list">
+                                <li><i data-icon="apps" style="width:18px;height:18px;color:var(--faint)"></i><a href="app.html" style="flex:1">Checkout API</a><span class="badge badge-green"><span class="dot"></span>Connected</span></li>
+                                <li><i data-icon="apps" style="width:18px;height:18px;color:var(--faint)"></i><a href="app.html#disconnected" style="flex:1">Receipts worker</a><span class="badge badge-red">Disconnected</span></li>
+                            </ul>
+                            <div class="panel-foot"><span>Change an app's team in its settings.</span></div>
+                        </section>
+
+                        <form class="panel" data-fake-submit="Team renamed" novalidate>
+                            <div class="panel-head"><h2>Team name</h2></div>
+                            <div class="panel-body">
+                                <div class="field"><label for="tname" class="sr-only">Team name</label><input class="input" id="tname" value="Payments"></div>
+                            </div>
+                            <div class="panel-foot"><span>The slug stays <span class="mono">payments</span>.</span><button class="btn btn-primary btn-sm" type="submit">Save</button></div>
+                        </form>
+
+                        <section class="panel panel-danger">
+                            <div class="panel-head"><div><h2>Delete team</h2><p>The 3 people stay in Kilima Labs. Checkout API and Receipts worker are left without a team.</p></div></div>
+                            <div class="panel-body"><button class="btn btn-danger-outline btn-sm" type="button" data-open="modal-del"><i data-icon="trash"></i>Delete Payments</button></div>
+                        </section>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-add" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title" data-fake-submit="Wanjiru Kamau added to Payments" novalidate>
+            <div class="modal-head">
+                <div><h2 id="add-title">Add people to Payments</h2><p>Only members of Kilima Labs can join a team. <a href="members.html#invite">Invite someone new</a> first if they're not in yet.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="panel" style="border-radius:var(--r-md)">
+                    <ul class="list">
+                        <li><label class="checkbox" style="flex:1;align-items:center"><input type="checkbox" id="add-wk" checked><span class="person"><span class="avatar avatar-sm">WK</span><span class="person-name">Wanjiru Kamau</span></span></label><span class="role">Admin</span></li>
+                        <li><label class="checkbox" style="flex:1;align-items:center"><input type="checkbox" id="add-ao"><span class="person"><span class="avatar avatar-sm">AO</span><span class="person-name">Amani Otieno</span></span></label><span class="role role-owner">Owner</span></li>
+                        <li><label class="checkbox" style="flex:1;align-items:center"><input type="checkbox" id="add-ko"><span class="person"><span class="avatar avatar-sm">KO</span><span class="person-name">Kevin Ochieng</span></span></label><span class="role">Viewer</span></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="submit">Add 1 person</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-del" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="del-title" data-fake-submit="Payments team deleted" data-next="teams.html" novalidate>
+            <div class="modal-head">
+                <div><h2 id="del-title">Delete the Payments team?</h2><p>Nobody loses access. The team's 3 people stay in Kilima Labs with the same roles, and its 2 apps are left without a team.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Delete team</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

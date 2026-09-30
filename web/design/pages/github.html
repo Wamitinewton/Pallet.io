@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>GitHub · Kilima Labs · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .gh-mark {
+            display: grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            flex: none;
+            border-radius: var(--r-md);
+            background: var(--ink);
+            color: var(--bg);
+        }
+
+        .gh-mark svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .gh-mark.user {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body data-states="list:Installations,returned:Back from GitHub,empty:Nothing connected">
+    <div class="app" data-nav="github">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Kilima Labs|overview.html;GitHub"></header>
+            <main class="page">
+                <div class="page-head">
+                    <div>
+                        <h1>GitHub</h1>
+                        <p>Install the Pallet GitHub App on the accounts that own your code. Apps in Kilima Labs can then build from those repositories.</p>
+                    </div>
+                    <button class="btn btn-primary" type="button" data-open="modal-install"><i data-icon="github"></i>Install on an account</button>
+                </div>
+
+                <div class="section-gap">
+                    <div class="callout callout-green" data-state="returned" hidden>
+                        <i data-icon="check-circle"></i>
+                        <span><strong>kilima-labs is connected.</strong> Its repositories now show up when you link a repository to an app. <a href="connect-repo.html">Link one now</a></span>
+                    </div>
+
+                    <section class="panel" data-state="empty" hidden>
+                        <div class="empty" style="padding-block:56px">
+                            <span class="glyph"><i data-icon="github"></i></span>
+                            <h2>GitHub isn't connected yet</h2>
+                            <p>Install the Pallet GitHub App on your GitHub organization or personal account. You choose which repositories Pallet can see, and you can change that on GitHub later.</p>
+                            <button class="btn btn-primary" type="button" data-open="modal-install" style="margin-top:6px"><i data-icon="github"></i>Install the GitHub App</button>
+                        </div>
+                    </section>
+
+                    <section class="panel" aria-labelledby="inst-h" data-state="list returned">
+                        <div class="panel-head">
+                            <div><h2 id="inst-h">Installations</h2><p>Only admins can add or remove installations.</p></div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr><th>GitHub account</th><th>Status</th><th>Used by</th><th class="hide-sm">Added</th><th class="actions"><span class="sr-only">Actions</span></th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><div class="person"><span class="gh-mark"><i data-icon="github"></i></span><div><div class="person-name">kilima-labs</div><div class="person-meta">Organization</div></div></div></td>
+                                        <td><span class="badge badge-green"><span class="dot"></span>Active</span></td>
+                                        <td>3 apps</td>
+                                        <td class="hide-sm"><span class="small">2 Aug 2026</span><br><span class="tiny muted">by Amani Otieno</span></td>
+                                        <td class="actions">
+                                            <div style="position:relative;display:inline-block" data-menu>
+                                                <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for kilima-labs" aria-haspopup="menu" aria-expanded="false" data-menu-button><i data-icon="more"></i></button>
+                                                <div class="menu" role="menu" style="right:0;top:calc(100% + 4px)" hidden>
+                                                    <a href="#"><i data-icon="external" style="width:16px;height:16px"></i>Choose repositories on GitHub</a>
+                                                    <hr>
+                                                    <button type="button" class="danger" data-open="modal-remove-busy"><i data-icon="trash" style="width:16px;height:16px"></i>Remove from Kilima Labs</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><div class="person"><span class="gh-mark user"><i data-icon="github"></i></span><div><div class="person-name">amani-otieno</div><div class="person-meta">Personal account</div></div></div></td>
+                                        <td><span class="badge badge-amber">Unused</span></td>
+                                        <td><span class="muted">No apps</span><br><span class="tiny" style="color:var(--amber-text)">Removed on 14 Oct unless an app uses it</span></td>
+                                        <td class="hide-sm"><span class="small">14 Sep 2026</span><br><span class="tiny muted">by Amani Otieno</span></td>
+                                        <td class="actions">
+                                            <div style="position:relative;display:inline-block" data-menu>
+                                                <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for amani-otieno" aria-haspopup="menu" aria-expanded="false" data-menu-button><i data-icon="more"></i></button>
+                                                <div class="menu" role="menu" style="right:0;top:calc(100% + 4px)" hidden>
+                                                    <a href="#"><i data-icon="external" style="width:16px;height:16px"></i>Choose repositories on GitHub</a>
+                                                    <hr>
+                                                    <button type="button" class="danger" data-open="modal-remove"><i data-icon="trash" style="width:16px;height:16px"></i>Remove from Kilima Labs</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><div class="person"><span class="gh-mark user"><i data-icon="github"></i></span><div><div class="person-name">wanjiru-kamau</div><div class="person-meta">Personal account</div></div></div></td>
+                                        <td><span class="badge badge-red">Suspended</span></td>
+                                        <td><span class="muted">No apps</span></td>
+                                        <td class="hide-sm"><span class="small">20 Mar 2026</span><br><span class="tiny muted">by Wanjiru Kamau</span></td>
+                                        <td class="actions">
+                                            <div style="position:relative;display:inline-block" data-menu>
+                                                <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Actions for wanjiru-kamau" aria-haspopup="menu" aria-expanded="false" data-menu-button><i data-icon="more"></i></button>
+                                                <div class="menu" role="menu" style="right:0;top:calc(100% + 4px)" hidden>
+                                                    <a href="#"><i data-icon="external" style="width:16px;height:16px"></i>Open on GitHub</a>
+                                                    <hr>
+                                                    <button type="button" class="danger" data-toast="wanjiru-kamau removed from Kilima Labs"><i data-icon="trash" style="width:16px;height:16px"></i>Remove from Kilima Labs</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="panel-foot">
+                            <span>A suspended installation was paused on GitHub. Its apps won't build until the account owner unsuspends it there.</span>
+                        </div>
+                    </section>
+
+                    <section class="panel" aria-labelledby="me-h">
+                        <div class="panel-head">
+                            <div><h2 id="me-h">Your GitHub sign-in</h2><p>Used to check which repositories you can push to when you link one. It's personal to you and lasts up to an hour.</p></div>
+                        </div>
+                        <div class="panel-body row-between">
+                            <div class="person">
+                                <span class="avatar">AO</span>
+                                <div><div class="person-name mono">@amani-otieno</div><div class="person-meta">Signed in until 15:20 today</div></div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" type="button" data-toast="Signed out of GitHub on Pallet">Sign out of GitHub</button>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-install" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="install-title">
+            <div class="modal-head">
+                <div><h2 id="install-title">Install the Pallet GitHub App</h2><p>We'll send you to GitHub to finish. Come back here when you're done.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <ol class="stack-sm" style="margin:0;padding-left:20px">
+                    <li>Pick the GitHub organization or personal account that owns the code.</li>
+                    <li>Choose all repositories, or only the ones Pallet should see.</li>
+                    <li>GitHub sends you back here and the account shows up in the list.</li>
+                </ol>
+                <div class="callout"><i data-icon="shield"></i><span>Pallet asks for read access to code and metadata, and permission to report build status on commits.</span></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-primary" type="button" data-close data-set-state="returned">Continue to GitHub<i data-icon="external"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-remove" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="remove-title" data-fake-submit="amani-otieno removed" novalidate>
+            <div class="modal-head">
+                <div><h2 id="remove-title">Remove amani-otieno?</h2><p>Kilima Labs will stop seeing this account's repositories. No apps use it, so nothing stops building. The Pallet app stays installed on GitHub until you uninstall it there.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Remove</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal-backdrop" id="modal-remove-busy" hidden>
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="busy-title" data-fake-submit="kilima-labs removed. 3 apps disconnected." novalidate>
+            <div class="modal-head">
+                <div><h2 id="busy-title">Remove kilima-labs?</h2><p>These apps build from its repositories. Removing it disconnects them, and pushes stop building until each one is linked again.</p></div>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Close" data-close><i data-icon="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <ul class="list panel" style="border-radius:var(--r-md)">
+                    <li><a href="app.html">Checkout API</a><span class="small muted mono" style="margin-left:auto">kilima-labs/checkout-api</span></li>
+                    <li><a href="app.html">Merchant dashboard</a><span class="small muted mono" style="margin-left:auto">kilima-labs/web</span></li>
+                    <li><a href="app.html#disconnected">Receipts worker</a><span class="small muted mono" style="margin-left:auto">kilima-labs/receipts</span></li>
+                </ul>
+                <p class="small muted">The Pallet app stays installed on GitHub, and other organizations using it aren't affected.</p>
+                <div class="field">
+                    <label for="confirm-inst">Type <span class="mono">kilima-labs</span> to confirm</label>
+                    <input class="input mono" id="confirm-inst" autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+                <button class="btn btn-danger" type="submit">Remove and disconnect 3 apps</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Notifications · Pallet</title>
+    <link rel="icon" href="../assets/favicon.svg">
+    <link rel="stylesheet" href="../assets/pallet.css">
+    <script src="../assets/pallet.js"></script>
+    <style>
+        .note {
+            display: grid;
+            grid-template-columns: 10px minmax(0, 1fr) auto;
+            gap: 4px 14px;
+            align-items: start;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .note:last-child {
+            border-bottom: 0;
+        }
+
+        .note .unread-dot {
+            width: 8px;
+            height: 8px;
+            margin-top: 7px;
+            border-radius: 50%;
+            background: var(--blue);
+        }
+
+        .note.is-read .unread-dot {
+            background: transparent;
+        }
+
+        .note h3 {
+            color: var(--ink);
+            font-family: var(--font-body);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .note.is-read h3 {
+            font-weight: 500;
+        }
+
+        .note p {
+            max-width: 68ch;
+            margin-top: 3px;
+            color: var(--muted);
+        }
+
+        .note time {
+            color: var(--faint);
+            font-size: 12.5px;
+            white-space: nowrap;
+        }
+
+        .note .actions {
+            display: flex;
+            gap: 6px;
+            grid-column: 2 / -1;
+            margin-top: 8px;
+        }
+
+        .day {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface-2);
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body data-states="list:Some unread,empty:All caught up">
+    <div class="app" data-nav="notifications">
+        <aside data-shell="sidebar"></aside>
+        <div class="main">
+            <header data-shell="topbar" data-crumbs="Notifications"></header>
+            <main class="page page-narrow">
+                <div class="page-head">
+                    <div>
+                        <h1>Notifications</h1>
+                        <p>Updates about your organizations, apps and account. We also email you the important ones.</p>
+                    </div>
+                    <button class="btn btn-secondary" type="button" data-set-state="empty" data-state="list"><i data-icon="check"></i>Mark all as read</button>
+                </div>
+
+                <section class="panel">
+                    <div class="panel-head">
+                        <div class="segmented" role="group" aria-label="Show">
+                            <button type="button" aria-pressed="true">All</button>
+                            <button type="button" aria-pressed="false">Unread <span class="num" data-state="list">(3)</span></button>
+                        </div>
+                        <span class="small muted num" data-state="list">3 unread</span>
+                    </div>
+
+                    <div data-state="list">
+                        <div class="day">Today</div>
+                        <article class="note">
+                            <span class="unread-dot" aria-label="Unread"></span>
+                            <div>
+                                <h3>Brian Mwangi joined Kilima Labs</h3>
+                                <p>Brian accepted your invite and joined as a developer. You can add Brian to a team now.</p>
+                            </div>
+                            <time datetime="2026-09-30T12:18">12:18</time>
+                            <div class="actions"><a class="btn btn-secondary btn-sm" href="team.html">Add to a team</a><button class="btn btn-ghost btn-sm" type="button" data-toast="Marked as read">Mark as read</button></div>
+                        </article>
+                        <article class="note">
+                            <span class="unread-dot" aria-label="Unread"></span>
+                            <div>
+                                <h3>Your invite to david.kariuki@kilimalabs.co expires tomorrow</h3>
+                                <p>Grace Njeri invited David to Kilima Labs 2 days ago. Resend it if David hasn't seen it yet.</p>
+                            </div>
+                            <time datetime="2026-09-30T09:00">09:00</time>
+                            <div class="actions"><a class="btn btn-secondary btn-sm" href="members.html#invites">View invite</a></div>
+                        </article>
+
+                        <div class="day">Earlier this week</div>
+                        <article class="note">
+                            <span class="unread-dot" aria-label="Unread"></span>
+                            <div>
+                                <h3>Receipts worker was disconnected from GitHub</h3>
+                                <p>Pallet can no longer read kilima-labs/receipts, so pushes to it won't build. Give the Pallet GitHub App access to the repository again, then check the link.</p>
+                            </div>
+                            <time datetime="2026-09-27T09:12">27 Sep</time>
+                            <div class="actions"><a class="btn btn-secondary btn-sm" href="app.html#disconnected">Fix the link</a></div>
+                        </article>
+                        <article class="note is-read">
+                            <span class="unread-dot"></span>
+                            <div>
+                                <h3>A GitHub installation will be removed soon</h3>
+                                <p>No app in Kilima Labs has used the amani-otieno installation. Pallet will remove it on 14 October unless an app is linked to one of its repositories.</p>
+                            </div>
+                            <time datetime="2026-09-24T08:00">24 Sep</time>
+                        </article>
+
+                        <div class="day">September</div>
+                        <article class="note is-read">
+                            <span class="unread-dot"></span>
+                            <div>
+                                <h3>You're now the owner of Kilima Labs</h3>
+                                <p>Wanjiru Kamau transferred ownership to you and is now an admin.</p>
+                            </div>
+                            <time datetime="2026-09-16T15:40">16 Sep</time>
+                        </article>
+                        <article class="note is-read">
+                            <span class="unread-dot"></span>
+                            <div>
+                                <h3>Welcome to Pallet, Amani</h3>
+                                <p>Your account is ready. Connect GitHub to link your first repository.</p>
+                            </div>
+                            <time datetime="2026-03-12T10:05">12 Mar</time>
+                        </article>
+                    </div>
+
+                    <div class="empty" data-state="empty" hidden>
+                        <span class="glyph"><i data-icon="bell"></i></span>
+                        <h2>You're all caught up</h2>
+                        <p>New notifications about your apps, invites and account will show up here.</p>
+                    </div>
+
+                    <div class="panel-foot" data-state="list"><span>Showing 6 of 6</span></div>
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>
