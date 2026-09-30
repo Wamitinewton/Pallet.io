@@ -1,6 +1,7 @@
 package io.pallet.apigateway.ratelimit;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,12 +44,14 @@ class RedisTokenBucketRateLimiter {
     }
 
     boolean tryConsume(String subjectKey) {
+        return tryConsume(subjectKey, properties.capacity(), properties.window());
+    }
+
+    boolean tryConsume(String subjectKey, int capacity, Duration window) {
         try {
             long count = redisTemplate.execute(
-                    FIXED_WINDOW_SCRIPT,
-                    List.of(KEY_PREFIX + subjectKey),
-                    String.valueOf(properties.window().toMillis()));
-            return count <= properties.capacity();
+                    FIXED_WINDOW_SCRIPT, List.of(KEY_PREFIX + subjectKey), String.valueOf(window.toMillis()));
+            return count <= capacity;
         } catch (DataAccessException e) {
             log.warn("Redis unavailable for edge rate limiting; failing open", e);
             meterRegistry.counter(UNAVAILABLE_METRIC).increment();

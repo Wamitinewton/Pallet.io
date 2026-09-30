@@ -293,7 +293,7 @@ head.
 1. GitHub App settings → Private keys → **Generate a private key**. GitHub keeps both keys valid.
 2. Put the new PEM in `PALLET_GIT_GITHUB_PRIVATE_KEY` (Vault or the secret store, never a tracked file) and deploy.
    Startup refuses a key that is not RSA of at least 2048 bits.
-3. Confirm `git_github_calls_seconds_count{endpoint="installation.token.create",outcome="ok"}` keeps increasing and
+3. Confirm `git_github_calls_seconds_count{endpoint="installation.token.create",outcome="success"}` keeps increasing and
    no `AppCredentialRejectedException` appears.
 4. Delete the old key on GitHub.
 

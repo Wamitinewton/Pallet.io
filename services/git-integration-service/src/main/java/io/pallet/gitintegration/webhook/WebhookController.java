@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.tracing.Tracer;
 import io.pallet.common.api.ApiResponse;
 import io.pallet.common.error.AppException;
+import io.pallet.common.error.ErrorResponse;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.delivery.DeliveryStore;
 import io.pallet.gitintegration.delivery.DeliveryStore.NewDelivery;
@@ -17,6 +18,14 @@ import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookBodyUnreadableE
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookPayloadTooLargeException;
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookSignatureInvalidException;
 import io.pallet.gitintegration.webhook.WebhookExceptions.WebhookSourceNotAllowedException;
+import io.swagger.v3.oas.annotations.ExternalDocumentation;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +47,7 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
  * is read here, bounded and exactly once, so no message converter or filter touches the bytes the signature covers.
  */
 @RestController
+@Tag(name = "Webhooks", description = "GitHub's deliveries to Pallet. Called by GitHub only, never by the dashboard.")
 class WebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
@@ -69,6 +79,81 @@ class WebhookController {
     }
 
     @PostMapping("/git-integration/webhooks/github")
+    @SecurityRequirements
+    @Operation(
+            summary = "Receive a GitHub webhook delivery",
+            description = "Called by GitHub only. Authenticated by the X-Hub-Signature-256 HMAC over the raw body, "
+                    + "never by a bearer token, so it takes none. The delivery is stored and acknowledged at once and "
+                    + "processed afterwards; a redelivery of a stored GUID changes nothing. The payload is GitHub's own "
+                    + "event, documented by GitHub.",
+            externalDocs =
+                    @ExternalDocumentation(
+                            description = "GitHub webhook events and payloads",
+                            url = "https://docs.github.com/en/webhooks/webhook-events-and-payloads"),
+            parameters = {
+                @Parameter(
+                        name = WebhookHeaders.SIGNATURE,
+                        in = ParameterIn.HEADER,
+                        required = true,
+                        description = "HMAC-SHA256 of the raw body under the app's webhook secret, hex encoded.",
+                        schema = @Schema(type = "string", pattern = "^sha256=[0-9a-fA-F]{64}$")),
+                @Parameter(
+                        name = WebhookHeaders.EVENT,
+                        in = ParameterIn.HEADER,
+                        required = true,
+                        description = "The event name, such as push or installation.",
+                        schema = @Schema(type = "string", pattern = "^[a-z_]{1,64}$", example = "push")),
+                @Parameter(
+                        name = WebhookHeaders.DELIVERY,
+                        in = ParameterIn.HEADER,
+                        required = true,
+                        description =
+                                "The delivery GUID; a delivery already stored is answered 200 and not reprocessed.",
+                        schema =
+                                @Schema(
+                                        type = "string",
+                                        format = "uuid",
+                                        example = "00000000-0000-4000-8000-000000000001"))
+            },
+            requestBody =
+                    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                            required = true,
+                            description = "GitHub's event payload, exactly as GitHub signed it.",
+                            content = @Content(mediaType = "application/json", schema = @Schema(type = "object"))),
+            responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "202",
+                        description = "Stored for processing, or stored and ignored for an event Pallet doesn't use"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200",
+                        description = "A duplicate of a delivery already stored, or a ping"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "400",
+                        description = "INVALID_WEBHOOK_HEADERS, MALFORMED_WEBHOOK_PAYLOAD or WEBHOOK_BODY_UNREADABLE, "
+                                + "all only after the signature passed",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "401",
+                        description = "WEBHOOK_SIGNATURE_INVALID: the signature is missing or wrong",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "403",
+                        description = "WEBHOOK_SOURCE_NOT_ALLOWED: outside GitHub's hook ranges, only when the IP "
+                                + "allowlist is on",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "413",
+                        description = "PAYLOAD_TOO_LARGE: the body is over the size limit",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "415",
+                        description = "UNSUPPORTED_MEDIA_TYPE: a signed body that isn't application/json",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "503",
+                        description = "SERVICE_UNAVAILABLE: the database is unreachable; GitHub retries",
+                        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            })
     ResponseEntity<ApiResponse<Void>> receive(HttpServletRequest request) {
         Timer.Sample sample = metrics.start();
         String eventLabel = SubscribedEvents.metricLabel(request.getHeader(WebhookHeaders.EVENT));

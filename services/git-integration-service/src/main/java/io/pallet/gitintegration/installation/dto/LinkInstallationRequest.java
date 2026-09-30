@@ -2,6 +2,7 @@ package io.pallet.gitintegration.installation.dto;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -10,7 +11,20 @@ import jakarta.validation.constraints.Positive;
  * {@code {installationId, code, state}} straight from a fresh install's redirect, or {@code {installationId}} for an
  * installation that already exists. {@code installationId} is only a claim until the caller's GitHub user proves it.
  */
-public record LinkInstallationRequest(@NotNull @Positive Long installationId, String code, String state) {
+@Schema(
+        description = "Either all three fields from a fresh install's setup redirect, or installationId alone for an "
+                + "installation that already exists. code and state go together or not at all.")
+public record LinkInstallationRequest(
+        @Schema(
+                description = "installation_id from GitHub's setup redirect, or from GET /github/installations.",
+                example = "41000001")
+        @NotNull @Positive Long installationId,
+
+        @Schema(description = "code from GitHub's setup redirect; used once and never returned.", nullable = true)
+        String code,
+
+        @Schema(description = "state from GitHub's setup redirect; used once and never returned.", nullable = true)
+        String state) {
 
     @JsonAnySetter
     @SuppressWarnings("unused")
