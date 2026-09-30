@@ -3,6 +3,7 @@ package io.pallet.gitintegration.github;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.github.GitHubExceptions.InstallationTokenRejectedException;
@@ -33,7 +34,8 @@ class InstallationTokenCacheTest {
 
     private final MutableClock clock = new MutableClock(NOW);
     private final CountingMinter minter = new CountingMinter();
-    private final InstallationTokenCache cache = new InstallationTokenCache(properties(10), clock);
+    private final InstallationTokenCache cache =
+            new InstallationTokenCache(properties(10), clock, new SimpleMeterRegistry());
 
     @Test
     void aTokenIsCachedPerScope() {
@@ -169,7 +171,7 @@ class InstallationTokenCacheTest {
 
     @Test
     void theLeastRecentlyUsedKeyIsDroppedPastTheLimit() {
-        InstallationTokenCache small = new InstallationTokenCache(properties(2), clock);
+        InstallationTokenCache small = new InstallationTokenCache(properties(2), clock, new SimpleMeterRegistry());
         small.token(1, TokenScope.INSTALLATION, minter);
         small.token(2, TokenScope.INSTALLATION, minter);
         small.token(1, TokenScope.INSTALLATION, minter);

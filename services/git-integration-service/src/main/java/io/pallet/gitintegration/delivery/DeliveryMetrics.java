@@ -1,8 +1,11 @@
 package io.pallet.gitintegration.delivery;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.gitintegration.delivery.DeliveryRepository.DeliveryStats;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,12 +16,6 @@ import org.springframework.stereotype.Component;
 /** Every tag value is an event from {@link SubscribedEvents} or a failure kind. */
 @Component
 public class DeliveryMetrics {
-
-    public static final String PENDING = "git.deliveries.pending";
-    public static final String OLDEST_PENDING_AGE = "git.deliveries.oldest_pending_age_seconds";
-    public static final String PARKED = "git.deliveries.parked";
-    public static final String PROCESSED = "git.deliveries.processed";
-    public static final String FAILURES = "git.deliveries.failures";
 
     public static final String KIND_MALFORMED = "malformed";
     public static final String KIND_RATE_LIMITED = "rate_limited";
@@ -34,16 +31,19 @@ public class DeliveryMetrics {
     DeliveryMetrics(MeterRegistry registry, DeliveryRepository deliveries) {
         this.registry = registry;
         this.deliveries = deliveries;
-        Gauge.builder(PENDING, snapshot, s -> s.get().pending())
+        Gauge.builder(DELIVERIES_PENDING, snapshot, s -> s.get().pending())
                 .description("Webhook deliveries waiting to be processed")
                 .register(registry);
-        Gauge.builder(OLDEST_PENDING_AGE, snapshot, s -> s.get().oldestPendingAgeSeconds())
+        Gauge.builder(DELIVERIES_OLDEST_PENDING_AGE, snapshot, s -> s.get().oldestPendingAgeSeconds())
                 .description("Age of the oldest webhook delivery waiting to be processed")
                 .baseUnit("seconds")
                 .register(registry);
-        Gauge.builder(PARKED, snapshot, s -> s.get().parked())
+        Gauge.builder(DELIVERIES_PARKED, snapshot, s -> s.get().parked())
                 .description("Webhook deliveries that failed every attempt and need an operator")
                 .register(registry);
+        for (String kind : List.of(KIND_MALFORMED, KIND_RATE_LIMITED, KIND_GITHUB_UNAVAILABLE, KIND_ERROR)) {
+            registry.counter(DELIVERIES_FAILURES, TAG_KIND, kind);
+        }
     }
 
     @Scheduled(fixedDelayString = "${pallet.git.delivery.metrics-interval:PT15S}")
@@ -62,12 +62,12 @@ public class DeliveryMetrics {
     }
 
     void completed(String event) {
-        registry.counter(PROCESSED, "event", SubscribedEvents.metricLabel(event))
+        registry.counter(DELIVERIES_PROCESSED, TAG_EVENT, SubscribedEvents.metricLabel(event))
                 .increment();
     }
 
     void failed(String kind) {
-        registry.counter(FAILURES, "kind", kind).increment();
+        registry.counter(DELIVERIES_FAILURES, TAG_KIND, kind).increment();
     }
 
     private record Snapshot(double pending, double oldestPendingAgeSeconds, double parked) {}

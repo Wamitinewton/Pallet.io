@@ -19,12 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /** One tenant's rate limit or missing resource must never open the breaker every tenant shares. */
 @IntegrationTest
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class GitHubBreakerIsolationIntegrationTest {
 
     private static final long RATE_LIMITED = 2_001;
@@ -35,11 +33,6 @@ class GitHubBreakerIsolationIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private GitHubClient client;

@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.checks;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import io.pallet.common.error.ExternalServiceException;
 import io.pallet.gitintegration.checks.CheckRunMetrics.DropReason;
 import io.pallet.gitintegration.checks.CheckRunMetrics.FailureKind;
@@ -13,6 +15,8 @@ import io.pallet.gitintegration.delivery.DeliveryBackoff;
 import io.pallet.gitintegration.github.GitHubExceptions.GitHubRateLimitedException;
 import io.pallet.gitintegration.github.GitHubExceptions.WriteOutcomeUnknownException;
 import io.pallet.gitintegration.github.GitHubRateLimitGuard;
+import io.pallet.gitintegration.observability.SpanAttributes;
+import io.pallet.gitintegration.observability.Traceparents;
 import io.pallet.gitintegration.scm.ScmProvider;
 import io.pallet.gitintegration.scm.ScmProvider.CheckRunReport;
 import java.time.Duration;
@@ -31,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -47,6 +52,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class CheckRunReporter implements AutoCloseable {
 
     static final String NAME_PREFIX = "Pallet / ";
+    static final String SPAN_NAME = "check run report";
 
     private static final Logger log = LoggerFactory.getLogger(CheckRunReporter.class);
     private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(30);
@@ -66,6 +72,7 @@ class CheckRunReporter implements AutoCloseable {
     private final GitIntegrationProperties.Checks properties;
     private final Duration rateLimitJitter;
     private final ExecutorService workers;
+    private final ObjectProvider<Tracer> tracer;
 
     CheckRunReporter(
             SchedulingLocks locks,
@@ -75,7 +82,9 @@ class CheckRunReporter implements AutoCloseable {
             DeliveryBackoff backoff,
             CheckRunMetrics metrics,
             PlatformTransactionManager transactionManager,
-            GitIntegrationProperties properties) {
+            GitIntegrationProperties properties,
+            ObjectProvider<Tracer> tracer) {
+        this.tracer = tracer;
         this.locks = locks;
         this.checkRuns = checkRuns;
         this.scm = scm;
@@ -180,6 +189,24 @@ class CheckRunReporter implements AutoCloseable {
      * create whose answer was lost, so it is looked for before a second one is created.
      */
     private void reportOne(CheckRun row, Target target) {
+        Tracer available = tracer.getIfAvailable();
+        if (available == null) {
+            write(row, target);
+            return;
+        }
+        Span span = Traceparents.startChild(available, SPAN_NAME, row.traceparent())
+                .tag(SpanAttributes.INSTALLATION_ID, String.valueOf(target.installationId()));
+        try (Tracer.SpanInScope ignored = available.withSpan(span)) {
+            write(row, target);
+        } catch (RuntimeException e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
+        }
+    }
+
+    private void write(CheckRun row, Target target) {
         CheckRunReport report = report(row, target);
         Long checkRunId = row.checkRunId();
         Reported outcome = Reported.UPDATED;

@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.ReadModelFixtures;
 import java.sql.Timestamp;
@@ -26,15 +27,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class CheckRunReporterIntegrationTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -43,11 +42,6 @@ class CheckRunReporterIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private CheckRunReporter reporter;
@@ -320,16 +314,19 @@ class CheckRunReporterIntegrationTest {
     }
 
     private double reported(String outcome) {
-        return count(
-                meters.find(CheckRunMetrics.REPORTED).tag("outcome", outcome).counter());
+        return count(meters.find(MetricsCatalog.CHECKS_REPORTED)
+                .tag("outcome", outcome)
+                .counter());
     }
 
     private double failures(String kind) {
-        return count(meters.find(CheckRunMetrics.FAILURES).tag("kind", kind).counter());
+        return count(
+                meters.find(MetricsCatalog.CHECKS_FAILURES).tag("kind", kind).counter());
     }
 
     private double dropped(String reason) {
-        return count(meters.find(CheckRunMetrics.DROPPED).tag("reason", reason).counter());
+        return count(
+                meters.find(MetricsCatalog.CHECKS_DROPPED).tag("reason", reason).counter());
     }
 
     private static double count(Counter counter) {

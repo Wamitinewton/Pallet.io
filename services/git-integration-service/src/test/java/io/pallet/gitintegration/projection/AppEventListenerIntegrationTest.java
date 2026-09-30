@@ -12,6 +12,7 @@ import io.pallet.common.inbox.TransactionalInbox;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.projection.AppProjection.Status;
 import io.pallet.gitintegration.support.TopicProbe;
 import java.time.Duration;
@@ -184,8 +185,8 @@ class AppEventListenerIntegrationTest {
 
     private double failures(String consumer) {
         Counter counter = meterRegistry
-                .find(ProjectionMetrics.EVENTS_FAILED)
-                .tag(ProjectionMetrics.TAG_LISTENER, consumer)
+                .find(MetricsCatalog.EVENTS_FAILED)
+                .tag(MetricsCatalog.TAG_LISTENER, consumer)
                 .counter();
         return counter == null ? 0 : counter.count();
     }

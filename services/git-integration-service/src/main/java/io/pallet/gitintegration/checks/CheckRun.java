@@ -5,7 +5,7 @@ import java.util.UUID;
 /**
  * One row of {@code check_runs}: the check run for an app and commit, what it should show, and how far delivering that
  * to GitHub got. {@code desiredRevision} grows with every accepted change of {@code desired}; the row is pending while
- * {@code reportedRevision} differs from it.
+ * {@code reportedRevision} differs from it. {@code traceparent} is the trace of the event that set the desire.
  */
 public record CheckRun(
         UUID appId,
@@ -16,7 +16,8 @@ public record CheckRun(
         int desiredRevision,
         CheckState lastReportedState,
         Integer reportedRevision,
-        int attempts) {
+        int attempts,
+        String traceparent) {
 
     public boolean pending() {
         return reportedRevision == null || reportedRevision != desiredRevision;

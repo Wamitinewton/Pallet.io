@@ -52,6 +52,20 @@ sealed interface GitHubCredential {
         }
     }
 
+    /** No credential, for GitHub's public endpoints. */
+    record Anonymous() implements GitHubCredential {
+
+        @Override
+        public String policy() {
+            return API_POLICY;
+        }
+
+        @Override
+        public Optional<String> authorization() {
+            return Optional.empty();
+        }
+    }
+
     record User(GitHubUserToken token) implements GitHubCredential {
 
         @Override

@@ -16,10 +16,14 @@ spring:
       enabled: false
   task:
     scheduling:
+      # On shutdown the delivery poll finishes the batch it claimed before the pool, and then the datasource, go away.
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
       pool:
         # The delivery poll can hold its thread through a GitHub call, and the daily jobs and retention sweeps through a
         # long run; the outbox relay and the gauges must not wait on them.
-        size: 9
+        size: 16
   datasource:
     hikari:
       # GitHub abandons a webhook after 10s; with Postgres unreachable the handler must answer 503 well before that.
@@ -47,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,prometheus
   endpoint:
     health:
       probes:

@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.security;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.error.AppException;
 import io.pallet.gitintegration.projection.MembershipProjection;
@@ -21,8 +23,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 @Component
 public class AccessResolver {
 
-    public static final String DENIED = "git.authz.denied";
-    public static final String TAG_REASON = "reason";
     public static final String REASON_ORG_DELETED = "org_deleted";
     public static final String REASON_NO_MEMBERSHIP = "no_membership";
     public static final String REASON_NOT_A_MEMBER = "not_a_member";
@@ -36,6 +36,11 @@ public class AccessResolver {
     AccessResolver(MembershipProjectionRepository memberships, MeterRegistry meterRegistry) {
         this.memberships = memberships;
         this.meterRegistry = meterRegistry;
+        for (String reason :
+                new String[] {REASON_ORG_DELETED, REASON_NO_MEMBERSHIP, REASON_NOT_A_MEMBER, REASON_INSUFFICIENT_ROLE
+                }) {
+            meterRegistry.counter(AUTHZ_DENIED, TAG_REASON, reason);
+        }
     }
 
     public AccessContext resolve(String pathOrgId) {
@@ -58,7 +63,7 @@ public class AccessResolver {
     }
 
     AppException denied(String reason, AppException exception) {
-        meterRegistry.counter(DENIED, TAG_REASON, reason).increment();
+        meterRegistry.counter(AUTHZ_DENIED, TAG_REASON, reason).increment();
         return exception;
     }
 

@@ -26,8 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -35,7 +33,7 @@ import tools.jackson.databind.JsonNode;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 @TestPropertySource(
         properties = {
             "spring.datasource.hikari.connection-timeout=1500",
@@ -56,11 +54,6 @@ class RecoveryAfterOutageIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private RedeliverySweeper sweeper;

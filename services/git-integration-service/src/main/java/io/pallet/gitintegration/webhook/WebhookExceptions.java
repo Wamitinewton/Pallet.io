@@ -20,6 +20,18 @@ public final class WebhookExceptions {
         }
     }
 
+    /** Only raised once GitHub's ranges have loaded; the address itself stays out of the message. */
+    public static class WebhookSourceNotAllowedException extends AppException {
+
+        public WebhookSourceNotAllowedException() {
+            super(
+                    HttpStatus.FORBIDDEN,
+                    "WEBHOOK_SOURCE_NOT_ALLOWED",
+                    "Webhooks are only accepted from GitHub.",
+                    "Webhook source address outside GitHub's hook ranges");
+        }
+    }
+
     public static class WebhookPayloadTooLargeException extends AppException {
 
         public WebhookPayloadTooLargeException(long maxBytes) {

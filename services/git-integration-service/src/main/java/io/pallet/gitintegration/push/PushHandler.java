@@ -24,6 +24,7 @@ class PushHandler implements DeliveryHandler {
 
     @Override
     public DeliveryOutcome handle(DeliveryContext context) {
-        return processor.process(context.deliveryId(), context.payload(PushPayload.class), context.lookups());
+        return processor.process(
+                context.deliveryId(), context.receivedAt(), context.payload(PushPayload.class), context.lookups());
     }
 }

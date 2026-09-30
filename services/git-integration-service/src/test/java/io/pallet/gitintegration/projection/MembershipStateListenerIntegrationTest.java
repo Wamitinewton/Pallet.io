@@ -9,6 +9,7 @@ import io.pallet.common.events.Topics;
 import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.projection.MembershipProjection.Status;
 import io.pallet.gitintegration.security.Role;
 import io.pallet.gitintegration.support.ConsumerGroups;
@@ -194,7 +195,7 @@ class MembershipStateListenerIntegrationTest {
 
     @Test
     void theProjectionLagIsMeasuredFromOccurredAt() {
-        Timer lag = meterRegistry.find(ProjectionMetrics.PROJECTION_LAG).timer();
+        Timer lag = meterRegistry.find(MetricsCatalog.AUTHZ_PROJECTION_LAG).timer();
         assertThat(lag).isNotNull();
         long countBefore = lag.count();
         double secondsBefore = lag.totalTime(TimeUnit.SECONDS);

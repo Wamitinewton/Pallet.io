@@ -14,6 +14,7 @@ import io.pallet.gitintegration.access.AccessReverifier.Run;
 import io.pallet.gitintegration.audit.AuditEvents;
 import io.pallet.gitintegration.delivery.DeliveryProcessor;
 import io.pallet.gitintegration.installation.ConnectionLostNotifier;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.ReadModelFixtures;
 import io.pallet.gitintegration.support.WebhookFixtures;
@@ -38,15 +39,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class AccessReverifierIntegrationTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -59,11 +58,6 @@ class AccessReverifierIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private AccessReverifier reverifier;
@@ -144,12 +138,13 @@ class AccessReverifierIntegrationTest {
         head(keptApp, A);
         github.stubCollaboratorPermission(repoId, VERIFIER, VERIFIER_ID, "read", "read");
         github.stubCollaboratorPermission(repoId, "octo-keeper", 7002, "write", "write");
-        double disconnectedBefore = meters.counter(ReverifyMetrics.DISCONNECTED).count();
+        double disconnectedBefore =
+                meters.counter(MetricsCatalog.REVERIFY_DISCONNECTED).count();
 
         Run run = reverifier.run().orElseThrow();
 
         assertThat(run.disconnected()).isEqualTo(1);
-        assertThat(meters.counter(ReverifyMetrics.DISCONNECTED).count() - disconnectedBefore)
+        assertThat(meters.counter(MetricsCatalog.REVERIFY_DISCONNECTED).count() - disconnectedBefore)
                 .isEqualTo(1);
         Row lost = link(lostApp);
         assertThat(lost.status()).isEqualTo("DISCONNECTED");
@@ -406,7 +401,7 @@ class AccessReverifierIntegrationTest {
 
         metrics.refresh();
 
-        assertThat(meters.get(ReverifyMetrics.OLDEST_CHECK_AGE).gauge().value())
+        assertThat(meters.get(MetricsCatalog.REVERIFY_OLDEST_CHECK_AGE).gauge().value())
                 .isCloseTo(Duration.ofHours(60).toSeconds(), within(60.0));
     }
 
@@ -495,7 +490,8 @@ class AccessReverifierIntegrationTest {
     }
 
     private double checked(String outcome) {
-        return meters.counter(ReverifyMetrics.CHECKED, "outcome", outcome).count();
+        return meters.counter(MetricsCatalog.REVERIFY_CHECKED, "outcome", outcome)
+                .count();
     }
 
     private static long newRepoId() {

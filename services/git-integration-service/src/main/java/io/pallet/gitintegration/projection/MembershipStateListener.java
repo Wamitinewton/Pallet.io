@@ -4,6 +4,7 @@ import io.pallet.common.events.OrgMembershipChanged;
 import io.pallet.common.events.Topics;
 import io.pallet.common.inbox.EventPayloads;
 import io.pallet.common.inbox.MalformedEventException;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.projection.MembershipProjection.Status;
 import io.pallet.gitintegration.security.Role;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -23,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 class MembershipStateListener {
 
     static final String LISTENER_ID = "membership-state-listener";
-    static final String CONSUMER = "membership-state-projection";
+    static final String CONSUMER = MetricsCatalog.LISTENER_MEMBERSHIP_STATE;
 
     static final int MAX_ID_LENGTH = 64;
     private static final char KEY_SEPARATOR = ':';

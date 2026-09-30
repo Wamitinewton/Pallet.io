@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.github;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.pallet.common.resilience.ExternalCall;
@@ -26,7 +28,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class GitHubHttp implements AutoCloseable {
 
-    static final String CALLS = "git.github.calls";
     static final String API_VERSION = "2022-11-28";
     static final String USER_AGENT = "pallet-git-integration";
     static final MediaType GITHUB_JSON = MediaType.parseMediaType("application/vnd.github+json");
@@ -89,9 +90,9 @@ class GitHubHttp implements AutoCloseable {
             }
             return exchanged.response();
         } finally {
-            sample.stop(Timer.builder(CALLS)
-                    .tag("endpoint", request.endpoint())
-                    .tag("outcome", outcome.tag())
+            sample.stop(Timer.builder(GITHUB_CALLS)
+                    .tag(TAG_ENDPOINT, request.endpoint())
+                    .tag(TAG_OUTCOME, outcome.tag())
                     .register(meters));
         }
     }

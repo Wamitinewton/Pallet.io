@@ -10,6 +10,7 @@ import io.pallet.common.events.GitPushReceived;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.gitintegration.delivery.DeliveryProcessor;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.push.PushProcessor;
 import io.pallet.gitintegration.recovery.HeadReconciler.Run;
 import io.pallet.gitintegration.recovery.RecoveryMetrics.Checked;
@@ -27,13 +28,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class HeadReconcilerIntegrationTest {
 
     private static final String A = sha('a');
@@ -43,11 +42,6 @@ class HeadReconcilerIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private HeadReconciler reconciler;
@@ -291,7 +285,7 @@ class HeadReconcilerIntegrationTest {
 
     private double checkedCount(Checked result) {
         return meters.counter(
-                        RecoveryMetrics.RECONCILER_CHECKED,
+                        MetricsCatalog.RECONCILER_CHECKED,
                         "result",
                         result.name().toLowerCase(Locale.ROOT))
                 .count();

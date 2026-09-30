@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.session;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.pallet.common.api.PageResponse;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
@@ -41,8 +43,6 @@ import org.springframework.web.util.UriComponentsBuilder;
  */
 @Service
 public class GitHubAuthorizationService {
-
-    public static final String SESSIONS_CREATED = "git.sessions.created";
 
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9_-]{1,128}");
 
@@ -112,7 +112,7 @@ public class GitHubAuthorizationService {
                 exchanged.expiresAt() == null || exchanged.expiresAt().isAfter(cap) ? cap : exchanged.expiresAt();
         GitHubUserSession session = new GitHubUserSession(exchanged.token(), user.id(), user.login(), expiresAt);
         sessions.save(sub, session);
-        meters.counter(SESSIONS_CREATED, "purpose", purpose.name().toLowerCase(Locale.ROOT))
+        meters.counter(SESSIONS_CREATED, TAG_PURPOSE, purpose.name().toLowerCase(Locale.ROOT))
                 .increment();
         return session;
     }

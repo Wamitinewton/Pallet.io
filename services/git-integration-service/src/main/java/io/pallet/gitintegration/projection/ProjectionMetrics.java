@@ -1,5 +1,7 @@
 package io.pallet.gitintegration.projection;
 
+import static io.pallet.gitintegration.observability.MetricsCatalog.*;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Clock;
@@ -10,10 +12,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProjectionMetrics {
 
-    public static final String PROJECTION_LAG = "git.authz.projection_lag_seconds";
-    public static final String EVENTS_FAILED = "git.events.failed";
-    public static final String TAG_LISTENER = "listener";
-
     private final MeterRegistry registry;
     private final Clock clock;
     private final Timer projectionLag;
@@ -21,10 +19,14 @@ public class ProjectionMetrics {
     ProjectionMetrics(MeterRegistry registry, Clock clock) {
         this.registry = registry;
         this.clock = clock;
-        this.projectionLag = Timer.builder(PROJECTION_LAG)
+        this.projectionLag = Timer.builder(AUTHZ_PROJECTION_LAG)
                 .description("Time from a membership change in org-team-service to it reaching the read model")
                 .publishPercentileHistogram()
                 .register(registry);
+        for (String listener : LISTENERS) {
+            registry.counter(EVENTS_FAILED, TAG_LISTENER, listener);
+            registry.counter(INBOX_DUPLICATES, TAG_LISTENER, listener);
+        }
     }
 
     void membershipApplied(Instant occurredAt) {

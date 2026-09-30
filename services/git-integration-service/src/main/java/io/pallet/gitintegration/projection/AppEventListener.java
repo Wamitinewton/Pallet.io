@@ -8,6 +8,7 @@ import io.pallet.common.inbox.MalformedEventException;
 import io.pallet.common.inbox.TransactionalInbox;
 import io.pallet.gitintegration.installation.ConnectionTeardown;
 import io.pallet.gitintegration.installation.TeardownResult;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -25,8 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class AppEventListener {
 
-    static final String CREATED_CONSUMER = "app-created-projection";
-    static final String DELETED_CONSUMER = "app-deleted-projection";
+    static final String CREATED_CONSUMER = MetricsCatalog.LISTENER_APP_CREATED;
+    static final String DELETED_CONSUMER = MetricsCatalog.LISTENER_APP_DELETED;
 
     static final int MAX_ORG_ID_LENGTH = 64;
     static final int MAX_SLUG_LENGTH = 63;

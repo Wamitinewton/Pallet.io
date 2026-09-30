@@ -12,6 +12,7 @@ import io.pallet.gitintegration.github.dto.GitHubUser;
 import io.pallet.gitintegration.github.dto.HookDelivery;
 import io.pallet.gitintegration.github.dto.Installation;
 import io.pallet.gitintegration.github.dto.InstallationRepositories;
+import io.pallet.gitintegration.github.dto.Meta;
 import io.pallet.gitintegration.github.dto.Repository;
 import io.pallet.gitintegration.github.dto.UserInstallations;
 import java.net.URLDecoder;
@@ -45,6 +46,7 @@ public class GitHubClient {
     private static final Pattern PERMISSION_WORD = Pattern.compile("[a-z_]{1,64}");
     private static final Pattern SHA = Pattern.compile("[0-9a-f]{40}");
     private static final Pattern DELIVERY_CURSOR = Pattern.compile("[A-Za-z0-9_=.-]{1,256}");
+    private static final Pattern CIDR = Pattern.compile("[0-9A-Fa-f:.]{2,39}/[0-9]{1,3}");
     private static final String NEXT_RELATION = "rel=\"next\"";
     private static final Set<String> ACCOUNT_TYPES = Set.of("User", "Organization");
     private static final Set<String> REPOSITORY_SELECTIONS = Set.of("all", "selected");
@@ -375,6 +377,25 @@ public class GitHubClient {
             }
         }
         return new HookDeliveryPage(Arrays.asList(deliveries), nextCursor(response.link()));
+    }
+
+    /**
+     * The CIDR ranges GitHub sends webhooks from, unauthenticated.
+     *
+     * @throws IllegalStateException if GitHub answered without a well-formed list
+     */
+    public List<String> hookRanges() {
+        Meta meta = http.execute(GitHubRequest.get("meta.get", Meta.class, "/meta"), new GitHubCredential.Anonymous())
+                .body();
+        if (meta == null || meta.hooks() == null || meta.hooks().isEmpty()) {
+            throw new IllegalStateException("GitHub answered GET /meta without hook ranges");
+        }
+        for (String range : meta.hooks()) {
+            if (range == null || !CIDR.matcher(range).matches()) {
+                throw new IllegalStateException("GitHub answered GET /meta with an invalid hook range");
+            }
+        }
+        return List.copyOf(meta.hooks());
     }
 
     /** Asks GitHub to send the delivery again; it arrives through the webhook with its original GUID. */

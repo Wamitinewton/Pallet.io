@@ -8,6 +8,7 @@ import io.pallet.common.events.GitPushReceived;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.gitintegration.delivery.DeliveryProcessor;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.push.PushScenario.Published;
 import io.pallet.gitintegration.support.GitHubApiStub;
 import io.pallet.gitintegration.support.WebhookFixtures;
@@ -22,13 +23,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@Import(RedisTestContainerConfiguration.class)
+@Import({RedisTestContainerConfiguration.class, GitHubApiStub.Properties.class})
 class PushProcessingIntegrationTest {
 
     private static final String HEAD = sha('a');
@@ -36,11 +35,6 @@ class PushProcessingIntegrationTest {
 
     @RegisterExtension
     static final GitHubApiStub github = new GitHubApiStub();
-
-    @DynamicPropertySource
-    static void github(DynamicPropertyRegistry registry) {
-        GitHubApiStub.register(registry);
-    }
 
     @Autowired
     private MockMvc mvc;
@@ -73,7 +67,7 @@ class PushProcessingIntegrationTest {
     @Test
     void theFirstPushAfterLinkingPublishesOneEventAndBecomesTheHead() {
         scenario.rootDirectory(appId, "src/main");
-        double publishedBefore = counter(PushMetrics.PUBLISHED, "trigger", GitPushReceived.TRIGGER_WEBHOOK);
+        double publishedBefore = counter(MetricsCatalog.PUSHES_PUBLISHED, "trigger", GitPushReceived.TRIGGER_WEBHOOK);
         UUID delivery = scenario.post(scenario.push(HEAD, NEXT));
 
         Map<String, Object> row = scenario.process(delivery);
@@ -95,7 +89,7 @@ class PushProcessingIntegrationTest {
             assertThat(event.payload().path("repoId").asLong()).isEqualTo(scenario.repoId);
             assertThat(event.payload().path("headCommitMessage").asString()).isEqualTo("Tune startup probe");
         });
-        assertThat(counter(PushMetrics.PUBLISHED, "trigger", GitPushReceived.TRIGGER_WEBHOOK))
+        assertThat(counter(MetricsCatalog.PUSHES_PUBLISHED, "trigger", GitPushReceived.TRIGGER_WEBHOOK))
                 .isEqualTo(publishedBefore + 1);
         assertThat(github.totalRequests()).isZero();
     }
@@ -116,7 +110,7 @@ class PushProcessingIntegrationTest {
     void theSamePushUnderANewGuidIsADuplicate() {
         scenario.head(appId, HEAD);
         scenario.postAndProcess(scenario.push(HEAD, NEXT));
-        double duplicatesBefore = counter(PushMetrics.CHAIN_RULE_OUTCOME, "outcome", "duplicate");
+        double duplicatesBefore = counter(MetricsCatalog.CHAIN_RULE_OUTCOME, "outcome", "duplicate");
 
         Map<String, Object> redelivered = scenario.postAndProcess(scenario.push(HEAD, NEXT));
 
@@ -124,21 +118,21 @@ class PushProcessingIntegrationTest {
                 .containsEntry("status", "IGNORED")
                 .containsEntry("outcome_reason", PushProcessor.DUPLICATE);
         assertThat(scenario.published(orgId)).hasSize(1);
-        assertThat(counter(PushMetrics.CHAIN_RULE_OUTCOME, "outcome", "duplicate"))
+        assertThat(counter(MetricsCatalog.CHAIN_RULE_OUTCOME, "outcome", "duplicate"))
                 .isEqualTo(duplicatesBefore + 1);
         assertThat(github.totalRequests()).isZero();
     }
 
     @Test
     void aTagIsIgnoredAndCountedOnce() {
-        double skippedBefore = counter(PushMetrics.SKIPPED, "reason", SkipRules.NOT_A_BRANCH);
+        double skippedBefore = counter(MetricsCatalog.PUSHES_SKIPPED, "reason", SkipRules.NOT_A_BRANCH);
 
         Map<String, Object> row = scenario.postAndProcess(WebhookFixtures.delivery("push-tag.json")
                 .with("/installation/id", scenario.installationId)
                 .with("/repository/id", scenario.repoId));
 
         assertIgnored(row, SkipRules.NOT_A_BRANCH);
-        assertThat(counter(PushMetrics.SKIPPED, "reason", SkipRules.NOT_A_BRANCH))
+        assertThat(counter(MetricsCatalog.PUSHES_SKIPPED, "reason", SkipRules.NOT_A_BRANCH))
                 .isEqualTo(skippedBefore + 1);
     }
 

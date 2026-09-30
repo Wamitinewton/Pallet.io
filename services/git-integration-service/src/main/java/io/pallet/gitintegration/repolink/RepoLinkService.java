@@ -1,6 +1,7 @@
 package io.pallet.gitintegration.repolink;
 
 import io.pallet.common.error.BadRequestException;
+import io.pallet.common.events.GitPushReceived;
 import io.pallet.common.outbox.OutboxWriter;
 import io.pallet.gitintegration.access.RepoAccessVerifier;
 import io.pallet.gitintegration.access.RepoAccessVerifier.VerifiedAccess;
@@ -16,6 +17,7 @@ import io.pallet.gitintegration.projection.AppProjection;
 import io.pallet.gitintegration.projection.AppProjectionRepository;
 import io.pallet.gitintegration.push.BranchHeadRepository;
 import io.pallet.gitintegration.push.PushEventFactory;
+import io.pallet.gitintegration.push.PushMetrics;
 import io.pallet.gitintegration.repolink.RepoLink.DisconnectReason;
 import io.pallet.gitintegration.repolink.RepoLinkExceptions.RepoLinkExistsException;
 import io.pallet.gitintegration.repolink.RepoLinkExceptions.RepoLinkNotFoundException;
@@ -55,6 +57,7 @@ public class RepoLinkService {
     private final RepoLinkRepository links;
     private final BranchHeadRepository heads;
     private final PushEventFactory pushes;
+    private final PushMetrics metrics;
     private final OutboxWriter outbox;
     private final TransactionTemplate transaction;
     private final Clock clock;
@@ -70,6 +73,7 @@ public class RepoLinkService {
             RepoLinkRepository links,
             BranchHeadRepository heads,
             PushEventFactory pushes,
+            PushMetrics metrics,
             OutboxWriter outbox,
             PlatformTransactionManager transactionManager,
             Clock clock) {
@@ -83,6 +87,7 @@ public class RepoLinkService {
         this.links = links;
         this.heads = heads;
         this.pushes = pushes;
+        this.metrics = metrics;
         this.outbox = outbox;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
@@ -131,6 +136,7 @@ public class RepoLinkService {
             RepoLink link = requireLink(orgId, appId);
             if (request.deployNowOrDefault()) {
                 outbox.append(pushes.linked(link, access.headSha()));
+                metrics.published(GitPushReceived.TRIGGER_LINKED);
             }
             outbox.append(AuditEvents.repoLinkCreated(
                     orgId,

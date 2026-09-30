@@ -13,6 +13,7 @@ import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.assertions.ErrorResponseAssert;
 import io.pallet.common.test.assertions.PalletAssertions;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.ProbeController;
 import io.pallet.gitintegration.support.ReadModelFixtures;
 import io.pallet.gitintegration.support.Tokens;
@@ -356,8 +357,8 @@ class AuthorizationWebIntegrationTest {
     }
 
     private double denied(String reason) {
-        Counter counter = meters.find(AccessResolver.DENIED)
-                .tag(AccessResolver.TAG_REASON, reason)
+        Counter counter = meters.find(MetricsCatalog.AUTHZ_DENIED)
+                .tag(MetricsCatalog.TAG_REASON, reason)
                 .counter();
         return counter == null ? 0 : counter.count();
     }

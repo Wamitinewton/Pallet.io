@@ -9,6 +9,7 @@ import io.pallet.gitintegration.delivery.payload.PushPayload;
 import io.pallet.gitintegration.repolink.RepoLink;
 import io.pallet.gitintegration.repolink.RepoLinkRepository;
 import io.pallet.gitintegration.scm.ScmProvider.CompareStatus;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,7 +59,7 @@ public class PushProcessor {
     }
 
     /** @throws NeedsGitHub when an app's decision waits on a compare this round has no answer for */
-    public DeliveryOutcome process(UUID deliveryId, PushPayload push, Lookups lookups) {
+    public DeliveryOutcome process(UUID deliveryId, Instant receivedAt, PushPayload push, Lookups lookups) {
         SkipRules.Result rules = skipRules.apply(push);
         if (rules instanceof SkipRules.Skip(String reason)) {
             metrics.skipped(reason);
@@ -75,7 +76,7 @@ public class PushProcessor {
         if (!unanswered.isEmpty()) {
             throw new NeedsGitHub(List.copyOf(unanswered));
         }
-        return apply(deliveryId, build.branch(), push, verdicts);
+        return apply(deliveryId, receivedAt, build.branch(), push, verdicts);
     }
 
     /**
@@ -166,7 +167,8 @@ public class PushProcessor {
                 new Step(head, decision, decision == ChainDecision.NEEDS_COMPARE ? compare : Optional.empty()));
     }
 
-    private DeliveryOutcome apply(UUID deliveryId, String branch, PushPayload push, List<Verdict> verdicts) {
+    private DeliveryOutcome apply(
+            UUID deliveryId, Instant receivedAt, String branch, PushPayload push, List<Verdict> verdicts) {
         boolean published = false;
         Set<String> reasons = new LinkedHashSet<>();
         for (Verdict verdict : verdicts) {
@@ -177,7 +179,7 @@ public class PushProcessor {
             Optional<String> skipped = verdict.skipReason();
             if (skipped.isEmpty()) {
                 outbox.append(events.fromWebhook(link, push, deliveryId));
-                metrics.published(GitPushReceived.TRIGGER_WEBHOOK);
+                metrics.published(GitPushReceived.TRIGGER_WEBHOOK, receivedAt);
                 published = true;
             } else {
                 metrics.skipped(skipped.get());

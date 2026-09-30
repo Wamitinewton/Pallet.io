@@ -1,0 +1,157 @@
+groups:
+  - name: git-integration-service
+    rules:
+      - alert: GitDeliveriesBackingUp
+        expr: max(git_deliveries_oldest_pending_age_seconds{job="git-integration-service"}) > 60
+        for: 1m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: Stored webhook deliveries are not being processed
+          description: The oldest waiting delivery is {{ $value | humanizeDuration }} old; pushes are not turning into builds.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#1-deliveries-backing-up
+
+      - alert: GitDeliveriesBackingUp
+        expr: max(git_deliveries_oldest_pending_age_seconds{job="git-integration-service"}) > 300
+        for: 1m
+        labels:
+          severity: page
+          service: git-integration-service
+        annotations:
+          summary: No push has become a build for more than five minutes
+          description: The oldest waiting delivery is {{ $value | humanizeDuration }} old.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#1-deliveries-backing-up
+
+      - alert: GitDeliveryParked
+        expr: max(git_deliveries_parked{job="git-integration-service"}) > 0
+        for: 1m
+        labels:
+          severity: page
+          service: git-integration-service
+        annotations:
+          summary: A webhook delivery failed every attempt and needs an operator
+          description: "{{ $value }} parked delivery(ies)."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#2-delivery-parked
+
+      - alert: GitWebhookSignatureFailures
+        expr: |
+          sum(rate(git_webhook_signature_failures_total{job="git-integration-service"}[10m])) > 0.1
+          and
+          sum(rate(git_webhook_signature_failures_total{job="git-integration-service"}[10m]))
+            > 3 * (sum(rate(git_webhook_signature_failures_total{job="git-integration-service"}[1d] offset 1h)) or vector(0))
+        for: 10m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: Webhook signatures are failing above their usual rate
+          description: "{{ $value | humanize }} failures/s: a secret mismatch after a rotation, or someone probing the endpoint."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#3-signature-failures
+
+      - alert: GitOutboxStalled
+        expr: max(git_outbox_oldest_pending_age_seconds{job="git-integration-service"}) > 60
+        for: 1m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: Push events are not reaching Kafka
+          description: The oldest unpublished outbox row is {{ $value | humanizeDuration }} old.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#4-outbox-stalled-or-held-back
+
+      - alert: GitOutboxStalled
+        expr: max(git_outbox_oldest_pending_age_seconds{job="git-integration-service"}) > 300
+        for: 1m
+        labels:
+          severity: page
+          service: git-integration-service
+        annotations:
+          summary: Push events have not reached Kafka for more than five minutes
+          description: The oldest unpublished outbox row is {{ $value | humanizeDuration }} old.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#4-outbox-stalled-or-held-back
+
+      - alert: GitOutboxHeldBack
+        expr: min(git_outbox_held_back{job="git-integration-service"}) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: A long-running transaction is holding back outbox publishing
+          description: "{{ $value }} outbox row(s) wait on an older open transaction (ADR-0017)."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#4-outbox-stalled-or-held-back
+
+      - alert: GitOutboxParked
+        expr: max(git_outbox_parked{job="git-integration-service"}) > 0
+        for: 1m
+        labels:
+          severity: page
+          service: git-integration-service
+        annotations:
+          summary: A parked outbox row is holding an organization's event history
+          description: "{{ $value }} parked outbox row(s)."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#5-outbox-row-parked
+
+      - alert: GitHubBreakerOpen
+        expr: max(resilience4j_circuitbreaker_state{job="git-integration-service", name="github-api", state="open"}) == 1
+        for: 5m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: The github-api breaker has been open for five minutes
+          description: GitHub is failing; anomalous pushes, links, manual builds and check runs wait. Ordinary pushes still build.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#6-github-breaker-open
+
+      - alert: GitReconcilerFindingPushes
+        expr: sum(increase(git_reconciler_pushes_found_total{job="git-integration-service"}[1h])) > 0
+        for: 3h
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: The head reconciler keeps finding pushes no webhook delivered
+          description: "{{ $value }} push(es) found in the last hour: webhooks are being lost somewhere."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#7-reconciler-finding-pushes
+
+      - alert: GitReverificationNotRunning
+        expr: max(git_reverify_oldest_check_age_seconds{job="git-integration-service"}) > 172800
+        for: 15m
+        labels:
+          severity: page
+          service: git-integration-service
+        annotations:
+          summary: Repo links have not been re-checked against GitHub for two days
+          description: The least recently checked active link was checked {{ $value | humanizeDuration }} ago.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#8-re-verification-not-running
+
+      - alert: GitAccessDenialsSpiking
+        expr: |
+          sum(rate(git_link_access_denied_total{job="git-integration-service"}[15m])) > 0.05
+          and
+          sum(rate(git_link_access_denied_total{job="git-integration-service"}[15m]))
+            > 5 * (sum(rate(git_link_access_denied_total{job="git-integration-service"}[1d] offset 1h)) or vector(0))
+        for: 15m
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: Repository access denials are well above their usual rate
+          description: Someone may be probing installations for repositories they can't reach.
+          runbook_url: docs/git-integration-service/RUNBOOK.md#9-access-denials-spiking
+
+      - alert: GitDeadLetter
+        expr: |
+          sum by (topic) (increase(messaging_dead_letter_total{topic=~"(app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed|build\\.started|build\\.succeeded|build\\.failed|deploy\\.state\\.changed)\\.DLT"}[10m])) > 0
+          or
+          (sum by (topic) (messaging_dead_letter_total{topic=~"(app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed|build\\.started|build\\.succeeded|build\\.failed|deploy\\.state\\.changed)\\.DLT"} > 0)
+            unless
+           sum by (topic) (messaging_dead_letter_total{topic=~"(app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed|build\\.started|build\\.succeeded|build\\.failed|deploy\\.state\\.changed)\\.DLT"} offset 10m))
+        labels:
+          severity: warning
+          service: git-integration-service
+        annotations:
+          summary: An event on a topic this service consumes failed every retry and was dead-lettered
+          description: "{{ $labels.topic }} received a record. The platform's DLT monitor counts it on whichever service's instance holds the partition, and other consumers of the same topic share the DLT; git_events_failed_total names this service's listener if it was ours."
+          runbook_url: docs/git-integration-service/RUNBOOK.md#10-dead-letter-topic-is-not-empty

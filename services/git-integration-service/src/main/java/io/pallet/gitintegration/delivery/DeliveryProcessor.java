@@ -1,7 +1,6 @@
 package io.pallet.gitintegration.delivery;
 
 import io.micrometer.tracing.Span;
-import io.micrometer.tracing.TraceContext;
 import io.micrometer.tracing.Tracer;
 import io.pallet.common.error.ExternalServiceException;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
@@ -10,6 +9,8 @@ import io.pallet.gitintegration.delivery.DeliveryRepository.RetryState;
 import io.pallet.gitintegration.delivery.NeedsGitHub.Lookup;
 import io.pallet.gitintegration.delivery.payload.DeliveryPayload;
 import io.pallet.gitintegration.github.GitHubExceptions.GitHubRateLimitedException;
+import io.pallet.gitintegration.observability.SpanAttributes;
+import io.pallet.gitintegration.observability.Traceparents;
 import io.pallet.gitintegration.scm.ScmProvider;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -59,7 +60,6 @@ public class DeliveryProcessor implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(DeliveryProcessor.class);
     private static final int MAX_ERROR_LENGTH = 500;
     private static final UUID NO_DELIVERY = new UUID(0, 0);
-    private static final Pattern TRACEPARENT = Pattern.compile("00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}");
     private static final Pattern URL_QUERY = Pattern.compile("\\?\\S*");
     private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
     private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(30);
@@ -223,6 +223,7 @@ public class DeliveryProcessor implements AutoCloseable {
                 delivery.event(),
                 delivery.action(),
                 delivery.installationId(),
+                delivery.receivedAt(),
                 payload,
                 lookups));
         return Objects.requireNonNull(outcome, () -> handler.getClass().getName() + " returned no outcome");
@@ -393,7 +394,7 @@ public class DeliveryProcessor implements AutoCloseable {
                 if (delivery.installationId() != null) {
                     MDC.put(MDC_INSTALLATION_ID, delivery.installationId().toString());
                 }
-                startSpan(delivery.deliveryId(), delivery.event(), delivery.traceparent());
+                startSpan(delivery);
             }
             MDC.put(MDC_ATTEMPTS, String.valueOf(delivery.attempts()));
         }
@@ -404,19 +405,19 @@ public class DeliveryProcessor implements AutoCloseable {
             }
         }
 
-        private void startSpan(UUID id, String eventName, String traceparent) {
+        private void startSpan(WebhookDelivery delivery) {
             Tracer available = tracer.getIfAvailable();
             if (available == null) {
                 return;
             }
-            TraceContext parent = parentOf(available, traceparent);
-            Span.Builder builder = available.spanBuilder().name(SPAN_NAME);
-            if (parent != null) {
-                builder.setParent(parent);
+            span = Traceparents.startChild(available, SPAN_NAME, delivery.traceparent())
+                    .tag(SpanAttributes.EVENT, SubscribedEvents.metricLabel(delivery.event()))
+                    .tag(SpanAttributes.DELIVERY_ID, delivery.deliveryId().toString());
+            if (delivery.installationId() != null) {
+                span.tag(
+                        SpanAttributes.INSTALLATION_ID,
+                        delivery.installationId().toString());
             }
-            span = builder.tag("git.delivery.event", SubscribedEvents.metricLabel(eventName))
-                    .tag("git.delivery.id", id.toString())
-                    .start();
             scope = available.withSpan(span);
         }
 
@@ -432,18 +433,6 @@ public class DeliveryProcessor implements AutoCloseable {
             MDC.remove(MDC_EVENT);
             MDC.remove(MDC_INSTALLATION_ID);
             MDC.remove(MDC_ATTEMPTS);
-        }
-
-        private static TraceContext parentOf(Tracer tracer, String traceparent) {
-            if (traceparent == null || !TRACEPARENT.matcher(traceparent).matches()) {
-                return null;
-            }
-            String[] parts = traceparent.split("-");
-            return tracer.traceContextBuilder()
-                    .traceId(parts[1])
-                    .spanId(parts[2])
-                    .sampled("01".equals(parts[3]))
-                    .build();
         }
     }
 

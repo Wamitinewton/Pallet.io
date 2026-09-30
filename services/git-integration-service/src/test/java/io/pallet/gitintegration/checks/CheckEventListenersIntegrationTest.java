@@ -15,7 +15,7 @@ import io.pallet.common.messaging.PlatformEventPublisher;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.gitintegration.checks.DesiredCheck.Conclusion;
-import io.pallet.gitintegration.projection.ProjectionMetrics;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.support.ReadModelFixtures;
 import io.pallet.gitintegration.support.TopicProbe;
 import java.time.Duration;
@@ -247,13 +247,14 @@ class CheckEventListenersIntegrationTest {
     }
 
     private double failures(String consumer) {
-        return count(meters.find(ProjectionMetrics.EVENTS_FAILED)
-                .tag(ProjectionMetrics.TAG_LISTENER, consumer)
+        return count(meters.find(MetricsCatalog.EVENTS_FAILED)
+                .tag(MetricsCatalog.TAG_LISTENER, consumer)
                 .counter());
     }
 
     private double dropped(String reason) {
-        return count(meters.find(CheckRunMetrics.DROPPED).tag("reason", reason).counter());
+        return count(
+                meters.find(MetricsCatalog.CHECKS_DROPPED).tag("reason", reason).counter());
     }
 
     private static double count(Counter counter) {

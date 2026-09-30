@@ -6,6 +6,7 @@ import io.pallet.common.events.BuildSucceeded;
 import io.pallet.common.events.Topics;
 import io.pallet.common.inbox.EventPayloads;
 import io.pallet.common.inbox.TransactionalInbox;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import java.util.function.Supplier;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -20,9 +21,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class BuildEventListener {
 
-    static final String STARTED_CONSUMER = "check-run-build-started";
-    static final String SUCCEEDED_CONSUMER = "check-run-build-succeeded";
-    static final String FAILED_CONSUMER = "check-run-build-failed";
+    static final String STARTED_CONSUMER = MetricsCatalog.LISTENER_BUILD_STARTED;
+    static final String SUCCEEDED_CONSUMER = MetricsCatalog.LISTENER_BUILD_SUCCEEDED;
+    static final String FAILED_CONSUMER = MetricsCatalog.LISTENER_BUILD_FAILED;
 
     private static final Logger log = LoggerFactory.getLogger(BuildEventListener.class);
 

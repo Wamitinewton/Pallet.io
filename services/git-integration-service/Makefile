@@ -30,6 +30,11 @@ format-check: ## Check Java formatting (Spotless/Palantir)
 format: ## Auto-fix Java formatting (Spotless/Palantir)
 	$(MVN) -q spotless:apply
 
+.PHONY: rules-check
+rules-check: ## Validate this service's Prometheus alert rules with promtool (also run by AlertRulesIntegrationTest)
+	docker run --rm -v $(CURDIR)/../../deploy/local/prometheus/rules:/rules:ro,Z --entrypoint promtool \
+		prom/prometheus:v3.14.0 check rules /rules/git-integration-service.rules.yml
+
 .PHONY: dev-secrets
 dev-secrets: ## Generate throwaway local key material into .env.local (git-ignored)
 	./scripts/dev-secrets.sh

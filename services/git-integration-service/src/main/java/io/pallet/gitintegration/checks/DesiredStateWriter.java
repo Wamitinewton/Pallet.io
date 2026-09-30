@@ -1,9 +1,11 @@
 package io.pallet.gitintegration.checks;
 
+import io.micrometer.tracing.Tracer;
 import io.pallet.gitintegration.checks.CheckRunMetrics.DropReason;
 import io.pallet.gitintegration.checks.DesiredCheck.Conclusion;
 import io.pallet.gitintegration.checks.DesiredCheck.Phase;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
+import io.pallet.gitintegration.observability.Traceparents;
 import io.pallet.gitintegration.repolink.RepoLink;
 import io.pallet.gitintegration.repolink.RepoLinkRepository;
 import java.net.URI;
@@ -13,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,15 +46,18 @@ public class DesiredStateWriter {
     private final RepoLinkRepository links;
     private final CheckRunMetrics metrics;
     private final boolean awaitDeploy;
+    private final ObjectProvider<Tracer> tracer;
 
     DesiredStateWriter(
             CheckRunRepository checkRuns,
             RepoLinkRepository links,
             CheckRunMetrics metrics,
-            GitIntegrationProperties properties) {
+            GitIntegrationProperties properties,
+            ObjectProvider<Tracer> tracer) {
         this.checkRuns = checkRuns;
         this.links = links;
         this.metrics = metrics;
+        this.tracer = tracer;
         this.awaitDeploy = properties.checks().awaitDeploy();
     }
 
@@ -65,7 +71,8 @@ public class DesiredStateWriter {
             metrics.dropped(DropReason.UNLINKED);
             return Result.DROPPED;
         }
-        if (checkRuns.insertIfAbsent(orgId, appId, commitSha, target)) {
+        String traceparent = Traceparents.current(tracer.getIfAvailable());
+        if (checkRuns.insertIfAbsent(orgId, appId, commitSha, target, traceparent)) {
             metrics.desired(true);
             return Result.APPLIED;
         }
@@ -75,7 +82,7 @@ public class DesiredStateWriter {
             return Result.DROPPED;
         }
         Optional<DesiredCheck> merged = merge(current.get().desired(), target);
-        merged.ifPresent(desired -> checkRuns.updateDesired(orgId, appId, commitSha, desired));
+        merged.ifPresent(desired -> checkRuns.updateDesired(orgId, appId, commitSha, desired, traceparent));
         metrics.desired(merged.isPresent());
         return merged.isPresent() ? Result.APPLIED : Result.UNCHANGED;
     }

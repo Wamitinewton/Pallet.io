@@ -1,0 +1,847 @@
+{
+  "uid": "git-integration-service",
+  "title": "git-integration-service",
+  "tags": [
+    "pallet",
+    "git-integration-service"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Ingestion",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Webhooks received by result",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (result) (rate(git_webhooks_received_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Webhook ack latency p99 (SLO 200 ms)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(git_webhook_ack_latency_seconds_bucket{job=\"git-integration-service\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Signature failures / verified by secret",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(git_webhook_signature_failures_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "failures"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (secret) (rate(git_webhook_signature_verified_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "verified {{secret}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Processing",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Oldest pending delivery",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_deliveries_oldest_pending_age_seconds{job=\"git-integration-service\"})",
+          "legendFormat": "oldest"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Pending and parked deliveries",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_deliveries_pending{job=\"git-integration-service\"})",
+          "legendFormat": "pending"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_deliveries_parked{job=\"git-integration-service\"})",
+          "legendFormat": "parked"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Delivery failures by kind",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (kind) (rate(git_deliveries_failures_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Pushes published by trigger",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (trigger) (rate(git_pushes_published_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{trigger}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Pushes skipped by reason",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (reason) (rate(git_pushes_skipped_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Push to outbox p99 (SLO 3 s end to end)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(git_push_to_outbox_latency_seconds_bucket{job=\"git-integration-service\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Outbox",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Oldest unpublished outbox row",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_outbox_oldest_pending_age_seconds{job=\"git-integration-service\"})",
+          "legendFormat": "oldest"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Outbox pending / held back / parked",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_outbox_pending{job=\"git-integration-service\"})",
+          "legendFormat": "pending"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_outbox_held_back{job=\"git-integration-service\"})",
+          "legendFormat": "held back"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_outbox_parked{job=\"git-integration-service\"})",
+          "legendFormat": "parked"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Published and failed",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 27,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(git_outbox_published_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "published"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (kind) (rate(git_outbox_publish_failures_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "failed {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "GitHub",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "GitHub calls by outcome",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (outcome) (rate(git_github_calls_seconds_count{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Breaker state (1 = open)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max by (name) (resilience4j_circuitbreaker_state{job=\"git-integration-service\", state=\"open\"})",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Installations under budget reserve / token mints",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_github_ratelimit_low_installations{job=\"git-integration-service\"})",
+          "legendFormat": "low budget"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(rate(git_github_token_mints_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "mints/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Access and recovery",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Oldest re-verification (alert at 48 h)",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_reverify_oldest_check_age_seconds{job=\"git-integration-service\"})",
+          "legendFormat": "oldest"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 172800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Access denials and authz denials",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (reason) (rate(git_link_access_denied_total{job=\"git-integration-service\"}[15m]))",
+          "legendFormat": "link {{reason}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (reason) (rate(git_authz_denied_total{job=\"git-integration-service\"}[15m]))",
+          "legendFormat": "authz {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Reconciler pushes found / redeliveries requested",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 45,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(git_reconciler_pushes_found_total{job=\"git-integration-service\"}[1h]))",
+          "legendFormat": "pushes found/h"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum(increase(git_redelivery_requested_total{job=\"git-integration-service\"}[1h]))",
+          "legendFormat": "redeliveries/h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Sessions active / unused installations",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_sessions_active{job=\"git-integration-service\"})",
+          "legendFormat": "sessions"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "max(git_installations_unused{job=\"git-integration-service\"})",
+          "legendFormat": "unused installations"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Check runs reported / failed",
+      "datasource": {
+        "type": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 53,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (outcome) (rate(git_checks_reported_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus"
+          },
+          "expr": "sum by (kind) (rate(git_checks_failures_total{job=\"git-integration-service\"}[5m]))",
+          "legendFormat": "failed {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

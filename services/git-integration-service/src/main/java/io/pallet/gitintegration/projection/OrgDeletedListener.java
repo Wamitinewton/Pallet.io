@@ -7,6 +7,7 @@ import io.pallet.common.inbox.MalformedEventException;
 import io.pallet.common.inbox.TransactionalInbox;
 import io.pallet.gitintegration.installation.ConnectionTeardown;
 import io.pallet.gitintegration.installation.TeardownResult;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class OrgDeletedListener {
 
-    static final String CONSUMER = "org-deleted-projection";
+    static final String CONSUMER = MetricsCatalog.LISTENER_ORG_DELETED;
 
     private static final Logger log = LoggerFactory.getLogger(OrgDeletedListener.class);
 

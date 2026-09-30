@@ -9,17 +9,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.tracing.Tracer;
 import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.gitintegration.checks.DesiredCheck.Conclusion;
 import io.pallet.gitintegration.checks.DesiredCheck.Phase;
 import io.pallet.gitintegration.checks.DesiredStateWriter.Result;
 import io.pallet.gitintegration.config.GitIntegrationProperties;
+import io.pallet.gitintegration.observability.MetricsCatalog;
 import io.pallet.gitintegration.repolink.RepoLink;
 import io.pallet.gitintegration.repolink.RepoLinkRepository;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
@@ -167,8 +170,9 @@ class DesiredStateWriterTest {
 
         assertThat(writer.apply(ORG, APP, SHA, writer.buildStarted())).isEqualTo(Result.DROPPED);
 
-        verify(checkRuns, never()).insertIfAbsent(anyString(), any(), anyString(), any());
-        assertThat(meters.counter(CheckRunMetrics.DROPPED, "reason", "unlinked").count())
+        verify(checkRuns, never()).insertIfAbsent(anyString(), any(), anyString(), any(), any());
+        assertThat(meters.counter(MetricsCatalog.CHECKS_DROPPED, "reason", "unlinked")
+                        .count())
                 .isEqualTo(1);
     }
 
@@ -176,27 +180,30 @@ class DesiredStateWriterTest {
     void theFirstDesireCreatesTheRowAndALaterOneMovesItForward() {
         when(links.existsByOrgIdAndAppIdAndStatus(ORG, APP, RepoLink.Status.ACTIVE))
                 .thenReturn(true);
-        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildStarted())).thenReturn(true);
+        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildStarted(), null))
+                .thenReturn(true);
 
         assertThat(writer.apply(ORG, APP, SHA, writer.buildStarted())).isEqualTo(Result.APPLIED);
 
-        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildSucceeded())).thenReturn(false);
+        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildSucceeded(), null))
+                .thenReturn(false);
         when(checkRuns.lock(ORG, APP, SHA)).thenReturn(Optional.of(row(writer.buildStarted())));
 
         assertThat(writer.apply(ORG, APP, SHA, writer.buildSucceeded())).isEqualTo(Result.APPLIED);
-        verify(checkRuns).updateDesired(ORG, APP, SHA, writer.buildSucceeded());
+        verify(checkRuns).updateDesired(ORG, APP, SHA, writer.buildSucceeded(), null);
     }
 
     @Test
     void aDesireThatWouldMoveTheCheckBackIsNotWritten() {
         when(links.existsByOrgIdAndAppIdAndStatus(ORG, APP, RepoLink.Status.ACTIVE))
                 .thenReturn(true);
-        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildStarted())).thenReturn(false);
+        when(checkRuns.insertIfAbsent(ORG, APP, SHA, writer.buildStarted(), null))
+                .thenReturn(false);
         when(checkRuns.lock(ORG, APP, SHA)).thenReturn(Optional.of(row(writer.buildSucceeded())));
 
         assertThat(writer.apply(ORG, APP, SHA, writer.buildStarted())).isEqualTo(Result.UNCHANGED);
 
-        verify(checkRuns, never()).updateDesired(anyString(), any(), anyString(), any());
+        verify(checkRuns, never()).updateDesired(anyString(), any(), anyString(), any(), any());
     }
 
     private DesiredStateWriter writer(boolean awaitDeploy) {
@@ -207,7 +214,12 @@ class DesiredStateWriterTest {
                         "pallet.git.checks.await-deploy", String.valueOf(awaitDeploy))))
                 .bind("pallet.git", Bindable.of(GitIntegrationProperties.class))
                 .get();
-        return new DesiredStateWriter(checkRuns, links, new CheckRunMetrics(meters), properties);
+        return new DesiredStateWriter(
+                checkRuns,
+                links,
+                new CheckRunMetrics(meters),
+                properties,
+                new DefaultListableBeanFactory().getBeanProvider(Tracer.class));
     }
 
     private static DesiredCheck queued() {
@@ -215,6 +227,6 @@ class DesiredStateWriterTest {
     }
 
     private static CheckRun row(DesiredCheck desired) {
-        return new CheckRun(APP, SHA, ORG, null, desired, 1, null, null, 0);
+        return new CheckRun(APP, SHA, ORG, null, desired, 1, null, null, 0, null);
     }
 }

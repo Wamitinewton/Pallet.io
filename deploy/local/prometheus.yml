@@ -29,3 +29,11 @@ scrape_configs:
           - "host.docker.internal:8084"
         labels:
           env: local
+
+  - job_name: git-integration-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - "host.docker.internal:8085"
+        labels:
+          env: local
