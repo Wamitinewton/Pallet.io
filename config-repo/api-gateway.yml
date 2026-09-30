@@ -32,10 +32,25 @@ pallet:
           - /api/v1/org-team/invites/*
           - /api/v1/org-team/v3/api-docs
         resilience-policy: org-team-service
+      git-integration-service:
+        uri: ${GIT_INTEGRATION_SERVICE_URI:http://localhost:8085}
+        path: /api/v1/git-integration/**
+        allowed-methods: [GET, POST, PUT, PATCH, DELETE]
+        public-paths:
+          - /api/v1/git-integration/webhooks/github
+          - /api/v1/git-integration/v3/api-docs
+        resilience-policy: git-integration-service
+        rate-limits:
+          - path: /api/v1/git-integration/webhooks/github
+            mode: DISABLED
     rate-limit:
       enabled: true
       capacity: 60
       window: 1m
+  resilience:
+    policies:
+      git-integration-service:
+        time-limiter: { timeout: 5s }
 
 spring:
   data:

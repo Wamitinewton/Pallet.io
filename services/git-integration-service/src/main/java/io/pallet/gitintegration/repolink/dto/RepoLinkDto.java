@@ -1,5 +1,6 @@
 package io.pallet.gitintegration.repolink.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import java.util.UUID;
  * first. {@code warnings} are codes for an active link that still works but needs attention, such as
  * {@link #REPOSITORY_ARCHIVED}. {@code version} is what a {@code PATCH} must send back.
  */
+@Schema(description = "An app's repository link.")
 public record RepoLinkDto(
         UUID appId,
         long installationId,
@@ -17,13 +19,21 @@ public record RepoLinkDto(
         String productionBranch,
         String rootDirectory,
         boolean autoDeploy,
+
+        @Schema(allowableValues = {"ACTIVE", "DISCONNECTED"})
         String status,
-        String disconnectReason,
+
+        @Schema(nullable = true) String disconnectReason,
         Instant disconnectedAt,
+
+        @Schema(
+                description = "Codes for an active link that still works but needs attention, such as "
+                        + "REPOSITORY_ARCHIVED.")
         List<String> warnings,
-        Head lastAcceptedHead,
+
+        @Schema(nullable = true) Head lastAcceptedHead,
         Verification verification,
-        long version,
+        @Schema(description = "Send it back on PATCH.") long version,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -39,7 +49,10 @@ public record RepoLinkDto(
     public record Verification(
             String verifiedByUserId,
             String githubLogin,
+
+            @Schema(allowableValues = {"push", "maintain", "admin"})
             String permission,
+
             Instant accessVerifiedAt,
             Instant accessCheckedAt) {}
 }

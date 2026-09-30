@@ -712,7 +712,7 @@ redirect with no prompt once the user has authorized the app before.
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/webhooks/github` | GitHub only. Authenticated by `X-Hub-Signature-256`, not by a bearer token. `202` when stored, `200` for a duplicate or `ping`, `401` for a bad signature, `413` over the size limit, `415` for a body that isn't `application/json` and `400` for bad delivery headers or a payload that isn't JSON (both only after the signature passes), `503` when Postgres is unreachable. Needs a gateway `public-paths` entry and a rate-limit exemption, see [Webhook ingestion](#webhook-ingestion). |
+| `POST` | `/webhooks/github` | GitHub only. Authenticated by `X-Hub-Signature-256`, not by a bearer token. `202` when stored, `200` for a duplicate or `ping`, `401` for a bad signature, `403` from outside GitHub's hook ranges when the optional IP allowlist is on, `413` over the size limit, `415` for a body that isn't `application/json` and `400` for bad delivery headers or a payload that isn't JSON (both only after the signature passes), `503` when Postgres is unreachable. Needs a gateway `public-paths` entry and a rate-limit exemption, see [Webhook ingestion](#webhook-ingestion). |
 
 ### GitHub user session
 
@@ -788,6 +788,7 @@ All extend `AppException`. None needs an `@ExceptionHandler`.
 | `GITHUB_RATE_LIMITED` | 503 | The installation's GitHub budget is spent. The wait is `meta.retryAfter` (seconds) in the body, the way `TOO_MANY_REQUESTS` carries it; `GlobalExceptionHandler` renders no `Retry-After` header. |
 | `CONCURRENT_MODIFICATION` | 409 | Optimistic lock lost (existing mapping). |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Missing or wrong `X-Hub-Signature-256`. The body says nothing about why. |
+| `WEBHOOK_SOURCE_NOT_ALLOWED` | 403 | The optional GitHub IP allowlist is on and the webhook came from outside GitHub's hook ranges. |
 | `PAYLOAD_TOO_LARGE` | 413 | Webhook body over `webhook.max-body`, by `Content-Length` or while reading. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | A signed webhook that isn't `application/json`. |
 | `INVALID_WEBHOOK_HEADERS` | 400 | A signed webhook whose `X-GitHub-Event` or `X-GitHub-Delivery` is missing or malformed. |
@@ -795,6 +796,10 @@ All extend `AppException`. None needs an `@ExceptionHandler`.
 | `WEBHOOK_BODY_UNREADABLE` | 400 | The connection failed while the webhook body was being read. |
 | `SERVICE_UNAVAILABLE` | 503 | Postgres is unreachable (`platform-common-exception`'s mapping of `DataAccessResourceFailureException`, `CannotCreateTransactionException` and their transient kin). |
 | `EXTERNAL_SERVICE_ERROR` | 502 | GitHub failed after retries, or a GitHub breaker is open (the existing `ExternalServiceException` mapping). |
+| `GITHUB_REQUEST_REJECTED` | 502 | GitHub answered a 4xx the service has no specific meaning for. A definite answer, so never retried. |
+| `GITHUB_CREDENTIAL_REJECTED` | 502 | GitHub refused an installation token twice, even after a fresh mint. |
+| `GITHUB_FORBIDDEN` | 403 | GitHub answered 403 without rate-limit headers where no endpoint-specific code applies. |
+| `GITHUB_RESOURCE_NOT_FOUND` | 404 | GitHub answered 404, 410 or 422 where no endpoint-specific code applies. |
 
 ## Authorization model
 

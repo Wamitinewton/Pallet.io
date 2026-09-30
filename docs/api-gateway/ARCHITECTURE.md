@@ -76,18 +76,28 @@ flowchart LR
         ISApi[Auth + account API]
     end
 
-    subgraph OTS["org-team-service"]
+    subgraph OTS["org-team-service<br/>:8084"]
         OApi[Org/team/member API]
     end
 
+    subgraph GIS["git-integration-service<br/>:8085"]
+        GApi[GitHub connection + repo link API]
+        GHook[GitHub webhook]
+    end
+
+    GH[GitHub]
+
     FE -- "Bearer JWT or anonymous" --> SEC
+    GH -- "signed webhook, no JWT" --> SEC
     SEC -- validates against --> KC
     SEC --> RL
     RL -- "INCR / EXPIRE" --> R
     RL --> RT
     RT --> CB
     CB -- "Authorization header forwarded unchanged" --> ISApi
-    CB -.->|"not routed until OTS exists"| OApi
+    CB --> OApi
+    CB --> GApi
+    CB -- "body forwarded byte for byte" --> GHook
     ISApi -. "validates the same JWT again, independently" .-> KC
 ```
 
@@ -220,7 +230,13 @@ does. `org-team-service` has its own `pallet.gateway.routes.org-team-service` en
 (`path: /api/v1/org-team/**`, per the same ADR-0013 namespace convention, added by
 `docs/workflows/org-team-service/15-openapi-and-gateway.md`). Its only public paths are the invite
 preview (`/api/v1/org-team/invites/*`, one path segment: the token) and its API docs; nothing under
-`/api/v1/org-team/orgs/**` is public. An
+`/api/v1/org-team/orgs/**` is public. `git-integration-service` has
+`pallet.gateway.routes.git-integration-service` (`path: /api/v1/git-integration/**`, added by
+`docs/workflows/api-gateway/08-git-integration-route.md`). It is the first route to allow `PUT` (the
+repo link), and its only public paths are the GitHub webhook
+(`/api/v1/git-integration/webhooks/github`, authenticated by the service's HMAC check, never a
+bearer token) and its API docs. The webhook is also the one path with a per-route rate-limit
+override, see [Rate limiting](#rate-limiting). An
 endpoint `identity-service` adds *later* under its own existing `/api/v1/identity/**` namespace
 needs **zero** gateway routing change — only its own `public-paths`/`allowed-methods` entries if
 the new endpoint is public or introduces a new HTTP method that service didn't use before; this is
@@ -319,6 +335,12 @@ every `ExternalCall` call site's own fallback behavior — one set of numbers, o
 whether the call is `identity-service` calling Keycloak or `api-gateway` calling
 `identity-service`.
 
+`git-integration-service` is the one route with its own policy today:
+`pallet.resilience.policies.git-integration-service.time-limiter.timeout: 5s`. That sits above the
+service's webhook budget (p99 under 200 ms, worst case a slow insert or the 3 s Hikari wait before a
+`503`) and well under GitHub's ten-second delivery timeout, so GitHub always gets the service's own
+answer rather than a gateway timeout it would record as a failed delivery.
+
 **Only `GET` is ever retried.** The retry filter's method allow-list defaults to `GET`, so a `POST`,
 `PATCH` or `DELETE` that fails is never re-sent by the route's retry policy. The proxy's Apache
 HttpClient has its own automatic retry, which by default re-sends *any* method once after a `503`
@@ -370,6 +392,49 @@ tradeoff for a first cut at edge protection, the same "deliberately simple" post
 A rejected request never reaches the circuit breaker or the backend: `429 TOO_MANY_REQUESTS`,
 `ErrorResponse`-shaped, the same `TOO_MANY_REQUESTS` code `identity-service`'s own limiter already
 uses via `TooManyRequestsException` — no new error shape introduced for this layer either.
+
+**Per-route overrides.** A route can list `rate-limits` entries, each an Ant-style `path` under
+that route's own `path` with a `mode`:
+
+```yaml
+      git-integration-service:
+        # ...
+        rate-limits:
+          - path: /api/v1/git-integration/webhooks/github
+            mode: DISABLED
+```
+
+`DEFAULT` keeps the global limit, `CUSTOM` applies its own `capacity` and `window` under a counter
+key of its own (`gateway:ratelimit:override:<path>:<subject>`), and `DISABLED` skips the limiter.
+The most specific matching pattern wins (`PathPattern.SPECIFICITY_COMPARATOR`); a path no entry
+matches keeps today's global behavior, and `pallet.gateway.rate-limit.enabled: false` still turns
+everything off. Binding fails at startup on an override outside its route's `path`, on `CUSTOM`
+without a positive `capacity` and `window`, and on `DISABLED` for a path that isn't also one of the
+route's `public-paths`, so a tenant-authenticated path can never go unlimited by accident. The
+overrides are a list rather than a map keyed by path because Spring's binder strips `/` out of an
+unbracketed map key.
+
+The GitHub webhook is the only override, and it is `DISABLED` rather than a large `CUSTOM` limit.
+GitHub delivers every tenant's webhooks from a small shared set of IP ranges, and a limit keyed by
+IP can't tell one tenant's pushes from another's: any value is either too low at peak, rejecting
+legitimate deliveries GitHub will not retry on its own, or high enough to mean nothing. The
+protection the edge limit gave is replaced inside `git-integration-service`: a forged request costs
+one HMAC and no database access, and an optional allowlist of GitHub's published hook ranges sits
+behind it as defense in depth (`docs/git-integration-service/ARCHITECTURE.md` §Route through the
+gateway). `WebhookBodyPassthroughIntegrationTest` pins it: 200 deliveries from one IP inside a
+minute are all forwarded, while the 61st unauthenticated request to the service's API docs from the
+same IP is still `429`.
+
+**Webhook body passthrough.** The service verifies `X-Hub-Signature-256` over the raw body, so the
+proxy must never re-encode it. `HandlerFunctions.http()` streams the servlet input stream to the
+backend as bytes, no gateway filter reads the body, and nothing at the gateway caps a raw body below
+the service's own 25 MB `pallet.git.webhook.max-body`. The one header the proxy did rewrite was
+`Content-Type`: Spring's servlet request view appends the request's character encoding
+(`application/json` arrives as `application/json;charset=UTF-8`), so `OriginalContentTypeHeadersFilter`
+forwards the caller's header exactly as sent. `WebhookBodyPassthroughIntegrationTest`
+proves it with a payload of odd whitespace, key order and unicode escapes and with a 5 MB body, and
+checks that `X-Hub-Signature-256`, `X-GitHub-Event`, `X-GitHub-Delivery` and `User-Agent` arrive
+unchanged. The gateway never verifies the signature itself and never logs the body.
 
 **Relationship to `identity-service`'s `AuthRateLimiter` (ADR-0012 decision 4)**: both stay. This
 layer is coarse, per-(org-or-IP), spans every route, and exists to absorb generic burst/abuse
@@ -483,7 +548,8 @@ services/api-gateway/
     ├── ApiGatewayApplication.java
     ├── config/            GatewayProperties (routes + rate-limit config)
     ├── routing/           GatewayRoutingConfiguration (one RouterFunction bean per configured route),
-    │                     ProxyClientConfiguration (proxy HTTP client, automatic retries off)
+    │                     ProxyClientConfiguration (proxy HTTP client, automatic retries off),
+    │                     OriginalContentTypeHeadersFilter (forwards Content-Type as sent)
     ├── security/          GatewaySecurityConfiguration (SecurityFilterChain, public-path allowlist
     │                     derived from GatewayProperties)
     ├── resilience/         GatewayResilienceConfiguration (circuit-breaker/retry filter wiring

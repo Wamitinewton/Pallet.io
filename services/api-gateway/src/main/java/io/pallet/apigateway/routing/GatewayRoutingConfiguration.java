@@ -43,7 +43,7 @@ class GatewayRoutingConfiguration {
                 .route(RequestPredicates.path(route.path()), HandlerFunctions.http())
                 // Runs first: a rate-limited request must never consume a retry attempt or count
                 // toward a circuit breaker's failure window.
-                .filter(rateLimit)
+                .filter(rateLimit.forRoute(route))
                 .filter((request, next) -> route.allowedMethods().contains(request.method())
                         ? next.handle(request)
                         : ServerResponse.status(HttpStatus.METHOD_NOT_ALLOWED).build())
