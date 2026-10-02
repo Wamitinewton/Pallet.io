@@ -28,6 +28,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0020](0020-shared-transactional-outbox-and-inbox.md) | Transactional outbox and inbox extracted into `platform-common-outbox` | accepted |
 | [0021](0021-github-app-source-host-integration.md) | GitHub App (not OAuth App) as Pallet's source-host integration, shared installations, per-repository verification | accepted |
 | [0022](0022-durable-webhook-intake-with-active-recovery.md) | Durable webhook intake: persist-then-acknowledge in Postgres, the chain rule for order, active recovery because GitHub never redelivers | accepted |
+| [0023](0023-web-app-architecture.md) | Web app: one Next.js deployable as dashboard and BFF, clean architecture enforced by lint, TanStack Query as the only server-state cache | accepted |
 
 ## Still open (from `PROJECT.md`)
 

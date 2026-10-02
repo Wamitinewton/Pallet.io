@@ -1,0 +1,68 @@
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    color: var(--blue-text);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    user-select: none;
+}
+
+.sm {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+}
+
+.lg {
+    width: 56px;
+    height: 56px;
+    font-size: 18px;
+}
+
+.org {
+    border-radius: var(--r-md);
+    background: var(--ink);
+    color: var(--bg);
+    font-family: var(--font-display);
+}
+
+.stack {
+    display: flex;
+}
+
+.stack > .avatar {
+    margin-left: -6px;
+    box-shadow: 0 0 0 2px var(--surface);
+}
+
+.stack > .avatar:first-child {
+    margin-left: 0;
+}
+
+.person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.personText {
+    min-width: 0;
+}
+
+.personName {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.personMeta {
+    color: var(--muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}

@@ -1,0 +1,49 @@
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.label {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.labelRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.labelRow a {
+    font-size: 13px;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.error {
+    color: var(--red-text);
+    font-size: 12.5px;
+}
+
+.success {
+    color: var(--green-text);
+    font-size: 12.5px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

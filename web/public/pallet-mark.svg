@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 362 348" role="img" aria-label="Pallet">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M40 86 L175 21 L310 86" stroke="#3AD98B" stroke-width="36"/>
+        <path d="M22 150 L175 226 L328 150" stroke="#2665FC" stroke-width="38"/>
+    </g>
+    <g fill="#2665FC" stroke="#2665FC" stroke-width="14" stroke-linejoin="round">
+        <path d="M100 127 L175 90 L250 127 L175 164 Z"/>
+        <path d="M8 206 L56 229 L56 272 L8 249 Z"/>
+        <path d="M294 229 L342 206 L342 249 L294 272 Z"/>
+        <path d="M136 267 L175 286 L214 267 L214 304 L175 323 L136 304 Z"/>
+    </g>
+</svg>

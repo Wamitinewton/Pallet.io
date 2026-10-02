@@ -1,0 +1,20 @@
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.stackSm {
+    gap: 8px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.between {
+    justify-content: space-between;
+}

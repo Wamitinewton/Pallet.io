@@ -53,3 +53,11 @@ repos:
         language: system
         files: ^services/git-integration-service/.*\.java$
         pass_filenames: false
+
+      - id: web-format-check
+        name: Prettier (web)
+        description: web formatting — cd web && make format to fix
+        entry: pnpm --dir web format:check
+        language: system
+        files: ^web/(?!design/)
+        pass_filenames: false

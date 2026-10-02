@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +47,7 @@ class AppController {
             description = "The cloud provider and region are chosen here and can never be changed. The region must be "
                     + "on the allow-list for the provider. " + ApiDocs.DEVELOPER + ApiDocs.RETRY_CONFLICTS,
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "App created"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "400",
                         description = "INVALID_REGION or a validation failure",
@@ -71,7 +73,7 @@ class AppController {
             @PathVariable String orgId,
             @RequestParam(required = false) UUID teamId,
             @RequestParam(required = false) CloudProvider cloudProvider,
-            @ModelAttribute PageQuery pageQuery) {
+            @ParameterObject @ModelAttribute PageQuery pageQuery) {
         return ApiResponse.ok("Apps retrieved", appService.list(orgId, teamId, cloudProvider, pageQuery));
     }
 
@@ -90,6 +92,7 @@ class AppController {
                     + "Any other field, including the cloud provider and region, is rejected with 400. "
                     + ApiDocs.DEVELOPER,
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "App updated"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "CONCURRENT_MODIFICATION",

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,6 +58,9 @@ class OrgController {
                     + ApiDocs.RETRY_CONFLICTS,
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "201",
+                        description = "Organization created"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "SLUG_TAKEN",
                         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -71,7 +75,7 @@ class OrgController {
             summary = "List my organizations",
             description = "Every organization the caller is an active member of, personal and team, with the "
                     + "caller's role in each. The personal organization comes first by default. " + ApiDocs.ANY_ACCOUNT)
-    ApiResponse<PageResponse<OrgSummaryDto>> listMine(@ModelAttribute PageQuery pageQuery) {
+    ApiResponse<PageResponse<OrgSummaryDto>> listMine(@ParameterObject @ModelAttribute PageQuery pageQuery) {
         return ApiResponse.ok(
                 "Organizations retrieved",
                 orgService.listMyOrgs(accessResolver.caller().userId(), pageQuery));

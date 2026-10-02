@@ -1,0 +1,2905 @@
+{
+  "components": {
+    "schemas": {
+      "ApiResponseAuthorizationStartResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthorizationStartResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseGitHubSessionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/GitHubSessionResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseInstallationLinkResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InstallationLinkResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseInstallSessionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InstallSessionResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseManualBuildResultDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ManualBuildResultDto"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePageResponseGitHubInstallationResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseGitHubInstallationResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePageResponseInstallationLinkResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseInstallationLinkResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePageResponsePickerRepositoryResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponsePickerRepositoryResponse"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRepoLinkDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RepoLinkDto"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseVoid": {
+        "properties": {
+          "data": {},
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "AuthorizationStartResponse": {
+        "description": "The state inside authorizeUrl is the only one ever returned; it works once, for this caller.",
+        "properties": {
+          "authorizeUrl": {
+            "example": "https://github.com/login/oauth/authorize?client_id=example-client&state=example-state",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "When the state in authorizeUrl expires.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CompleteAuthorizationRequest": {
+        "description": "code and state from GitHub's redirect; each works once and neither is ever returned.",
+        "properties": {
+          "code": {
+            "description": "code from GitHub's redirect.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "description": "state from GitHub's redirect.",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "meta": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "path": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "validationErrors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "GitHubInstallationResponse": {
+        "properties": {
+          "accountLogin": {
+            "example": "example-org",
+            "type": "string"
+          },
+          "accountType": {
+            "enum": [
+              "User",
+              "Organization"
+            ],
+            "type": "string"
+          },
+          "installationId": {
+            "example": 41000001,
+            "format": "int64",
+            "type": "integer"
+          },
+          "suspended": {
+            "description": "Suspended on GitHub; linking it is refused until it is unsuspended.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GitHubSessionResponse": {
+        "description": "The caller's GitHub session. Never returned: the GitHub token, a code, or a state; the only state ever returned is the one inside authorizeUrl or installUrl.",
+        "properties": {
+          "expiresAt": {
+            "description": "After this the session is gone and GitHub authorization starts again.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "githubLogin": {
+            "example": "octo-example",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Head": {
+        "properties": {
+          "advancedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InstallationLinkResponse": {
+        "properties": {
+          "accountLogin": {
+            "example": "example-org",
+            "type": "string"
+          },
+          "accountType": {
+            "enum": [
+              "User",
+              "Organization"
+            ],
+            "type": "string"
+          },
+          "installationId": {
+            "example": 41000001,
+            "format": "int64",
+            "type": "integer"
+          },
+          "linkedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "linkedByUserId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InstallSessionResponse": {
+        "description": "The state inside installUrl is the only one ever returned; it works once, for this org and caller.",
+        "properties": {
+          "expiresAt": {
+            "description": "When the state in installUrl expires.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "installUrl": {
+            "example": "https://github.com/apps/pallet/installations/new?state=example-state",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LinkInstallationRequest": {
+        "description": "Either all three fields from a fresh install's setup redirect, or installationId alone for an installation that already exists. code and state go together or not at all.",
+        "properties": {
+          "code": {
+            "description": "code from GitHub's setup redirect; used once and never returned.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "installationId": {
+            "description": "installation_id from GitHub's setup redirect, or from GET /github/installations.",
+            "example": 41000001,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "description": "state from GitHub's setup redirect; used once and never returned.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "installationId"
+        ],
+        "type": "object"
+      },
+      "ManualBuildRequestDto": {
+        "description": "Optional. An empty or absent body builds the production branch's head.",
+        "properties": {
+          "branch": {
+            "description": "Defaults to the production branch. A Git branch name: at most 255 bytes, no spaces, control characters or any of ~^:?*[\\, no '..', '@{' or '//', not starting with '-' or '/', not ending with '/' or '.', and no component starting with '.' or ending with '.lock'.",
+            "example": "main",
+            "pattern": "^(?!-)(?!/)(?!.*/$)(?!.*\\.$)(?!.*\\.\\.)(?!.*//)(?!.*@\\{)(?!@$)(?!(.*/)?\\.)(?!.*\\.lock(/|$))[^\\x00-\\x20\\x7f~^:?*\\[\\\\]{1,255}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ManualBuildResultDto": {
+        "properties": {
+          "branch": {
+            "example": "main",
+            "type": "string"
+          },
+          "commitSha": {
+            "example": "0123456789abcdef0123456789abcdef01234567",
+            "type": "string"
+          },
+          "eventId": {
+            "description": "Names the build request; a retry with the same key returns the same id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PageResponseGitHubInstallationResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubInstallationResponse"
+            },
+            "type": "array"
+          },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalElements": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResponseInstallationLinkResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/InstallationLinkResponse"
+            },
+            "type": "array"
+          },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalElements": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResponsePickerRepositoryResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/PickerRepositoryResponse"
+            },
+            "type": "array"
+          },
+          "first": {
+            "type": "boolean"
+          },
+          "last": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalElements": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PatchRepoLinkRequest": {
+        "description": "Tunes a link without choosing another repository. At least one of productionBranch, rootDirectory and autoDeploy is required; any other field, installationId and repoId included, is a 400.",
+        "properties": {
+          "autoDeploy": {
+            "description": "Whether future pushes to the production branch build.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "productionBranch": {
+            "description": "Must exist on GitHub. A Git branch name: at most 255 bytes, no spaces, control characters or any of ~^:?*[\\, no '..', '@{' or '//', not starting with '-' or '/', not ending with '/' or '.', and no component starting with '.' or ending with '.lock'.",
+            "example": "release",
+            "pattern": "^(?!-)(?!/)(?!.*/$)(?!.*\\.$)(?!.*\\.\\.)(?!.*//)(?!.*@\\{)(?!@$)(?!(.*/)?\\.)(?!.*\\.lock(/|$))[^\\x00-\\x20\\x7f~^:?*\\[\\\\]{1,255}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rootDirectory": {
+            "description": "A path relative to the repository root, at most 255 characters, with no '..', no '.' or empty segment, no backslash and no control character; a trailing '/' is dropped. Empty means the repository root. Anything else is 400 INVALID_ROOT_DIRECTORY.",
+            "example": "services/api",
+            "pattern": "^$|^(?!/)(?!.*\\.\\.)(?!.*//)(?!(.*/)?\\.(/|$))[^\\\\\\x00-\\x1f\\x7f-\\x9f]{1,255}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "The link's version from the last read; a stale one is 409.",
+            "example": 3,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "type": "object"
+      },
+      "PickerRepositoryResponse": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "defaultBranch": {
+            "example": "main",
+            "type": "string"
+          },
+          "fullName": {
+            "example": "example-org/web",
+            "type": "string"
+          },
+          "linkable": {
+            "description": "Whether PUT repo-link would accept it: push or above, and not archived.",
+            "type": "boolean"
+          },
+          "permission": {
+            "description": "The caller's own highest permission on GitHub, or null for none.",
+            "enum": [
+              "admin",
+              "maintain",
+              "push",
+              "triage",
+              "pull"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "repoId": {
+            "example": 72000001,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PutRepoLinkRequest": {
+        "description": "Chooses the repository an app deploys from. Any field not listed here is a 400.",
+        "properties": {
+          "autoDeploy": {
+            "default": true,
+            "description": "Whether future pushes to the production branch build.",
+            "type": "boolean"
+          },
+          "deployNow": {
+            "default": false,
+            "description": "Whether to build the branch's current head right away.",
+            "type": "boolean"
+          },
+          "installationId": {
+            "description": "An installation linked to this org.",
+            "example": 41000001,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "productionBranch": {
+            "description": "Defaults to the repository's default branch. A Git branch name: at most 255 bytes, no spaces, control characters or any of ~^:?*[\\, no '..', '@{' or '//', not starting with '-' or '/', not ending with '/' or '.', and no component starting with '.' or ending with '.lock'.",
+            "example": "main",
+            "pattern": "^(?!-)(?!/)(?!.*/$)(?!.*\\.$)(?!.*\\.\\.)(?!.*//)(?!.*@\\{)(?!@$)(?!(.*/)?\\.)(?!.*\\.lock(/|$))[^\\x00-\\x20\\x7f~^:?*\\[\\\\]{1,255}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repoId": {
+            "description": "GitHub's numeric repository id, from the repository picker.",
+            "example": 72000001,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rootDirectory": {
+            "description": "A path relative to the repository root, at most 255 characters, with no '..', no '.' or empty segment, no backslash and no control character; a trailing '/' is dropped. Empty means the repository root. Anything else is 400 INVALID_ROOT_DIRECTORY.",
+            "example": "apps/web",
+            "pattern": "^$|^(?!/)(?!.*\\.\\.)(?!.*//)(?!(.*/)?\\.(/|$))[^\\\\\\x00-\\x1f\\x7f-\\x9f]{1,255}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "installationId",
+          "repoId"
+        ],
+        "type": "object"
+      },
+      "RepoLinkDto": {
+        "description": "An app's repository link.",
+        "properties": {
+          "appId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "autoDeploy": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disconnectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disconnectReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "installationId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastAcceptedHead": {
+            "$ref": "#/components/schemas/Head",
+            "type": "null"
+          },
+          "productionBranch": {
+            "type": "string"
+          },
+          "repoFullName": {
+            "type": "string"
+          },
+          "repoId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rootDirectory": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "DISCONNECTED"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          },
+          "version": {
+            "description": "Send it back on PATCH.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "warnings": {
+            "description": "Codes for an active link that still works but needs attention, such as REPOSITORY_ARCHIVED.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Verification": {
+        "properties": {
+          "accessCheckedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "accessVerifiedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "githubLogin": {
+            "type": "string"
+          },
+          "permission": {
+            "enum": [
+              "push",
+              "maintain",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "verifiedByUserId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Every endpoint returns an ApiResponse, or a PageResponse nested inside one for a paginated result; failures are rendered as an ErrorResponse by the platform's global exception handler.",
+    "title": "Git Integration Service"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/git-integration/github/authorizations": {
+      "post": {
+        "description": "Returns authorizeUrl, GitHub's user authorization page with a signed, single-use state bound to the caller, and when that state expires. Send the user there; GitHub redirects back with code and state, which go to POST /github/authorizations/complete. A user who authorized before is sent straight back without a prompt. Requires any signed-in account; no organization membership is involved, and the session belongs to the caller whichever org is open.",
+        "operationId": "start",
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthorizationStartResponse"
+                }
+              }
+            },
+            "description": "Authorization started"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated but not authorized for this resource"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Start GitHub authorization",
+        "tags": [
+          "GitHub session"
+        ]
+      }
+    },
+    "/api/v1/git-integration/github/authorizations/complete": {
+      "post": {
+        "description": "Takes code and state from GitHub's redirect, exchanges the code and stores the session. Each state completes once; start again after a 400. Requires any signed-in account; no organization membership is involved, and the session belongs to the caller whichever org is open.",
+        "operationId": "complete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGitHubSessionResponse"
+                }
+              }
+            },
+            "description": "Session stored"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INVALID_AUTHORIZATION_STATE: the state is forged, expired, already used or for another user, or GitHub rejected the code. Also a missing code or state"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated but not authorized for this resource"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          }
+        },
+        "summary": "Complete GitHub authorization",
+        "tags": [
+          "GitHub session"
+        ]
+      }
+    },
+    "/api/v1/git-integration/github/installations": {
+      "get": {
+        "description": "What the dashboard offers when an org links an installation that already exists: pick one here, then call POST /orgs/{orgId}/github/installations with {installationId} alone. Each entry says whether the app is suspended on that account. Requires any signed-in account; no organization membership is involved, and the session belongs to the caller whichever org is open. Needs a GitHub user session. Without one it answers 403 GITHUB_AUTHORIZATION_REQUIRED; start one with POST /github/authorizations and retry. A user who authorized before goes through GitHub without a prompt.",
+        "operationId": "installations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseGitHubInstallationResponse"
+                }
+              }
+            },
+            "description": "One page of installations"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_AUTHORIZATION_REQUIRED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          }
+        },
+        "summary": "List installations the caller's GitHub user can see",
+        "tags": [
+          "GitHub session"
+        ]
+      }
+    },
+    "/api/v1/git-integration/github/session": {
+      "delete": {
+        "description": "Forgets the session on Pallet's side; the app stays authorized on GitHub, so the next authorization needs no prompt. Ending a session that doesn't exist is also a 204. Requires any signed-in account; no organization membership is involved, and the session belongs to the caller whichever org is open.",
+        "operationId": "end",
+        "responses": {
+          "204": {
+            "description": "Ended"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated but not authorized for this resource"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "End the caller's GitHub session",
+        "tags": [
+          "GitHub session"
+        ]
+      },
+      "get": {
+        "description": "The GitHub login and when the session expires. Requires any signed-in account; no organization membership is involved, and the session belongs to the caller whichever org is open.",
+        "operationId": "session",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGitHubSessionResponse"
+                }
+              }
+            },
+            "description": "The session"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated but not authorized for this resource"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_SESSION_NOT_FOUND: the caller has no session, or it expired"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Get the caller's GitHub session",
+        "tags": [
+          "GitHub session"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/apps/{appId}/repo-link": {
+      "delete": {
+        "description": "Sets the link DISCONNECTED with reason UNLINKED_BY_USER; pushes stop building. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "disconnect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Disconnected"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, REPO_LINK_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Disconnect the repository link",
+        "tags": [
+          "Repository links"
+        ]
+      },
+      "get": {
+        "description": "The link, its status and disconnect reason, the last accepted head, who verified access and when it was last confirmed, and warnings such as REPOSITORY_ARCHIVED. Requires any active member of the organization, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRepoLinkDto"
+                }
+              }
+            },
+            "description": "The link"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, REPO_LINK_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Get the app's repository link",
+        "tags": [
+          "Repository links"
+        ]
+      },
+      "patch": {
+        "description": "Changes productionBranch, rootDirectory or autoDeploy, with the version from the last read. An absent field is unchanged; an empty rootDirectory builds from the repository root. A new branch must exist on GitHub. Requires DEVELOPER or above, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchRepoLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRepoLinkDto"
+                }
+              }
+            },
+            "description": "Updated"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INVALID_ROOT_DIRECTORY, an invalid productionBranch, no field to change, or any other field"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, REPO_LINK_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "CONCURRENT_MODIFICATION: version is stale"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "BRANCH_NOT_FOUND"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_RATE_LIMITED: the installation's GitHub budget is spent; wait meta.retryAfter seconds. SERVICE_UNAVAILABLE when the database is unreachable"
+          }
+        },
+        "summary": "Tune the repository link",
+        "tags": [
+          "Repository links"
+        ]
+      },
+      "put": {
+        "description": "Links the app to a repository in one of this org's installations. The caller must hold at least push on it on GitHub, checked with their own token. The branch defaults to the repository's default branch and must exist. autoDeploy and deployNow are separate on purpose: autoDeploy says whether future pushes build, deployNow whether to build the current head right away. The dashboard's import flow sends deployNow true; linking a repository to test the connection gets no deploy. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs a GitHub user session. Without one it answers 403 GITHUB_AUTHORIZATION_REQUIRED; start one with POST /github/authorizations and retry. A user who authorized before goes through GitHub without a prompt.",
+        "operationId": "link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutRepoLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRepoLinkDto"
+                }
+              }
+            },
+            "description": "Linked"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INVALID_ROOT_DIRECTORY, an invalid productionBranch, or an unknown field"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REPOSITORY_NOT_ACCESSIBLE, REPOSITORY_PERMISSION_TOO_LOW, GITHUB_AUTHORIZATION_REQUIRED, NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, INSTALLATION_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REPO_LINK_EXISTS: the app already has an active link. INSTALLATION_SUSPENDED"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REPOSITORY_ARCHIVED or BRANCH_NOT_FOUND"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_RATE_LIMITED: the installation's GitHub budget is spent; wait meta.retryAfter seconds. SERVICE_UNAVAILABLE when the database is unreachable"
+          }
+        },
+        "summary": "Link a repository to the app",
+        "tags": [
+          "Repository links"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/apps/{appId}/repo-link/builds": {
+      "post": {
+        "description": "Resolves the branch's head on GitHub and asks for a build of it; the branch defaults to the production branch and a commit can't be named. A retry with the same Idempotency-Key and request returns the first result without calling GitHub or counting against the limit. Limited per app per hour. Requires DEVELOPER or above, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "build",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Names this request; a retry with the same key returns the first result.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "example": "build-7f3c2a",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualBuildRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseManualBuildResultDto"
+                }
+              }
+            },
+            "description": "Requested, or the first result of an earlier request with this key"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Idempotency-Key missing or not 1 to 128 of [A-Za-z0-9_-], an invalid branch, or an unknown field"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, REPO_LINK_NOT_FOUND, INSTALLATION_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "IDEMPOTENCY_KEY_REUSE: the key was used for a different request. INSTALLATION_SUSPENDED. CONCURRENT_MODIFICATION"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "BRANCH_NOT_FOUND"
+          },
+          "429": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "TOO_MANY_REQUESTS: the app's manual build limit is reached; wait meta.retryAfter seconds"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_RATE_LIMITED: the installation's GitHub budget is spent; wait meta.retryAfter seconds. SERVICE_UNAVAILABLE when the database is unreachable"
+          }
+        },
+        "summary": "Build the branch's current head",
+        "tags": [
+          "Repository links"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/apps/{appId}/repo-link/verification": {
+      "post": {
+        "description": "Makes the caller the link's verifier after the same access check as linking, for handing over before the current verifier leaves the GitHub organization. A caller who fails the check changes nothing. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs a GitHub user session. Without one it answers 403 GITHUB_AUTHORIZATION_REQUIRED; start one with POST /github/authorizations and retry. A user who authorized before goes through GitHub without a prompt.",
+        "operationId": "takeOverVerification",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRepoLinkDto"
+                }
+              }
+            },
+            "description": "The caller is now the verifier"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REPOSITORY_NOT_ACCESSIBLE, REPOSITORY_PERMISSION_TOO_LOW, GITHUB_AUTHORIZATION_REQUIRED, NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "APP_NOT_FOUND, REPO_LINK_NOT_FOUND, INSTALLATION_NOT_FOUND, ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "CONCURRENT_MODIFICATION: the link moved to another repository during the check. INSTALLATION_SUSPENDED"
+          },
+          "422": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "REPOSITORY_ARCHIVED or BRANCH_NOT_FOUND"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_RATE_LIMITED: the installation's GitHub budget is spent; wait meta.retryAfter seconds. SERVICE_UNAVAILABLE when the database is unreachable"
+          }
+        },
+        "summary": "Take over verifying the link",
+        "tags": [
+          "Repository links"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/github/install-sessions": {
+      "post": {
+        "description": "Returns installUrl, GitHub's page for installing the app with a signed, single-use state bound to this org and the caller, and when the state expires (ten minutes). After the install, GitHub redirects back with installation_id, code and state for POST installations. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "startInstall",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseInstallSessionResponse"
+                }
+              }
+            },
+            "description": "Install session started"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Start a GitHub App install",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/github/installations": {
+      "get": {
+        "description": "The org's linked installations and their status on GitHub, newest link first; sort is ignored. Requires any active member of the organization, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseInstallationLinkResponse"
+                }
+              }
+            },
+            "description": "One page of linked installations"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "List the org's installations",
+        "tags": [
+          "Installations"
+        ]
+      },
+      "post": {
+        "description": "Either {installationId, code, state} straight from a fresh install's setup redirect, which also creates the caller's GitHub session, or {installationId} alone for an installation that already exists, which needs a session. Both check with the caller's own GitHub token that they can see the installation. 201 with the link, 200 when this org already had it linked. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs a GitHub user session. Without one it answers 403 GITHUB_AUTHORIZATION_REQUIRED; start one with POST /github/authorizations and retry. A user who authorized before goes through GitHub without a prompt. The fresh-install form brings its own session.",
+        "operationId": "link_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkInstallationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseInstallationLinkResponse"
+                }
+              }
+            },
+            "description": "Already linked to this org"
+          },
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseInstallationLinkResponse"
+                }
+              }
+            },
+            "description": "Linked"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INVALID_AUTHORIZATION_STATE, or code and state not sent together"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INSTALLATION_NOT_ACCESSIBLE, GITHUB_AUTHORIZATION_REQUIRED, NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INSTALLATION_SUSPENDED: the app is suspended on that GitHub account"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "GITHUB_RATE_LIMITED: the installation's GitHub budget is spent; wait meta.retryAfter seconds. SERVICE_UNAVAILABLE when the database is unreachable"
+          }
+        },
+        "summary": "Link an installation to the org",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/github/installations/{installationId}": {
+      "delete": {
+        "description": "Unlinks it from this org only and disconnects this org's repository links that used it; other orgs keep theirs. The app stays installed on GitHub. Requires ADMIN or above, judged from your current membership in this org, not your token's roles. Needs no GitHub user session.",
+        "operationId": "unlink",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unlinked"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation or malformed-request failure"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INSTALLATION_NOT_FOUND: not linked to this org. ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "summary": "Unlink an installation from the org",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/git-integration/orgs/{orgId}/github/installations/{installationId}/repositories": {
+      "get": {
+        "description": "The repository picker. Lists only repositories in this installation that the caller can reach on GitHub, with the caller's own permission and whether PUT repo-link would accept it; never the installation's full list. Requires DEVELOPER or above, judged from your current membership in this org, not your token's roles. Needs a GitHub user session. Without one it answers 403 GITHUB_AUTHORIZATION_REQUIRED; start one with POST /github/authorizations and retry. A user who authorized before goes through GitHub without a prompt.",
+        "operationId": "repositories",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orgId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filters by repository name prefix, at most 100 characters.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponsePickerRepositoryResponse"
+                }
+              }
+            },
+            "description": "One page of repositories"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "q is longer than 100 characters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INSTALLATION_NOT_ACCESSIBLE, GITHUB_AUTHORIZATION_REQUIRED, NOT_A_MEMBER or INSUFFICIENT_ROLE"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INSTALLATION_NOT_FOUND: not linked to this org. ORG_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "502": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "EXTERNAL_SERVICE_ERROR: GitHub failed after retries, or its breaker is open. GITHUB_REQUEST_REJECTED or GITHUB_CREDENTIAL_REJECTED: GitHub refused the call"
+          }
+        },
+        "summary": "List repositories the caller can link",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/git-integration/webhooks/github": {
+      "post": {
+        "description": "Called by GitHub only. Authenticated by the X-Hub-Signature-256 HMAC over the raw body, never by a bearer token, so it takes none. The delivery is stored and acknowledged at once and processed afterwards; a redelivery of a stored GUID changes nothing. The payload is GitHub's own event, documented by GitHub.",
+        "externalDocs": {
+          "description": "GitHub webhook events and payloads",
+          "url": "https://docs.github.com/en/webhooks/webhook-events-and-payloads"
+        },
+        "operationId": "receive",
+        "parameters": [
+          {
+            "description": "HMAC-SHA256 of the raw body under the app's webhook secret, hex encoded.",
+            "in": "header",
+            "name": "X-Hub-Signature-256",
+            "required": true,
+            "schema": {
+              "pattern": "^sha256=[0-9a-fA-F]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The event name, such as push or installation.",
+            "in": "header",
+            "name": "X-GitHub-Event",
+            "required": true,
+            "schema": {
+              "example": "push",
+              "pattern": "^[a-z_]{1,64}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The delivery GUID; a delivery already stored is answered 200 and not reprocessed.",
+            "in": "header",
+            "name": "X-GitHub-Delivery",
+            "required": true,
+            "schema": {
+              "example": "00000000-0000-4000-8000-000000000001",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "description": "GitHub's event payload, exactly as GitHub signed it.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "A duplicate of a delivery already stored, or a ping"
+          },
+          "202": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "Stored for processing, or stored and ignored for an event Pallet doesn't use"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "INVALID_WEBHOOK_HEADERS, MALFORMED_WEBHOOK_PAYLOAD or WEBHOOK_BODY_UNREADABLE, all only after the signature passed"
+          },
+          "401": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "WEBHOOK_SIGNATURE_INVALID: the signature is missing or wrong"
+          },
+          "403": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "WEBHOOK_SOURCE_NOT_ALLOWED: outside GitHub's hook ranges, only when the IP allowlist is on"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict with current resource state"
+          },
+          "413": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PAYLOAD_TOO_LARGE: the body is over the size limit"
+          },
+          "415": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "UNSUPPORTED_MEDIA_TYPE: a signed body that isn't application/json"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SERVICE_UNAVAILABLE: the database is unreachable; GitHub retries"
+          }
+        },
+        "security": [],
+        "summary": "Receive a GitHub webhook delivery",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Generated server url",
+      "url": "http://localhost:8085"
+    }
+  ],
+  "tags": [
+    {
+      "description": "The caller's own GitHub user session: authorizing Pallet on GitHub, reading and ending the session, and listing the installations the caller's GitHub user can see. No response ever carries a GitHub token.",
+      "name": "GitHub session"
+    },
+    {
+      "description": "Connecting an org to GitHub App installations. A fresh install: POST install-sessions, send the user to installUrl, and GitHub's setup redirect brings back installation_id, code and state; POST installations with all three. A setup redirect with setup_action=request carries no installation_id: a GitHub organization member asked their admin to approve the install, and there is nothing to call until the admin does. An installation that already exists: GET /github/installations, then POST installations with {installationId} alone.",
+      "name": "Installations"
+    },
+    {
+      "description": "GitHub's deliveries to Pallet. Called by GitHub only, never by the dashboard.",
+      "name": "Webhooks"
+    },
+    {
+      "description": "Which repository and branch an app deploys from. Choosing the repository needs ADMIN and the caller's own push access on GitHub; tuning branch, directory and auto-deploy needs DEVELOPER and no GitHub session, since it can't change which repository is built.",
+      "name": "Repository links"
+    }
+  ]
+}

@@ -9,5 +9,6 @@ docs/
 deploy/
 **/*-credentials.json
 **/application-secrets.y*ml
+**/keys.properties
 *.env
 .env

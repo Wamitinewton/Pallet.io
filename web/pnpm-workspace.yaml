@@ -1,0 +1,7 @@
+saveExact: true
+engineStrict: true
+
+allowBuilds:
+  esbuild: false
+  sharp: false
+  unrs-resolver: false

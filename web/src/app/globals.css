@@ -1,0 +1,208 @@
+:root {
+    color-scheme: light;
+
+    /* Brand, sampled from docs/assets/logo.png */
+    --blue: #2665fc;
+    --blue-hover: #1b55e0;
+    --blue-press: #1546bd;
+    --blue-text: #1f58e0;
+    --blue-soft: #ebf1ff;
+    --blue-line: #c7d7ff;
+    --green: #3ad98b;
+    --green-text: #0b7a47;
+    --green-soft: #e5f8ee;
+
+    /* Neutrals lean slightly toward the brand blue */
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --surface-2: #f0f3f8;
+    --line: #e1e6ee;
+    --line-strong: #cbd3df;
+    --ink: #0e1628;
+    --text: #2a3345;
+    --muted: #5d6779;
+    --faint: #8a93a4;
+
+    --amber-text: #9a5b00;
+    --amber-soft: #fff3dc;
+    --red: #d23b3b;
+    --red-text: #b42727;
+    --red-soft: #fdeded;
+
+    --on-blue: #ffffff;
+    --shadow: 0 1px 2px rgb(14 22 40 / 0.06), 0 4px 16px rgb(14 22 40 / 0.06);
+    --shadow-pop: 0 12px 40px rgb(14 22 40 / 0.18);
+    --scrim: rgb(14 22 40 / 0.45);
+
+    --on-red: #ffffff;
+    --thumb: #ffffff;
+    --thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+
+    --font-display: var(--font-outfit), "Outfit", "Onest", ui-sans-serif, system-ui, sans-serif;
+    --font-body: var(--font-onest), "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono:
+        var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+    --r-sm: 6px;
+    --r-md: 8px;
+    --r-lg: 12px;
+    --sidebar-w: 244px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --blue-hover: #3a74ff;
+        --blue-press: #1b55e0;
+        --blue-text: #86aaff;
+        --blue-soft: #15224a;
+        --blue-line: #2a3f7a;
+        --green-text: #4fe39c;
+        --green-soft: #0f2c21;
+        --bg: #0a0f1c;
+        --surface: #111827;
+        --surface-2: #172034;
+        --line: #222d43;
+        --line-strong: #33405b;
+        --ink: #eef2f9;
+        --text: #c9d1df;
+        --muted: #8f99ae;
+        --faint: #677189;
+        --amber-text: #f3b54f;
+        --amber-soft: #33260f;
+        --red: #f06464;
+        --red-text: #ff8a8a;
+        --red-soft: #3a1719;
+        --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+        --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.55);
+        --scrim: rgb(3 6 14 / 0.7);
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --blue-hover: #3a74ff;
+    --blue-press: #1b55e0;
+    --blue-text: #86aaff;
+    --blue-soft: #15224a;
+    --blue-line: #2a3f7a;
+    --green-text: #4fe39c;
+    --green-soft: #0f2c21;
+    --bg: #0a0f1c;
+    --surface: #111827;
+    --surface-2: #172034;
+    --line: #222d43;
+    --line-strong: #33405b;
+    --ink: #eef2f9;
+    --text: #c9d1df;
+    --muted: #8f99ae;
+    --faint: #677189;
+    --amber-text: #f3b54f;
+    --amber-soft: #33260f;
+    --red: #f06464;
+    --red-text: #ff8a8a;
+    --red-soft: #3a1719;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+    --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.55);
+    --scrim: rgb(3 6 14 / 0.7);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+    max-width: 100%;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+a {
+    color: var(--blue-text);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.2;
+    text-wrap: balance;
+}
+
+h1 {
+    font-size: 26px;
+    letter-spacing: -0.01em;
+}
+
+h2 {
+    font-size: 18px;
+}
+
+h3 {
+    font-size: 15px;
+}
+
+p {
+    margin: 0;
+}
+
+code,
+kbd,
+samp {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+}
+
+::selection {
+    background: var(--blue-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+}

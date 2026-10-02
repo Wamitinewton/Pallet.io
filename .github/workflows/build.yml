@@ -23,6 +23,7 @@ jobs:
       common_modules: ${{ steps.classify.outputs.common_modules }}
       services_matrix: ${{ steps.classify.outputs.services_matrix }}
       services_all: ${{ steps.classify.outputs.services_all }}
+      web: ${{ steps.classify.outputs.web }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -44,6 +45,7 @@ jobs:
             echo "full=true"                     >> "$GITHUB_OUTPUT"
             echo "common_modules=[]"              >> "$GITHUB_OUTPUT"
             echo "services_matrix=$services_all"  >> "$GITHUB_OUTPUT"
+            echo "web=true"                       >> "$GITHUB_OUTPUT"
             echo "$1"
             exit 0
           }
@@ -53,7 +55,7 @@ jobs:
           else
             base="$BEFORE_SHA"
             if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-              full_build "no usable base commit for $EVENT -> platform-common reactor + every service"
+              full_build "no usable base commit for $EVENT -> platform-common reactor + every service + web"
             fi
           fi
 
@@ -63,7 +65,7 @@ jobs:
 
           shared="$(printf '%s\n' "$changed" | grep -E '^platform-common/(pom\.xml|mvnw|mvnw\.cmd|spotbugs-exclude\.xml|owasp-suppressions\.xml)$|^platform-common/\.mvn/|^\.github/workflows/build\.yml$' || true)"
           if [ -n "$shared" ]; then
-            full_build "shared change -> platform-common reactor + every service"
+            full_build "shared change -> platform-common reactor + every service + web"
           fi
 
           common_modules="$(printf '%s\n' "$changed" \
@@ -72,12 +74,15 @@ jobs:
           services_matrix="$(printf '%s\n' "$changed" \
             | sed -nE 's#^services/([^/]+)/.*#\1#p' \
             | sort -u | jq -R . | jq -cs .)"
+          web="$(printf '%s\n' "$changed" | grep -qE '^web/' && echo true || echo false)"
 
           echo "full=false"                        >> "$GITHUB_OUTPUT"
           echo "common_modules=$common_modules"     >> "$GITHUB_OUTPUT"
           echo "services_matrix=$services_matrix"   >> "$GITHUB_OUTPUT"
+          echo "web=$web"                           >> "$GITHUB_OUTPUT"
           echo "affected platform-common modules: $common_modules"
           echo "affected services: $services_matrix"
+          echo "web changed: $web"
 
   common-reactor:
     needs: scope
@@ -205,10 +210,42 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./mvnw -B -P security -DskipTests -Ddependency-check.skip=true verify
 
+  # Typecheck, lint (layer boundaries included), format check, unit + component + integration
+  # tests (Testcontainers; Docker is preinstalled on ubuntu-latest) and the production build.
+  # Playwright needs the whole local stack, so it does not run here.
+  web:
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm verify
+
+  # web-format-check needs web's node_modules; the web job runs the same check through `pnpm verify`.
   style:
     runs-on: ubuntu-latest
     env:
-      SKIP: spotless-check-platform-common,spotless-check-config-server,spotless-check-notification-service
+      SKIP: spotless-check-platform-common,spotless-check-config-server,spotless-check-notification-service,web-format-check
     steps:
       - uses: actions/checkout@v7
 
@@ -226,7 +263,7 @@ jobs:
   # Single stable status check to require in branch protection. Passes when every build path
   # that actually ran succeeded; a skipped job is fine, it means nothing in its scope changed.
   build:
-    needs: [scope, common-reactor, common-module, service, security-common, security-service, style]
+    needs: [scope, common-reactor, common-module, service, security-common, security-service, web, style]
     if: always()
     runs-on: ubuntu-latest
     steps:

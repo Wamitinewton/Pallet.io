@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,6 +49,9 @@ class InviteController {
                     + ApiDocs.ADMIN + ApiDocs.RETRY_CONFLICTS,
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "201",
+                        description = "Invite created and emailed"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "ALREADY_A_MEMBER, MEMBER_PREVIOUSLY_REMOVED, INVITE_ALREADY_PENDING, "
                                 + "QUOTA_EXCEEDED or PERSONAL_ORG_IMMUTABLE",
@@ -69,7 +73,7 @@ class InviteController {
     ApiResponse<PageResponse<InviteDto>> list(
             @PathVariable String orgId,
             @RequestParam(required = false) InviteStatus status,
-            @ModelAttribute PageQuery pageQuery) {
+            @ParameterObject @ModelAttribute PageQuery pageQuery) {
         return ApiResponse.ok("Invites retrieved", inviteService.list(orgId, status, pageQuery));
     }
 
@@ -80,6 +84,9 @@ class InviteController {
             description = "Issues a fresh link with a new expiry for the same invite. Subject to a cooldown between "
                     + "sends and a maximum send count. " + ApiDocs.ADMIN + ApiDocs.RETRY_CONFLICTS,
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200",
+                        description = "Invite resent"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "INVITE_NOT_PENDING or QUOTA_EXCEEDED",

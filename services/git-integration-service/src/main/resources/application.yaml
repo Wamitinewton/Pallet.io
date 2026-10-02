@@ -8,7 +8,10 @@ spring:
   application:
     name: git-integration-service
   config:
-    import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
+    import:
+      - optional:file:./keys.properties
+      - optional:file:./services/git-integration-service/keys.properties
+      - optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
   lifecycle:
     timeout-per-shutdown-phase: 30s
   servlet:

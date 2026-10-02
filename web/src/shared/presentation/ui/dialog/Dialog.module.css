@@ -1,0 +1,52 @@
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--scrim);
+    overflow-y: auto;
+}
+
+.dialog {
+    width: 100%;
+    max-width: 480px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-pop);
+}
+
+.wide {
+    max-width: 580px;
+}
+
+.head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 20px 0;
+}
+
+.description {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13.5px;
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+}
+
+.foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+}

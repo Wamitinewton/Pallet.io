@@ -1,0 +1,41 @@
+.list {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: -1px;
+    padding: 10px 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--muted);
+    font: 500 14px/1 var(--font-body);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.trigger:hover {
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.trigger[data-state="active"] {
+    border-bottom-color: var(--blue);
+    color: var(--ink);
+}
+
+.count {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,2 @@
+openapi/*.json linguist-generated=true
+src/shared/infrastructure/api/generated/** linguist-generated=true
