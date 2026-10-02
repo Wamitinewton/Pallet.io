@@ -32,6 +32,9 @@ class InvitePreviewController {
                     + "invitee signs up. The token is verified before anything is read; the invitee's email is masked.",
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200",
+                        description = "What the invite is for"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "400",
                         description = "INVALID_TOKEN: bad signature, expired or wrong purpose",
                         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),

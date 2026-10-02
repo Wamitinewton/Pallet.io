@@ -1,0 +1,83 @@
+.control {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--ink);
+    font: 400 14px/1.4 var(--font-body);
+    transition:
+        border-color 120ms,
+        box-shadow 120ms;
+}
+
+.control::placeholder {
+    color: var(--faint);
+}
+
+.control:hover {
+    border-color: var(--faint);
+}
+
+.control:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px var(--blue-soft);
+    outline: none;
+}
+
+.control[readonly] {
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.control:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.control[aria-invalid="true"] {
+    border-color: var(--red);
+}
+
+.control[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px var(--red-soft);
+}
+
+.mono {
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+.textarea {
+    min-height: 88px;
+    resize: vertical;
+}
+
+.textarea:hover {
+    border-color: var(--line-strong);
+}
+
+.group {
+    display: flex;
+    align-items: stretch;
+}
+
+.addon {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border: 1px solid var(--line-strong);
+    border-right: 0;
+    border-radius: var(--r-md) 0 0 var(--r-md);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.group .control {
+    min-width: 0;
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+}

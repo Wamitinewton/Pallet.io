@@ -1,0 +1,38 @@
+.root {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--line-strong);
+    cursor: pointer;
+    transition: background-color 150ms;
+}
+
+.root[data-state="checked"] {
+    background: var(--blue);
+}
+
+.root:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--thumb);
+    box-shadow: var(--thumb-shadow);
+    transition: transform 150ms;
+}
+
+.thumb[data-state="checked"] {
+    transform: translateX(16px);
+}

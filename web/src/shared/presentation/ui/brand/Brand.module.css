@@ -1,0 +1,37 @@
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.brand:hover {
+    text-decoration: none;
+}
+
+.mark {
+    width: 28px;
+    height: auto;
+    flex: none;
+}
+
+.wordmark {
+    color: var(--blue);
+}
+
+.green {
+    stroke: var(--green);
+}
+
+.blue {
+    stroke: var(--blue);
+}
+
+.solid {
+    fill: var(--blue);
+    stroke: var(--blue);
+}

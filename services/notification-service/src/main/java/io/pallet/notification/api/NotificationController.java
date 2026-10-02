@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +37,7 @@ class NotificationController {
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Filter to only unread notifications, or ALL") @RequestParam(defaultValue = "ALL")
                     ReadStatus status,
-            @ModelAttribute PageQuery pageQuery) {
+            @ParameterObject @ModelAttribute PageQuery pageQuery) {
         PageResponse<NotificationDto> page =
                 queryService.list(jwt.getSubject(), pageQuery, status == ReadStatus.UNREAD);
         return ApiResponse.ok("Notifications retrieved", page);

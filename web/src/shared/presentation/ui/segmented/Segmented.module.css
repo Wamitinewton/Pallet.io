@@ -1,0 +1,33 @@
+.root {
+    display: inline-flex;
+    width: max-content;
+    max-width: 100%;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+
+.item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--muted);
+    font: 500 13px/1 var(--font-body);
+    cursor: pointer;
+}
+
+.item:hover {
+    color: var(--ink);
+}
+
+.item[data-state="on"] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+}

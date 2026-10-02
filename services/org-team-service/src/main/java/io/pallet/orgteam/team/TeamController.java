@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +47,9 @@ class TeamController {
             description = "The slug is derived from the name when omitted. " + ApiDocs.ADMIN + ApiDocs.RETRY_CONFLICTS,
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "201",
+                        description = "Team created"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "SLUG_TAKEN or QUOTA_EXCEEDED",
                         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -60,7 +64,8 @@ class TeamController {
     @GetMapping
     @PreAuthorize("@access.atLeast(#orgId, 'VIEWER')")
     @Operation(summary = "List teams", description = ApiDocs.ANY_MEMBER)
-    ApiResponse<PageResponse<TeamDto>> list(@PathVariable String orgId, @ModelAttribute PageQuery pageQuery) {
+    ApiResponse<PageResponse<TeamDto>> list(
+            @PathVariable String orgId, @ParameterObject @ModelAttribute PageQuery pageQuery) {
         return ApiResponse.ok("Teams retrieved", teamService.list(orgId, pageQuery));
     }
 
@@ -97,7 +102,9 @@ class TeamController {
     @PreAuthorize("@access.atLeast(#orgId, 'VIEWER')")
     @Operation(summary = "List a team's members", description = ApiDocs.ANY_MEMBER)
     ApiResponse<PageResponse<MemberDto>> listMembers(
-            @PathVariable String orgId, @PathVariable UUID teamId, @ModelAttribute PageQuery pageQuery) {
+            @PathVariable String orgId,
+            @PathVariable UUID teamId,
+            @ParameterObject @ModelAttribute PageQuery pageQuery) {
         return ApiResponse.ok("Team members retrieved", teamService.listMembers(orgId, teamId, pageQuery));
     }
 
@@ -108,6 +115,9 @@ class TeamController {
             description = "Assigns an existing active organization member; it does not invite anyone. " + ApiDocs.ADMIN
                     + ApiDocs.RETRY_CONFLICTS,
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "201",
+                        description = "Member added to the team"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "ALREADY_IN_TEAM",

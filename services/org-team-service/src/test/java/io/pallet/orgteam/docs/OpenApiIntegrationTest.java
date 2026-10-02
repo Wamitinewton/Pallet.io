@@ -61,6 +61,19 @@ class OpenApiIntegrationTest {
             "DELETE " + BASE + "/orgs/{orgId}/apps/{appId}");
 
     private static final String PREVIEW = "GET " + BASE + "/invites/{token}";
+    private static final Set<String> CREATED = Set.of(
+            "POST " + BASE + "/orgs",
+            "POST " + BASE + "/orgs/{orgId}/invites",
+            "POST " + BASE + "/orgs/{orgId}/teams",
+            "POST " + BASE + "/orgs/{orgId}/teams/{teamId}/members",
+            "POST " + BASE + "/orgs/{orgId}/apps");
+    private static final List<String> PAGED = List.of(
+            "GET " + BASE + "/orgs",
+            "GET " + BASE + "/orgs/{orgId}/members",
+            "GET " + BASE + "/orgs/{orgId}/invites",
+            "GET " + BASE + "/orgs/{orgId}/teams",
+            "GET " + BASE + "/orgs/{orgId}/teams/{teamId}/members",
+            "GET " + BASE + "/orgs/{orgId}/apps");
 
     @Autowired
     private MockMvc mvc;
@@ -97,6 +110,48 @@ class OpenApiIntegrationTest {
             operation.path("responses").propertyNames().forEach(documented::add);
             assertThat(documented).as(key + " responses").containsAll(STANDARD_ERRORS);
         });
+    }
+
+    @Test
+    void everyOperationDocumentsTheSuccessItAnswersWithItsBody() {
+        operations().forEach((key, operation) -> {
+            List<String> success = responseCodes(operation).stream()
+                    .filter(code -> code.startsWith("2"))
+                    .toList();
+            assertThat(success).as(key).isNotEmpty();
+            success.stream()
+                    .filter(code -> !code.equals("204"))
+                    .forEach(code -> assertThat(operation.at("/responses/" + code + "/content"))
+                            .as(key + " " + code)
+                            .isNotEmpty());
+        });
+    }
+
+    @Test
+    void creatingOperationsAnswer201AndNever200() {
+        CREATED.forEach(key -> assertThat(responseCodes(operations().get(key)))
+                .as(key)
+                .contains("201")
+                .doesNotContain("200"));
+    }
+
+    @Test
+    void pagedOperationsTakePageSizeAndSortAsQueryParameters() {
+        for (String key : PAGED) {
+            JsonNode operation = operations().get(key);
+            for (String name : List.of("page", "size", "sort")) {
+                assertThat(parameter(operation, name)).as(key + " " + name).isNotNull();
+                assertThat(parameter(operation, name).path("in").asString())
+                        .as(key + " " + name)
+                        .isEqualTo("query");
+            }
+            assertThat(parameter(operation, "pageQuery")).as(key).isNull();
+        }
+        JsonNode members = operations().get("GET " + BASE + "/orgs/{orgId}/members");
+        for (String name : List.of("status", "role", "q")) {
+            assertThat(parameter(members, name)).as("members " + name).isNotNull();
+        }
+        assertThat(parameter(members, "filter")).isNull();
     }
 
     @Test
@@ -233,6 +288,21 @@ class OpenApiIntegrationTest {
                         .contains("Retrying conflicts (409) rather than creating a duplicate.");
             }
         });
+    }
+
+    private static List<String> responseCodes(JsonNode operation) {
+        List<String> codes = new ArrayList<>();
+        operation.path("responses").propertyNames().forEach(codes::add);
+        return codes;
+    }
+
+    private static JsonNode parameter(JsonNode operation, String name) {
+        for (JsonNode parameter : operation.path("parameters")) {
+            if (parameter.path("name").asString("").equals(name)) {
+                return parameter;
+            }
+        }
+        return null;
     }
 
     private java.util.Map<String, JsonNode> operations() {

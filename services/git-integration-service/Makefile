@@ -1,6 +1,5 @@
 .DEFAULT_GOAL := help
 MVN := ./mvnw
-ENV_FILE := .env.local
 
 .PHONY: help
 help: ## List targets
@@ -36,9 +35,9 @@ rules-check: ## Validate this service's Prometheus alert rules with promtool (al
 		prom/prometheus:v3.14.0 check rules /rules/git-integration-service.rules.yml
 
 .PHONY: dev-secrets
-dev-secrets: ## Generate throwaway local key material into .env.local (git-ignored)
+dev-secrets: ## Generate throwaway local key material into keys.properties (git-ignored)
 	./scripts/dev-secrets.sh
 
 .PHONY: run
 run: ## Run git-integration-service locally (needs: make up at the repo root, then make dev-secrets)
-	@if [ -f $(ENV_FILE) ]; then set -a; . ./$(ENV_FILE); set +a; fi; $(MVN) -B spring-boot:run
+	$(MVN) -B spring-boot:run

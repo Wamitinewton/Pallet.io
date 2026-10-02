@@ -1,0 +1,5 @@
+.sha {
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+}

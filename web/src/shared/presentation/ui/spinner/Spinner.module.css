@@ -1,0 +1,23 @@
+.spinner {
+    display: inline-block;
+    flex: none;
+    width: var(--spinner-size, 16px);
+    height: var(--spinner-size, 16px);
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner {
+        border-right-color: currentColor;
+        opacity: 0.6;
+    }
+}

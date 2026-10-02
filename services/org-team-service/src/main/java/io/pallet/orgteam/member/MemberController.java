@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,8 +51,8 @@ class MemberController {
                     + ApiDocs.ANY_MEMBER)
     ApiResponse<PageResponse<MemberDto>> list(
             @PathVariable String orgId,
-            @Valid @ModelAttribute MemberFilter filter,
-            @ModelAttribute PageQuery pageQuery) {
+            @ParameterObject @Valid @ModelAttribute MemberFilter filter,
+            @ParameterObject @ModelAttribute PageQuery pageQuery) {
         AccessContext caller = accessResolver.resolve(orgId);
         return ApiResponse.ok("Members retrieved", memberService.list(orgId, caller.role(), filter, pageQuery));
     }
@@ -82,6 +83,9 @@ class MemberController {
                     + "be assigned here; use transfer-ownership. Setting the current role is a 200 with no change. "
                     + ApiDocs.OWNER,
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200",
+                        description = "Role changed"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "409",
                         description = "INVALID_ROLE_TRANSITION, LAST_OWNER or CONCURRENT_MODIFICATION",
@@ -124,6 +128,9 @@ class MemberController {
                     + " A retry after success is rejected because the caller is no longer the owner; it does not "
                     + "transfer twice.",
             responses = {
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200",
+                        description = "Ownership transferred"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "403",
                         description = "INSUFFICIENT_ROLE, NOT_A_MEMBER or REAUTHENTICATION_REQUIRED",

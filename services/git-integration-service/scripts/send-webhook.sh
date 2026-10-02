@@ -16,10 +16,10 @@ command -v openssl >/dev/null || { echo "openssl is required" >&2; exit 1; }
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
 
 service_dir="$(cd "$(dirname "$0")/.." && pwd)"
-env_file="$service_dir/.env.local"
+env_file="$service_dir/keys.properties"
 secret="${PALLET_GIT_WEBHOOK_SECRET:-}"
 if [[ -z "$secret" && -f "$env_file" ]]; then
-  secret="$(grep -E '^PALLET_GIT_WEBHOOK_SECRET=' "$env_file" | head -n 1 | cut -d= -f2- | tr -d '"')"
+  secret="$(grep -E '^PALLET_GIT_WEBHOOK_SECRET=' "$env_file" | head -n 1 | cut -d= -f2-)"
 fi
 [[ -n "$secret" ]] || { echo "PALLET_GIT_WEBHOOK_SECRET is not set and not in $env_file (run: make dev-secrets)" >&2; exit 1; }
 

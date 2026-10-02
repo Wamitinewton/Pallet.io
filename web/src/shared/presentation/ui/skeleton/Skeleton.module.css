@@ -1,0 +1,28 @@
+.skeleton {
+    display: block;
+    width: var(--skeleton-width, 100%);
+    height: var(--skeleton-height, 14px);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+.circle {
+    border-radius: 50%;
+}
+
+.lines {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.lines > .skeleton:last-child:not(:only-child) {
+    width: 60%;
+}
+
+@keyframes pulse {
+    50% {
+        opacity: 0.55;
+    }
+}

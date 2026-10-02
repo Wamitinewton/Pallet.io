@@ -1,0 +1,130 @@
+.button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: none;
+    color: var(--ink);
+    font: 500 14px/1 var(--font-body);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        background-color 120ms,
+        border-color 120ms,
+        color 120ms;
+}
+
+.button:hover {
+    text-decoration: none;
+}
+
+.button svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+.primary {
+    background: var(--blue);
+    color: var(--on-blue);
+}
+
+.primary:hover {
+    background: var(--blue-hover);
+}
+
+.primary:active {
+    background: var(--blue-press);
+}
+
+.secondary {
+    border-color: var(--line-strong);
+    background: var(--surface);
+}
+
+.secondary:hover {
+    background: var(--surface-2);
+}
+
+.ghost {
+    color: var(--muted);
+}
+
+.ghost:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+
+.danger {
+    background: var(--red);
+    color: var(--on-red);
+}
+
+.danger:hover {
+    filter: brightness(0.94);
+}
+
+.dangerOutline {
+    border-color: var(--line-strong);
+    background: var(--surface);
+    color: var(--red-text);
+}
+
+.dangerOutline:hover {
+    border-color: var(--red);
+    background: var(--red-soft);
+}
+
+.sm {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+}
+
+.lg {
+    min-height: 44px;
+    padding: 0 20px;
+    font-size: 15px;
+}
+
+.block {
+    width: 100%;
+}
+
+.iconOnly {
+    width: 36px;
+    padding: 0;
+}
+
+.sm.iconOnly {
+    width: 30px;
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.button[aria-busy="true"] {
+    opacity: 1;
+    cursor: progress;
+}
+
+.content {
+    display: inline-flex;
+    align-items: center;
+    gap: inherit;
+    visibility: hidden;
+}
+
+.spinner {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+}
