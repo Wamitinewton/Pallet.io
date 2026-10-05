@@ -88,8 +88,9 @@ class WebhookBodyPassthroughIntegrationTest {
     static void gatewayProperties(DynamicPropertyRegistry registry) {
         registry.add("GIT_INTEGRATION_SERVICE_URI", GIT_INTEGRATION_SERVICE::baseUrl);
         registry.add("pallet.gateway.rate-limit.enabled", () -> "true");
+        // A refill this slow adds nothing during the test, so the 61st docs request is reliably over.
         registry.add("pallet.gateway.rate-limit.capacity", () -> "60");
-        registry.add("pallet.gateway.rate-limit.window", () -> "1m");
+        registry.add("pallet.gateway.rate-limit.window", () -> "1h");
     }
 
     @Test

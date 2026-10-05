@@ -171,7 +171,7 @@ class EndToEndRoutingIntegrationTest {
         static void gatewayConfig(DynamicPropertyRegistry registry) {
             registry.add("pallet.gateway.rate-limit.enabled", () -> "true");
             registry.add("pallet.gateway.rate-limit.capacity", () -> "3");
-            registry.add("pallet.gateway.rate-limit.window", () -> "5s");
+            registry.add("pallet.gateway.rate-limit.window", () -> "1h");
 
             registry.add("pallet.gateway.routes.limited-service.uri", BACKEND::baseUrl);
             registry.add("pallet.gateway.routes.limited-service.path", () -> "/api/v1/limited/**");
@@ -189,6 +189,7 @@ class EndToEndRoutingIntegrationTest {
             HttpResponse<String> rejected = send();
 
             assertThat(rejected.statusCode()).isEqualTo(429);
+            assertThat(rejected.headers().firstValue("Retry-After")).isPresent();
             BACKEND.verify(3, getRequestedFor(urlEqualTo("/api/v1/limited/anything")));
         }
 

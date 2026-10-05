@@ -11,25 +11,48 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Fixed-window counter, not yet a real token bucket — kept under this name so a later swap to one
- * doesn't ripple through call sites (see {@code ARCHITECTURE.md}'s named tradeoff). One atomic
- * {@code INCR}+conditional-{@code PEXPIRE} Lua script per call so concurrent callers against the
- * same key never race a separate increment/expire pair. Fails open on a Redis error: an edge
+ * Token bucket per subject key: holds at most {@code capacity} tokens and refills continuously at
+ * {@code capacity / window}, so a drained bucket can't burst again at a window boundary. The whole
+ * refill-and-take runs in one Lua script against Redis's own clock, keeping concurrent callers and
+ * clock-skewed gateway instances from double-spending a token. Fails open on a Redis error: an edge
  * abuse-prevention layer going dark shouldn't take every route down with it.
  */
 @Component
 class RedisTokenBucketRateLimiter {
 
     private static final Logger log = LoggerFactory.getLogger(RedisTokenBucketRateLimiter.class);
-    private static final String KEY_PREFIX = "gateway:ratelimit:";
+    // Distinct from the old fixed-window prefix so a mixed fleet mid-rollout never hits WRONGTYPE
+    // on a key the other algorithm wrote.
+    private static final String KEY_PREFIX = "gateway:ratelimit:bucket:";
     private static final String UNAVAILABLE_METRIC = "gateway.ratelimit.unavailable";
 
-    private static final DefaultRedisScript<Long> FIXED_WINDOW_SCRIPT = new DefaultRedisScript<>("""
-            local current = redis.call('INCR', KEYS[1])
-            if current == 1 then
-              redis.call('PEXPIRE', KEYS[1], ARGV[1])
+    // Returns 0 when a token was taken, otherwise the milliseconds until one will be available. A
+    // rejection writes nothing: refill is linear and a rejected bucket is below capacity, so
+    // recomputing from the stored state later gives the same answer. The key expires once the
+    // bucket would be full again, since a full bucket and a missing key are indistinguishable.
+    private static final DefaultRedisScript<Long> TOKEN_BUCKET_SCRIPT = new DefaultRedisScript<>("""
+            local capacity = tonumber(ARGV[1])
+            local rate = capacity / tonumber(ARGV[2])
+            local time = redis.call('TIME')
+            local now = tonumber(time[1]) * 1000 + tonumber(time[2]) / 1000
+
+            local bucket = redis.call('HMGET', KEYS[1], 'tokens', 'refilled_at')
+            local tokens = tonumber(bucket[1])
+            local refilled_at = tonumber(bucket[2])
+            if tokens == nil or refilled_at == nil then
+              tokens = capacity
+              refilled_at = now
             end
-            return current
+
+            tokens = math.min(capacity, tokens + math.max(0, now - refilled_at) * rate)
+            if tokens < 1 then
+              return math.max(1, math.ceil((1 - tokens) / rate))
+            end
+
+            tokens = tokens - 1
+            redis.call('HSET', KEYS[1], 'tokens', tokens, 'refilled_at', now)
+            redis.call('PEXPIRE', KEYS[1], math.max(1, math.ceil((capacity - tokens) / rate)))
+            return 0
             """, Long.class);
 
     private final StringRedisTemplate redisTemplate;
@@ -43,19 +66,34 @@ class RedisTokenBucketRateLimiter {
         this.meterRegistry = meterRegistry;
     }
 
-    boolean tryConsume(String subjectKey) {
+    Decision tryConsume(String subjectKey) {
         return tryConsume(subjectKey, properties.capacity(), properties.window());
     }
 
-    boolean tryConsume(String subjectKey, int capacity, Duration window) {
+    Decision tryConsume(String subjectKey, int capacity, Duration window) {
         try {
-            long count = redisTemplate.execute(
-                    FIXED_WINDOW_SCRIPT, List.of(KEY_PREFIX + subjectKey), String.valueOf(window.toMillis()));
-            return count <= capacity;
+            Long retryAfterMillis = redisTemplate.execute(
+                    TOKEN_BUCKET_SCRIPT,
+                    List.of(KEY_PREFIX + subjectKey),
+                    String.valueOf(capacity),
+                    String.valueOf(window.toMillis()));
+            return retryAfterMillis == null || retryAfterMillis == 0
+                    ? Decision.ALLOWED
+                    : Decision.rejected(Duration.ofMillis(retryAfterMillis));
         } catch (DataAccessException e) {
             log.warn("Redis unavailable for edge rate limiting; failing open", e);
             meterRegistry.counter(UNAVAILABLE_METRIC).increment();
-            return true;
+            return Decision.ALLOWED;
+        }
+    }
+
+    /** Whether a request was admitted and, if not, how long until the bucket holds a token again. */
+    record Decision(boolean allowed, Duration retryAfter) {
+
+        static final Decision ALLOWED = new Decision(true, Duration.ZERO);
+
+        static Decision rejected(Duration retryAfter) {
+            return new Decision(false, retryAfter);
         }
     }
 }

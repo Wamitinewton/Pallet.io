@@ -5,9 +5,11 @@ import io.pallet.apigateway.config.GatewayProperties.RateLimitMode;
 import io.pallet.apigateway.config.GatewayProperties.RateLimitOverride;
 import io.pallet.common.error.ErrorResponse;
 import io.pallet.common.security.OrgContext;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
@@ -81,14 +83,21 @@ public class RateLimitFilterFunction implements HandlerFilterFunction<ServerResp
                 .findFirst();
     }
 
-    private static ServerResponse admit(ServerRequest request, boolean allowed, HandlerFunction<ServerResponse> next)
+    private static ServerResponse admit(
+            ServerRequest request, RedisTokenBucketRateLimiter.Decision decision, HandlerFunction<ServerResponse> next)
             throws Exception {
-        if (!allowed) {
+        if (!decision.allowed()) {
             return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header(HttpHeaders.RETRY_AFTER, retryAfterSeconds(decision.retryAfter()))
                     .body(ErrorResponse.of(
                             HttpStatus.TOO_MANY_REQUESTS, RATE_LIMITED_MESSAGE, RATE_LIMITED_CODE, request.path()));
         }
         return next.handle(request);
+    }
+
+    // Retry-After only carries whole seconds; rounding down would invite a retry that's still early.
+    private static String retryAfterSeconds(Duration retryAfter) {
+        return String.valueOf(Math.max(1, Math.ceilDiv(retryAfter.toMillis(), 1000L)));
     }
 
     private static String subjectKeyFor(ServerRequest request) {

@@ -70,7 +70,7 @@ flowchart LR
     end
 
     KC[(Keycloak<br/>JWKS / issuer)]
-    R[(Redis<br/>rate-limit counters)]
+    R[(Redis<br/>rate-limit buckets)]
 
     subgraph IS["identity-service<br/>:8082"]
         ISApi[Auth + account API]
@@ -91,7 +91,7 @@ flowchart LR
     GH -- "signed webhook, no JWT" --> SEC
     SEC -- validates against --> KC
     SEC --> RL
-    RL -- "INCR / EXPIRE" --> R
+    RL -- "token-bucket script (EVALSHA)" --> R
     RL --> RT
     RT --> CB
     CB -- "Authorization header forwarded unchanged" --> ISApi
@@ -104,7 +104,7 @@ flowchart LR
 `api-gateway` is the platform's first service that is purely an HTTP edge component: it never
 publishes or consumes a Kafka event, and it owns no aggregate of its own — every arrow into a
 backend on the right is a proxied HTTP call, and the only state `api-gateway` itself holds is the
-ephemeral rate-limit counters in Redis.
+ephemeral rate-limit buckets in Redis.
 
 ## Design goals and non-goals
 
@@ -380,18 +380,22 @@ the shape `docs/PROJECT.md` names as this component's eventual home for plan-bas
 IP on a public route, where no `org_id` exists yet — the same distinction
 `identity-service`'s own `AuthRateLimiter` already draws for its unauthenticated endpoints.
 
-**Mechanism — confirmed as the final v1 algorithm, not a placeholder** (see
-[Hardening decisions](#hardening-decisions-resolved)): a fixed-window counter in Redis, one
-`INCR`+conditional-`EXPIRE` Lua script per request for atomicity — `pallet.gateway.rate-limit.capacity`
-requests per `pallet.gateway.rate-limit.window` per key. Deliberately the simplest correct
-distributed limiter, not a true token bucket or sliding-window log: a fixed window admits a caller
-up to roughly `2 × capacity` requests across a window boundary in the worst case, an accepted
-tradeoff for a first cut at edge protection, the same "deliberately simple" posture
-`docs/identity-service/ARCHITECTURE.md`'s checkpoint 12 took for `AuthRateLimiter`.
+**Mechanism — a token bucket** ([ADR-0024](../adr/0024-edge-rate-limiting-token-bucket.md)):
+`pallet.gateway.rate-limit.capacity` is the largest burst a key can send and
+`pallet.gateway.rate-limit.window` is how long an empty bucket takes to refill, so the sustained
+rate is `capacity / window` (60 per `1m` is one request a second after a 60-request burst). One Lua
+script per request refills the bucket for the time elapsed on Redis's own clock (never the
+gateway's, so instances with skewed clocks agree), caps it at `capacity`, and takes a token if a
+whole one is there, all atomically. The bucket is a hash at `gateway:ratelimit:bucket:<subject>`
+that expires once it would be full again. Unlike the fixed window this replaced, a caller who
+drains the bucket just before what used to be a window boundary gets a fraction of a token just
+after it, not a fresh budget.
 
 A rejected request never reaches the circuit breaker or the backend: `429 TOO_MANY_REQUESTS`,
 `ErrorResponse`-shaped, the same `TOO_MANY_REQUESTS` code `identity-service`'s own limiter already
-uses via `TooManyRequestsException` — no new error shape introduced for this layer either.
+uses via `TooManyRequestsException` — no new error shape introduced for this layer either. It carries a
+`Retry-After` header: the time until the bucket holds a whole token again, rounded up to whole
+seconds.
 
 **Per-route overrides.** A route can list `rate-limits` entries, each an Ant-style `path` under
 that route's own `path` with a `mode`:
@@ -405,7 +409,7 @@ that route's own `path` with a `mode`:
 ```
 
 `DEFAULT` keeps the global limit, `CUSTOM` applies its own `capacity` and `window` under a counter
-key of its own (`gateway:ratelimit:override:<path>:<subject>`), and `DISABLED` skips the limiter.
+bucket of its own (`gateway:ratelimit:bucket:override:<path>:<subject>`), and `DISABLED` skips the limiter.
 The most specific matching pattern wins (`PathPattern.SPECIFICITY_COMPARATOR`); a path no entry
 matches keeps today's global behavior, and `pallet.gateway.rate-limit.enabled: false` still turns
 everything off. Binding fails at startup on an override outside its route's `path`, on `CUSTOM`
@@ -531,7 +535,7 @@ flowchart TB
 Stateless HTTP only — no Kafka consumer group, no database connection pool, no local disk state.
 Every instance is identical and interchangeable; horizontal scaling is purely "add another
 instance behind whatever load-balances inbound traffic to it," with Redis as the only shared state
-(rate-limit counters) that has to be reachable from every instance. This is a deliberately simpler
+(rate-limit buckets) that has to be reachable from every instance. This is a deliberately simpler
 deployment shape than every other service built so far, precisely because it carries no aggregate
 of its own — see [Non-goals](#design-goals-and-non-goals).
 
@@ -562,7 +566,7 @@ services/api-gateway/
 
 POM: `platform-common-exception`, `-observability`, `-resilience`, `-security`;
 `spring-boot-starter-webmvc`; `spring-cloud-starter-gateway-server-mvc`;
-`spring-boot-starter-data-redis` (rate-limit counters — reuses
+`spring-boot-starter-data-redis` (rate-limit buckets — reuses
 `platform-common-test`'s existing `RedisTestContainerConfiguration`/`RedisContainerHolder` for
 integration tests, the same container-holder pattern `platform-common-messaging`'s
 `RedisEventIdempotencyGuard` tests already use). **Deliberately absent**: `platform-common-api`
@@ -609,12 +613,12 @@ firing for any sustained window in production — the same "a metric, not a feel
 revisit" discipline `docs/identity-service/ARCHITECTURE.md`'s own
 `identity.signups.compensating_delete` counter uses for its dual-write gap.
 
-**2. Fixed-window rate limiting — confirmed as the final v1 algorithm.** Not a placeholder for a
-future token-bucket/sliding-window rewrite; [Rate limiting](#rate-limiting)'s stated tradeoff (up
-to `2 × capacity` admitted across a window boundary) is accepted as proportionate for v1 edge
-protection. **Revisit trigger**: real traffic showing rejections or abuse concentrated at window
-boundaries specifically — not "the algorithm is theoretically imprecise," which is already known
-and accepted.
+**2. Rate-limiting algorithm — token bucket.** First settled as a fixed-window counter, then
+superseded by [ADR-0024](../adr/0024-edge-rate-limiting-token-bucket.md): a fixed window admits up
+to `2 × capacity` inside a couple of seconds around a reset, and the edge limiter is the planned
+home for plan-based limits that have to mean what they say. [Rate limiting](#rate-limiting) has the
+mechanism. **Revisit trigger**: a plan that needs a hard per-window ceiling below what
+`capacity + window` refill allows, which calls for a separate burst size, not a new algorithm.
 
 **3. Thread-pool sizing for the blocking proxy model — a concrete default, not an unset
 question.** Because a Gateway Server MVC proxy call executes synchronously on the same

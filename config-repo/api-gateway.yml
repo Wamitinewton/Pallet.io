@@ -43,6 +43,8 @@ pallet:
         rate-limits:
           - path: /api/v1/git-integration/webhooks/github
             mode: DISABLED
+    # Token bucket per org (or client IP on a public path): bursts up to `capacity`, then refills
+    # continuously at capacity/window, here one request a second.
     rate-limit:
       enabled: true
       capacity: 60
@@ -57,3 +59,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # The limiter fails open, but only as fast as a command times out: Lettuce's 60s default
+      # would let a hung (not down) Redis stall every route before the fail-open path ever runs.
+      timeout: 250ms
+      connect-timeout: 1s
