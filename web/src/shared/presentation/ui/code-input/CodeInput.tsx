@@ -1,19 +1,28 @@
 "use client";
 
 import {
+    useImperativeHandle,
     useRef,
     useState,
     type ClipboardEvent,
     type ComponentProps,
     type CSSProperties,
     type KeyboardEvent,
+    type Ref,
 } from "react";
 import { cx } from "../cx";
 import { useFieldControl, useFieldLabelId } from "../field/FieldContext";
 import { fillCells, sanitizeCode } from "./code";
 import styles from "./CodeInput.module.css";
 
-export type CodeInputProps = Omit<ComponentProps<"div">, "onChange" | "defaultValue"> & {
+export interface CodeInputHandle {
+    /** Empties every cell without reporting a change; the caller already knows the value it discarded. */
+    clear(): void;
+    focus(): void;
+}
+
+export type CodeInputProps = Omit<ComponentProps<"div">, "onChange" | "defaultValue" | "ref"> & {
+    ref?: Ref<CodeInputHandle>;
     length?: number;
     defaultValue?: string;
     disabled?: boolean;
@@ -22,6 +31,7 @@ export type CodeInputProps = Omit<ComponentProps<"div">, "onChange" | "defaultVa
 };
 
 export function CodeInput({
+    ref,
     length = 8,
     defaultValue = "",
     disabled = false,
@@ -41,6 +51,19 @@ export function CodeInput({
         target?.focus();
         target?.select();
     };
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            clear: () => {
+                setCells(Array<string>(length).fill(""));
+            },
+            focus: () => {
+                refs.current[0]?.focus();
+            },
+        }),
+        [length],
+    );
 
     const commit = (next: string[]) => {
         setCells(next);

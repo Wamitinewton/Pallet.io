@@ -1,0 +1,12 @@
+.header {
+    margin-top: 20px;
+}
+
+.email {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.resend {
+    flex-wrap: wrap;
+}

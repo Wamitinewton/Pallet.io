@@ -8,16 +8,18 @@ export interface ServerTransportOptions {
     readonly gatewayUrl: string;
     readonly tokens: AccessTokenProvider;
     readonly correlationId?: () => string;
+    readonly fetch?: (request: Request, init: RequestInit) => Promise<Response>;
 }
 
 export function serverTransport({
     gatewayUrl,
     tokens,
     correlationId = newCorrelationId,
+    fetch: send = (request, init) => fetch(request, init),
 }: ServerTransportOptions): Transport {
     return {
         baseUrl: `${trimTrailingSlash(gatewayUrl)}/api/v1`,
-        fetch: (request) => fetch(request, { cache: "no-store" }),
+        fetch: (request) => send(request, { cache: "no-store" }),
         middleware: [
             {
                 async onRequest({ request }) {

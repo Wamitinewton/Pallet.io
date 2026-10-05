@@ -12,3 +12,7 @@ export function bffUrl(path: string): string {
 export function gatewayUrl(path: string): string {
     return `${TEST_GATEWAY_URL}/api/v1${path}`;
 }
+
+export function sessionApiUrl(path: string): string {
+    return `${TEST_ORIGIN}/api/session${path}`;
+}

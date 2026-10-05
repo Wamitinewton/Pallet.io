@@ -1,0 +1,33 @@
+.window {
+    max-width: 440px;
+}
+
+.body {
+    padding: 18px;
+}
+
+.from {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.from svg {
+    width: 22px;
+    height: 22px;
+}
+
+.sender {
+    margin-left: auto;
+}
+
+.code {
+    padding: 14px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 22px;
+    letter-spacing: 0.2em;
+    text-align: center;
+}

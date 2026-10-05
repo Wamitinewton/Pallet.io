@@ -76,6 +76,9 @@
 }
 
 .card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     padding: 32px;
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
@@ -84,6 +87,27 @@
 
 .card h1 {
     font-size: 26px;
+}
+
+.icon {
+    display: inline-grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    flex: none;
+    border-radius: var(--r-lg);
+    background: var(--blue-soft);
+    color: var(--blue-text);
+}
+
+.icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.iconAmber {
+    background: var(--amber-soft);
+    color: var(--amber-text);
 }
 
 .divider {
@@ -120,4 +144,8 @@
     .card {
         padding: 24px 20px;
     }
+}
+
+.card[tabindex="-1"]:focus-visible {
+    outline: none;
 }
