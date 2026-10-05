@@ -30,6 +30,7 @@ export const projects: TestProjectInlineConfiguration[] = [
             environment: "node",
             include: [`${integrationTests}/*.int.test.ts`],
             setupFiles: ["./src/test/setup-node.ts", "./src/test/setup-msw.ts"],
+            globalSetup: ["./src/test/redis-global-setup.ts"],
             pool: "forks",
             fileParallelism: false,
             hookTimeout: 60_000,

@@ -15,11 +15,36 @@ const base64Key = z
         error: `must decode to ${String(ENCRYPTION_KEY_BYTES)} bytes`,
     });
 
+const keyId = z.string().regex(/^[a-z0-9]{1,16}$/, "must be 1-16 lowercase letters or digits");
+
+const retiredKeys = z
+    .string()
+    .transform((value, context) => {
+        const keys: Record<string, string> = {};
+        for (const entry of value.split(",").map((part) => part.trim())) {
+            const separator = entry.indexOf(":");
+            const id = keyId.safeParse(entry.slice(0, separator));
+            const key = base64Key.safeParse(entry.slice(separator + 1));
+            if (separator < 1 || !id.success || !key.success) {
+                context.addIssue({
+                    code: "custom",
+                    message: "must be a comma-separated list of <id>:<32-byte base64 key>",
+                });
+                return z.NEVER;
+            }
+            keys[id.data] = key.data;
+        }
+        return keys;
+    })
+    .optional();
+
 const serverEnvSchema = z.object({
     PALLET_GATEWAY_URL: httpUrl,
     PALLET_PUBLIC_BASE_URL: httpUrl,
     PALLET_REDIS_URL: z.url({ protocol: /^rediss?$/, error: "must be a redis:// or rediss:// URL" }),
     PALLET_SESSION_ENCRYPTION_KEY: base64Key,
+    PALLET_SESSION_ENCRYPTION_KEY_ID: keyId.default("1"),
+    PALLET_SESSION_RETIRED_ENCRYPTION_KEYS: retiredKeys,
     PALLET_TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(10),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]),
     OTEL_SERVICE_NAME: z.string().min(1),

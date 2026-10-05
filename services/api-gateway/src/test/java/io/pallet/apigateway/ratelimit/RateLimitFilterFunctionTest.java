@@ -13,6 +13,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -40,7 +41,7 @@ class RateLimitFilterFunctionTest {
     @Test
     void resolvesTheSubjectKeyFromTheOrgIdClaimWhenAuthenticated() throws Exception {
         authenticateWithOrgId("org-42");
-        when(limiter.tryConsume("org-42")).thenReturn(true);
+        when(limiter.tryConsume("org-42")).thenReturn(RedisTokenBucketRateLimiter.Decision.ALLOWED);
         when(next.handle(request)).thenReturn(ServerResponse.ok().build());
 
         new RateLimitFilterFunction(enabledProperties(), limiter).filter(request, next);
@@ -51,7 +52,7 @@ class RateLimitFilterFunctionTest {
     @Test
     void resolvesTheSubjectKeyFromTheRemoteAddressWhenUnauthenticated() throws Exception {
         when(request.remoteAddress()).thenReturn(Optional.of(new InetSocketAddress("203.0.113.7", 51000)));
-        when(limiter.tryConsume("203.0.113.7")).thenReturn(true);
+        when(limiter.tryConsume("203.0.113.7")).thenReturn(RedisTokenBucketRateLimiter.Decision.ALLOWED);
         when(next.handle(request)).thenReturn(ServerResponse.ok().build());
 
         new RateLimitFilterFunction(enabledProperties(), limiter).filter(request, next);
@@ -63,12 +64,28 @@ class RateLimitFilterFunctionTest {
     void shortCircuitsToTooManyRequestsWithoutCallingNextWhenOverBudget() throws Exception {
         when(request.remoteAddress()).thenReturn(Optional.of(new InetSocketAddress("203.0.113.7", 51000)));
         when(request.path()).thenReturn("/api/v1/identity/auth/login");
-        when(limiter.tryConsume("203.0.113.7")).thenReturn(false);
+        when(limiter.tryConsume("203.0.113.7"))
+                .thenReturn(RedisTokenBucketRateLimiter.Decision.rejected(Duration.ofMillis(1500)));
 
         ServerResponse response = new RateLimitFilterFunction(enabledProperties(), limiter).filter(request, next);
 
         assertThat(response.statusCode().value()).isEqualTo(429);
         verify(next, never()).handle(request);
+    }
+
+    @Test
+    void roundsRetryAfterUpToWholeSecondsAndNeverBelowOne() throws Exception {
+        when(request.remoteAddress()).thenReturn(Optional.of(new InetSocketAddress("203.0.113.7", 51000)));
+        when(request.path()).thenReturn("/api/v1/identity/auth/login");
+        when(limiter.tryConsume("203.0.113.7"))
+                .thenReturn(RedisTokenBucketRateLimiter.Decision.rejected(Duration.ofMillis(1500)))
+                .thenReturn(RedisTokenBucketRateLimiter.Decision.rejected(Duration.ofMillis(3)));
+        RateLimitFilterFunction filter = new RateLimitFilterFunction(enabledProperties(), limiter);
+
+        assertThat(filter.filter(request, next).headers().getFirst(HttpHeaders.RETRY_AFTER))
+                .isEqualTo("2");
+        assertThat(filter.filter(request, next).headers().getFirst(HttpHeaders.RETRY_AFTER))
+                .isEqualTo("1");
     }
 
     @Test

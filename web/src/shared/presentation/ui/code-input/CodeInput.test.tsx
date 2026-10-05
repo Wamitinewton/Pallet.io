@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Field } from "../field/Field";
-import { CodeInput } from "./CodeInput";
+import { CodeInput, type CodeInputHandle } from "./CodeInput";
 
 const cell = (position: number) => screen.getByRole("textbox", { name: `Character ${String(position)} of 8` });
 
@@ -76,5 +77,24 @@ describe("CodeInput", () => {
 
         expect(cells[0]).toHaveValue("");
         expect(cells[0]).toHaveFocus();
+    });
+
+    it("clears every cell and focuses the first through its handle", async () => {
+        const user = userEvent.setup();
+        const handle = createRef<CodeInputHandle>();
+        const onValueChange = vi.fn<(value: string) => void>();
+        render(<CodeInput ref={handle} onValueChange={onValueChange} />);
+
+        await user.click(cell(1));
+        await user.paste("AB12CD34");
+        onValueChange.mockClear();
+        act(() => {
+            handle.current?.clear();
+            handle.current?.focus();
+        });
+
+        expect(screen.getAllByRole("textbox").every((input) => (input as HTMLInputElement).value === "")).toBe(true);
+        expect(cell(1)).toHaveFocus();
+        expect(onValueChange).not.toHaveBeenCalled();
     });
 });

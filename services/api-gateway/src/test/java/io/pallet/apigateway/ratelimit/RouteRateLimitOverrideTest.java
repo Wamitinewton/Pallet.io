@@ -62,7 +62,7 @@ class RouteRateLimitOverrideTest {
     @Test
     void aPathWithNoMatchingOverrideKeepsTheGlobalLimit() throws Exception {
         when(request.path()).thenReturn(BASE + "/v3/api-docs");
-        when(limiter.tryConsume(CLIENT_IP)).thenReturn(true);
+        when(limiter.tryConsume(CLIENT_IP)).thenReturn(RedisTokenBucketRateLimiter.Decision.ALLOWED);
         when(next.handle(request)).thenReturn(ServerResponse.ok().build());
 
         filterFor(route(List.of(WEBHOOK), new RateLimitOverride(WEBHOOK, RateLimitMode.DISABLED, null, null)))
@@ -74,7 +74,7 @@ class RouteRateLimitOverrideTest {
     @Test
     void aDefaultOverrideKeepsTheGlobalLimit() throws Exception {
         when(request.path()).thenReturn(WEBHOOK);
-        when(limiter.tryConsume(CLIENT_IP)).thenReturn(true);
+        when(limiter.tryConsume(CLIENT_IP)).thenReturn(RedisTokenBucketRateLimiter.Decision.ALLOWED);
         when(next.handle(request)).thenReturn(ServerResponse.ok().build());
 
         filterFor(route(List.of(), new RateLimitOverride(WEBHOOK, RateLimitMode.DEFAULT, null, null)))
@@ -87,7 +87,7 @@ class RouteRateLimitOverrideTest {
     void aCustomOverrideUsesItsOwnCapacityWindowAndKey() throws Exception {
         when(request.path()).thenReturn(WEBHOOK);
         when(limiter.tryConsume("override:" + WEBHOOK + ":" + CLIENT_IP, 500, Duration.ofSeconds(10)))
-                .thenReturn(false);
+                .thenReturn(RedisTokenBucketRateLimiter.Decision.rejected(Duration.ofSeconds(1)));
 
         ServerResponse response = filterFor(route(
                         List.of(), new RateLimitOverride(WEBHOOK, RateLimitMode.CUSTOM, 500, Duration.ofSeconds(10))))

@@ -8,12 +8,6 @@ spring:
     import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
   autoconfigure:
     exclude:
-      # spring-cloud-starter-circuitbreaker-resilience4j pulls resilience4j-spring-boot3 in
-      # transitively (for Resilience4jBulkheadProvider's registry beans). Its circuit-breaker/
-      # time-limiter/retry/rate-limiter auto-configuration would otherwise register its own
-      # CircuitBreakerRegistry/TimeLimiterRegistry/RetryRegistry beans ahead of
-      # platform-common-resilience's — silently routing every gateway route through
-      # resilience4j's library defaults instead of this route's pallet.resilience.* policy.
       - io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerAutoConfiguration
       - io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerMetricsAutoConfiguration
       - io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerStreamEventsAutoConfiguration

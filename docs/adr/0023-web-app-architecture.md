@@ -23,7 +23,7 @@ first end-to-end test of every backend contract. Four forces shape it:
 
 1. **One Next.js App Router deployable is both the dashboard and the backend-for-frontend.** Server
    Components prefetch for first paint; route handlers hold the session (encrypted in Redis, keyed by
-   an httpOnly cookie, ADR-0024) and proxy `/bff/*` to the gateway with the bearer token attached. The
+   an httpOnly cookie, ADR-0025) and proxy `/bff/*` to the gateway with the bearer token attached. The
    browser talks only to its own origin. `output: "standalone"`, strict TypeScript
    (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), React Compiler and typed routes on.
 2. **Clean architecture with feature modules that mirror the backend aggregates.** `src/modules/<name>/`
@@ -66,7 +66,7 @@ first end-to-end test of every backend contract. Four forces shape it:
   OpenAPI snapshots under `web/openapi/` must be refreshed when a service changes its API.
 - Restyling a token in `pallet.css` restyles the app, but there is no utility-class vocabulary; layout
   lives in each component's module.
-- Follow-up: ADR-0024 records the session and proxy design (checkpoint 04).
+- Follow-up: ADR-0025 records the session and proxy design (checkpoint 04).
 
 ## Alternatives considered
 

@@ -46,6 +46,23 @@ describe("parseServerEnv", () => {
         ]);
     });
 
+    it("defaults the encryption key id and reads retired keys by id", () => {
+        const retired = key(32);
+        expect(parseServerEnv({ ...valid, PALLET_SESSION_RETIRED_ENCRYPTION_KEYS: ` 0:${retired} ` })).toMatchObject({
+            PALLET_SESSION_ENCRYPTION_KEY_ID: "1",
+            PALLET_SESSION_RETIRED_ENCRYPTION_KEYS: { "0": retired },
+        });
+    });
+
+    it.each(["0", `0:${key(31)}`, `Old:${key(32)}`, `:${key(32)}`])(
+        "rejects a malformed retired key entry %#",
+        (entry) => {
+            expect(problemsOf({ ...valid, PALLET_SESSION_RETIRED_ENCRYPTION_KEYS: entry })).toEqual([
+                "PALLET_SESSION_RETIRED_ENCRYPTION_KEYS must be a comma-separated list of <id>:<32-byte base64 key>",
+            ]);
+        },
+    );
+
     it("reports every problem at once and never echoes a value", () => {
         const secret = key(16);
         const error = (() => {

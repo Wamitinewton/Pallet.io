@@ -1,6 +1,8 @@
 import { UseCasesProvider } from "@/composition/client";
+import { httpSessionGateway } from "@/modules/session/infrastructure/http-session-gateway";
 import { fixedClock, type Clock } from "@/shared/domain/clock";
 import { browserTransport } from "@/shared/infrastructure/api/browser-transport";
+import { httpFetch } from "@/shared/infrastructure/http/http-fetch";
 import { ClockProvider, QueryProvider, ThemeProvider } from "@/shared/presentation/providers";
 import { createQueryClient } from "@/shared/presentation/query";
 import { Toaster } from "@/shared/presentation/ui";
@@ -46,6 +48,7 @@ export function renderWithProviders(
     }: RenderWithProvidersOptions = {},
 ): RenderWithProvidersResult {
     const transport = browserTransport({ baseUrl: `${TEST_ORIGIN}/bff` });
+    const sessionGateway = httpSessionGateway({ fetch: httpFetch, baseUrl: `${TEST_ORIGIN}/api/session` });
 
     function Wrapper({ children }: { children: ReactNode }) {
         return (
@@ -56,7 +59,7 @@ export function renderWithProviders(
                 <ThemeProvider>
                     <QueryProvider client={queryClient}>
                         <ClockProvider clock={clock}>
-                            <UseCasesProvider transport={transport}>
+                            <UseCasesProvider transport={transport} sessionGateway={sessionGateway}>
                                 <Toaster>{children}</Toaster>
                             </UseCasesProvider>
                         </ClockProvider>

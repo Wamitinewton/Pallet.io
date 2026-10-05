@@ -7,6 +7,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 const elements = [
+    { type: "integration-test", pattern: "src/**/__int__", partialMatch: false },
     { type: "app", pattern: "src/app", partialMatch: false },
     { type: "composition", pattern: "src/composition", partialMatch: false },
     { type: "module-domain", pattern: "src/modules/*/domain", partialMatch: false, capture: ["module"] },
@@ -32,6 +33,18 @@ const own = (type) => ({ element: { type, captured: { module: "{{from.element.ca
 const moduleApi = { element: { type: "module-api" }, file: { categories: "module-entry" } };
 
 const allowed = {
+    "integration-test": [
+        any("integration-test"),
+        any("app"),
+        any("composition"),
+        moduleApi,
+        any("module-domain"),
+        any("module-application"),
+        any("module-infrastructure"),
+        any("shared-domain"),
+        any("shared-application"),
+        any("shared-infrastructure"),
+    ],
     app: [any("app"), any("composition"), moduleApi, any("shared-presentation")],
     composition: [
         any("composition"),

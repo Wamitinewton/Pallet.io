@@ -1,15 +1,17 @@
 export {
     AuthCard,
+    AuthColumn,
     AuthFoot,
     AuthForm,
     AuthHeader,
+    AuthIcon,
     AuthLayout,
     AuthMain,
     AuthSide,
     AuthSolo,
     Divider,
 } from "./auth/AuthLayout";
-export type { AuthHeaderProps } from "./auth/AuthLayout";
+export type { AuthCardProps, AuthHeaderProps, AuthIconProps, AuthIconTone } from "./auth/AuthLayout";
 export { Avatar, AvatarStack, OrgAvatar, Person } from "./avatar/Avatar";
 export type { AvatarProps, AvatarSize, PersonProps } from "./avatar/Avatar";
 export { Badge, RoleBadge, StatusDot } from "./badge/Badge";
@@ -25,7 +27,7 @@ export type { CheckboxProps } from "./checkbox/Checkbox";
 export { Choice, ChoiceGroup } from "./choice/ChoiceGroup";
 export type { ChoiceGroupProps, ChoiceProps } from "./choice/ChoiceGroup";
 export { CodeInput } from "./code-input/CodeInput";
-export type { CodeInputProps } from "./code-input/CodeInput";
+export type { CodeInputHandle, CodeInputProps } from "./code-input/CodeInput";
 export { Copyable } from "./copyable/Copyable";
 export type { CopyableProps } from "./copyable/Copyable";
 export { ConfirmDialog } from "./dialog/ConfirmDialog";
@@ -54,6 +56,8 @@ export { Panel, PanelBody, PanelFoot, PanelHead } from "./panel/Panel";
 export type { PanelHeadProps, PanelProps } from "./panel/Panel";
 export { PasswordInput, StrengthMeter } from "./password/PasswordInput";
 export type { PasswordInputProps, StrengthMeterProps } from "./password/PasswordInput";
+export { PreviewWindow } from "./preview/PreviewWindow";
+export type { PreviewWindowProps } from "./preview/PreviewWindow";
 export { Segmented, SegmentedItem } from "./segmented/Segmented";
 export type { SegmentedItemProps, SegmentedProps } from "./segmented/Segmented";
 export { Select } from "./select/Select";

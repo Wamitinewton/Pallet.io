@@ -1,0 +1,19 @@
+.preview {
+    max-width: 460px;
+}
+
+.app {
+    flex: 1;
+    min-width: 0;
+}
+
+.appIcon {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-md);
+    background: var(--blue-soft);
+    color: var(--blue-text);
+}

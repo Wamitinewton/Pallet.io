@@ -6,6 +6,10 @@ export const SESSION_EXPIRED_COPY = "Your session has ended. Sign in again to co
 export const NETWORK_COPY = "We couldn't reach Pallet. Check your connection and try again.";
 export const GENERIC_COPY = "Something went wrong on our side. Try again in a moment.";
 
+export function tooManyAttemptsCopy(seconds: number): string {
+    return `Too many attempts. Try again in ${String(seconds)} second${seconds === 1 ? "" : "s"}.`;
+}
+
 const DEFAULT_COPY: ErrorCopy = {
     TOO_MANY_REQUESTS: (error) => {
         const seconds = error.retryAfterSeconds();
