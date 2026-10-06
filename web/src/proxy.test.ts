@@ -29,7 +29,21 @@ describe("proxy route guard", () => {
         expect(response.headers.get("x-middleware-request-x-pallet-requested-path")).toBe("/orgs/o-1/apps?page=2");
     });
 
-    it("guards only the dashboard paths", () => {
-        expect(config.matcher).toEqual(["/orgs/:path*", "/account/:path*", "/notifications/:path*"]);
+    it("never echoes GitHub's code and state into the way back", () => {
+        const location = new URL(visit("/github/callback?code=c0de&state=st4te").headers.get("Location") ?? "");
+
+        expect(location.searchParams.get("next")).toBe("/github/callback");
+        expect(location.search).not.toContain("c0de");
+        expect(location.search).not.toContain("st4te");
+    });
+
+    it("hands the GitHub callback to the page without its query", () => {
+        const response = visit("/github/callback?code=c0de&state=st4te", "pallet_session=x");
+
+        expect(response.headers.get("x-middleware-request-x-pallet-requested-path")).toBe("/github/callback");
+    });
+
+    it("guards only the signed-in paths", () => {
+        expect(config.matcher).toEqual(["/orgs/:path*", "/account/:path*", "/notifications/:path*", "/github/:path*"]);
     });
 });

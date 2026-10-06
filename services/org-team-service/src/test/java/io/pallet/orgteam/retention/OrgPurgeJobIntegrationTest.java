@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 
 import io.pallet.common.events.OrgProvisioned;
+import io.pallet.common.events.Topics;
 import io.pallet.common.test.annotations.IntegrationTest;
 import io.pallet.common.test.containers.RedisTestContainerConfiguration;
 import io.pallet.orgteam.member.MembershipRepository;
@@ -51,9 +52,23 @@ class OrgPurgeJobIntegrationTest {
             jdbc.update("DELETE FROM org_team.teams WHERE org_id = ?", orgId);
             jdbc.update("DELETE FROM org_team.invites WHERE org_id = ?", orgId);
             jdbc.update("DELETE FROM org_team.memberships WHERE org_id = ?", orgId);
+            jdbc.update("DELETE FROM org_team.outbox_events WHERE org_id = ?", orgId);
             jdbc.update("DELETE FROM org_team.organizations WHERE org_id = ?", orgId);
         });
         orgIds.clear();
+    }
+
+    @Test
+    void purgingPublishesAMembershipTombstoneForEveryPurgedMembership() {
+        String orgId = seedOrg("DELETED", 31);
+
+        job.purgeExpired();
+
+        assertThat(jdbc.queryForList("""
+                        SELECT record_key FROM org_team.outbox_events
+                        WHERE org_id = ? AND event_type = ? AND tombstone AND payload IS NULL
+                        """, String.class, orgId, Topics.ORG_MEMBERSHIP_CHANGED))
+                .containsExactlyInAnyOrder(orgId + ":owner", orgId + ":dev");
     }
 
     @Test
@@ -131,6 +146,9 @@ class OrgPurgeJobIntegrationTest {
 
         assertThat(childRows(orgId)).isEqualTo(before);
         assertThat(isPurged(orgId)).isFalse();
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM org_team.outbox_events WHERE org_id = ?", Integer.class, orgId))
+                .isZero();
     }
 
     private String seedOrg(String status, int deletedDaysAgo) {

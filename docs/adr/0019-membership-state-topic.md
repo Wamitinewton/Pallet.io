@@ -37,7 +37,11 @@ appends one to its outbox in the same transaction as every membership change.
 **2. Removal is a `REMOVED` record, not a tombstone.** A tombstone disappears once compaction runs,
 after which a consumer seeding from the beginning can't tell a removed member (`403 NOT_A_MEMBER`)
 from a stranger to an org it has never heard of (`404 ORG_NOT_FOUND`). Tombstones are published only
-when `org-team-service` purges a deleted org's data, when forgetting the membership is the point.
+when `org-team-service` purges a deleted org's data, when forgetting the membership is the point,
+and when its retention sweep deletes a `REMOVED` membership row (365 days after removal). The second
+case is forced, not chosen: a membership created again after its row is gone starts at version 0, and
+a consumer still holding the old `REMOVED` record at a higher version would drop every record of it,
+locking a re-invited member out of every service that reads this topic.
 `PlatformEventPublisher.publishTombstone` refuses any topic the catalog does not mark compacted.
 
 **3. Consumers apply a record only when its version is newer.** A consumer stores the applied

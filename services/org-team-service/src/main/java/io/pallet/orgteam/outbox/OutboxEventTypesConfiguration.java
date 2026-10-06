@@ -9,6 +9,7 @@ import io.pallet.common.events.OrgInviteRejected;
 import io.pallet.common.events.OrgMemberAdded;
 import io.pallet.common.events.OrgMemberRemoved;
 import io.pallet.common.events.OrgMemberRoleChanged;
+import io.pallet.common.events.OrgMembershipChanged;
 import io.pallet.common.outbox.OutboxEventTypes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ public class OutboxEventTypesConfiguration {
                 OrgMemberAdded.class,
                 OrgMemberRemoved.class,
                 OrgMemberRoleChanged.class,
+                OrgMembershipChanged.class,
                 OrgDeleted.class,
                 OrgInviteRejected.class,
                 AppCreated.class,

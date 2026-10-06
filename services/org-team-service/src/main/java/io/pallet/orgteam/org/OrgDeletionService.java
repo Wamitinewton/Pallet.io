@@ -8,6 +8,8 @@ import io.pallet.orgteam.app.AppRepository;
 import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipRepository.MembershipRow;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
@@ -24,6 +26,7 @@ public class OrgDeletionService {
 
     private final OrganizationRepository organizations;
     private final MembershipRepository memberships;
+    private final MembershipStatePublisher membershipState;
     private final TeamMemberRepository teamMembers;
     private final InviteRepository invites;
     private final AppRepository apps;
@@ -34,6 +37,7 @@ public class OrgDeletionService {
     OrgDeletionService(
             OrganizationRepository organizations,
             MembershipRepository memberships,
+            MembershipStatePublisher membershipState,
             TeamMemberRepository teamMembers,
             InviteRepository invites,
             AppRepository apps,
@@ -42,6 +46,7 @@ public class OrgDeletionService {
             Clock clock) {
         this.organizations = organizations;
         this.memberships = memberships;
+        this.membershipState = membershipState;
         this.teamMembers = teamMembers;
         this.invites = invites;
         this.apps = apps;
@@ -68,7 +73,7 @@ public class OrgDeletionService {
 
         Instant now = clock.instant();
         org.markDeleted(actorUserId, now);
-        memberships.removeAllActive(orgId, actorUserId, now);
+        List<MembershipRow> removed = memberships.removeAllActive(orgId, actorUserId, now);
         teamMembers.deleteAllForOrg(orgId);
         invites.revokeAllPending(orgId, now);
         List<AppRef> deletedApps = apps.findActiveRefs(orgId);
@@ -77,6 +82,7 @@ public class OrgDeletionService {
 
         deletedApps.forEach(app -> outbox.append(AppDeleted.of(orgId, app.id().toString(), app.slug(), actorUserId)));
         outbox.append(OrgDeleted.of(orgId, actorUserId));
+        removed.forEach(row -> membershipState.publish(row.toState()));
         outbox.append(AuditEvents.orgDeleted(orgId, actorUserId, deletedApps.size()));
         metrics.orgDeleted();
     }

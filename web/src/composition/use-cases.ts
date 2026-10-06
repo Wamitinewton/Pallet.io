@@ -1,3 +1,11 @@
+import type { AppUseCases } from "@/modules/apps";
+import { makeAppUseCases } from "@/modules/apps/application/use-cases";
+import { httpAppRepository } from "@/modules/apps/infrastructure/http-app-repository";
+import type { GitHubUseCases } from "@/modules/github";
+import { makeGitHubUseCases } from "@/modules/github/application/use-cases";
+import { httpGitHubSessionRepository } from "@/modules/github/infrastructure/http-github-session-repository";
+import { httpInstallationRepository } from "@/modules/github/infrastructure/http-installation-repository";
+import { sessionStorageReturnIntentStore } from "@/modules/github/infrastructure/session-storage-return-intent-store";
 import type { IdentityUseCases } from "@/modules/identity";
 import { makeIdentityUseCases } from "@/modules/identity/application/use-cases";
 import { httpAccountRepository } from "@/modules/identity/infrastructure/http-account-repository";
@@ -34,6 +42,8 @@ export interface UseCases {
     readonly members: MemberUseCases;
     readonly invites: InviteUseCases;
     readonly teams: TeamUseCases;
+    readonly apps: AppUseCases;
+    readonly github: GitHubUseCases;
     readonly notifications: NotificationUseCases;
 }
 
@@ -53,6 +63,13 @@ export function makeUseCases({ clients, clock }: UseCaseDependencies): UseCases 
             clock,
         }),
         teams: makeTeamUseCases({ teams: httpTeamRepository(clients.orgTeam) }),
+        apps: makeAppUseCases({ apps: httpAppRepository(clients.orgTeam) }),
+        github: makeGitHubUseCases({
+            sessions: httpGitHubSessionRepository(clients.gitIntegration),
+            installations: httpInstallationRepository(clients.gitIntegration),
+            intents: sessionStorageReturnIntentStore(),
+            clock,
+        }),
         notifications: makeNotificationUseCases({ notifications: httpNotificationRepository(clients.notification) }),
     };
 }

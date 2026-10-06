@@ -1,5 +1,5 @@
 import { ApiError } from "@/shared/domain/errors";
-import { asTeamId, type TeamId, type UserId } from "@/shared/domain/ids";
+import { asTeamId, isUuid, type TeamId, type UserId } from "@/shared/domain/ids";
 import type { IsoInstant } from "@/shared/domain/instant";
 import type { Role } from "@/shared/domain/role";
 import { optionalSlugSchema } from "@/shared/domain/slug";
@@ -67,11 +67,9 @@ export function withMemberCountChange(team: Team, change: number): Team {
     return { ...team, memberCount: Math.max(0, team.memberCount + change) };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** The `[teamId]` route segment; anything but a UUID can't name a team, so it never reaches the backend. */
 export function teamIdFromParam(value: string): TeamId | undefined {
-    return UUID.test(value) ? asTeamId(value) : undefined;
+    return isUuid(value) ? asTeamId(value) : undefined;
 }
 
 /** The team is gone, or never existed: the page draws its not-found state for either. */

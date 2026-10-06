@@ -82,3 +82,20 @@ export function teamDto(overrides: Partial<TeamDto> = {}): TeamDto {
         ...overrides,
     };
 }
+
+/** `teamId` is null, not absent, for an app without a team. */
+export type AppDto = Omit<Required<Schemas["AppDto"]>, "teamId"> & { teamId: string | null };
+
+export function appDto(overrides: Partial<AppDto> = {}): AppDto {
+    return {
+        id: "6f1c2a9e-4b7d-4e21-9a0c-3d5b8e7f1a24",
+        name: "Checkout API",
+        slug: "checkout-api",
+        cloudProvider: "AWS",
+        region: "af-south-1",
+        teamId: "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b",
+        createdAt: "2026-01-09T09:00:00Z",
+        updatedAt: "2026-01-12T09:00:00Z",
+        ...overrides,
+    };
+}

@@ -767,12 +767,19 @@
       "UpdateAppRequest": {
         "properties": {
           "name": {
+            "description": "New display name",
+            "example": "Storefront API",
+            "maxLength": 100,
             "type": "string",
             "writeOnly": true
           },
           "teamId": {
+            "description": "New owning team; send null to detach the app from its team",
             "format": "uuid",
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "writeOnly": true
           }
         },
@@ -1486,7 +1493,7 @@
     },
     "/api/v1/org-team/orgs/{orgId}/apps": {
       "get": {
-        "description": "Optionally filtered by team or cloud provider. Requires any active member of the organization, judged from your current membership, not your token's roles.",
+        "description": "Optionally filtered by team (or by having no team), cloud provider, and a search on name or slug. Requires any active member of the organization, judged from your current membership, not your token's roles.",
         "operationId": "list_2",
         "parameters": [
           {
@@ -1498,23 +1505,49 @@
             }
           },
           {
+            "description": "Only apps owned by this team",
             "in": "query",
             "name": "teamId",
             "required": false,
             "schema": {
+              "description": "Only apps owned by this team",
               "format": "uuid",
               "type": "string"
             }
           },
           {
+            "description": "Only apps with no owning team; cannot be combined with teamId",
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "description": "Only apps with no owning team; cannot be combined with teamId",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only apps running on this cloud provider",
             "in": "query",
             "name": "cloudProvider",
             "required": false,
             "schema": {
+              "description": "Only apps running on this cloud provider",
               "enum": [
                 "AWS",
                 "GCP"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Case-insensitive match anywhere in the app's name or slug",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "description": "Case-insensitive match anywhere in the app's name or slug",
+              "maxLength": 100,
+              "minLength": 0,
               "type": "string"
             }
           },

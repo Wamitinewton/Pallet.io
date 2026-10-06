@@ -56,7 +56,13 @@ export function createQueryClient(): QueryClient {
                 retry: false,
             },
             dehydrate: {
-                shouldDehydrateQuery: (query) => defaultShouldDehydrateQuery(query) || query.state.status === "pending",
+                /*
+                 * Settled queries only. A layout and its page share one request-scoped client and render in
+                 * parallel, so a pending query in the layout's snapshot is usually the page's own prefetch: the
+                 * server render would show its loading state while the client, once the promise streams in,
+                 * hydrates with the data.
+                 */
+                shouldDehydrateQuery: defaultShouldDehydrateQuery,
                 shouldRedactErrors: () => false,
             },
         },

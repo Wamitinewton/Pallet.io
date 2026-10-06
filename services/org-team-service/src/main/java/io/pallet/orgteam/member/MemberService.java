@@ -32,6 +32,7 @@ public class MemberService {
     private final OrgGuard guard;
     private final MembershipRepository memberships;
     private final MembershipPolicy policy;
+    private final MembershipStatePublisher membershipState;
     private final OutboxWriter outbox;
     private final OrgTeamMetrics metrics;
     private final Clock clock;
@@ -40,12 +41,14 @@ public class MemberService {
             OrgGuard guard,
             MembershipRepository memberships,
             MembershipPolicy policy,
+            MembershipStatePublisher membershipState,
             OutboxWriter outbox,
             OrgTeamMetrics metrics,
             Clock clock) {
         this.guard = guard;
         this.memberships = memberships;
         this.policy = policy;
+        this.membershipState = membershipState;
         this.outbox = outbox;
         this.metrics = metrics;
         this.clock = clock;
@@ -84,6 +87,7 @@ public class MemberService {
 
         outbox.append(
                 OrgMemberRoleChanged.of(orgId, targetUserId, previousRole.keycloakName(), newRole.keycloakName()));
+        membershipState.publish(target);
         outbox.append(AuditEvents.memberRoleChanged(
                 orgId, actorUserId, targetUserId, previousRole.keycloakName(), newRole.keycloakName()));
         metrics.memberRoleChanged();
@@ -102,6 +106,7 @@ public class MemberService {
         memberships.deleteTeamAssignments(orgId, targetUserId);
 
         outbox.append(OrgMemberRemoved.of(orgId, targetUserId, target.getEmail()));
+        membershipState.publish(target);
         outbox.append(AuditEvents.memberRemoved(orgId, actorUserId, targetUserId));
         metrics.memberRemoved();
     }
@@ -127,6 +132,8 @@ public class MemberService {
                 orgId, targetUserId, targetPreviousRole.keycloakName(), Role.OWNER.keycloakName()));
         outbox.append(
                 OrgMemberRoleChanged.of(orgId, actorUserId, Role.OWNER.keycloakName(), Role.ADMIN.keycloakName()));
+        membershipState.publish(target);
+        membershipState.publish(actor);
         outbox.append(AuditEvents.ownershipTransferred(orgId, actorUserId, targetUserId));
         metrics.memberRoleChanged();
         metrics.memberRoleChanged();

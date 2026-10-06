@@ -1,4 +1,5 @@
 import { getServerUseCases, rethrowServerFailure } from "@/composition/server";
+import { appQueries, TeamAppsPanel, teamAppsQuery } from "@/modules/apps";
 import { organizationQueries, orgIdFromParam } from "@/modules/organizations";
 import {
     isTeamUnavailable,
@@ -21,7 +22,7 @@ function settleTeamFailure(error: unknown): Promise<never> {
     return rethrowServerFailure(error);
 }
 
-/** The people list draws its own error state, so a failed prefetch only costs a client fetch. */
+/** The people and apps lists draw their own error states, so a failed prefetch only costs a client fetch. */
 const ignore = () => undefined;
 
 export async function generateMetadata({ params }: TeamPageProps): Promise<Metadata> {
@@ -40,7 +41,7 @@ export default async function TeamPage({ params, searchParams }: TeamPageProps) 
     const teamId = teamIdFromParam(teamParam);
     if (teamId === undefined) notFound();
 
-    const { organizations, teams } = getServerUseCases();
+    const { organizations, teams, apps } = getServerUseCases();
     const queryClient = getServerQueryClient();
 
     const [organization, memberParams] = await Promise.all([
@@ -52,11 +53,17 @@ export default async function TeamPage({ params, searchParams }: TeamPageProps) 
         queryClient
             .query(teamQueries.members(teams.listTeamMembers, orgId, teamId, teamMemberListQuery(memberParams.page)))
             .catch(ignore),
+        queryClient.query(appQueries.list(apps.listApps, orgId, teamAppsQuery(teamId))).catch(ignore),
     ]);
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>
-            <TeamView orgId={orgId} orgName={organization.name} teamId={teamId} />
+            <TeamView
+                orgId={orgId}
+                orgName={organization.name}
+                teamId={teamId}
+                apps={<TeamAppsPanel orgId={orgId} teamId={teamId} />}
+            />
         </HydrationBoundary>
     );
 }

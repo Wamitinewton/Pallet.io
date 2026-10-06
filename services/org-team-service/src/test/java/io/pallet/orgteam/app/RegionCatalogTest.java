@@ -13,7 +13,7 @@ class RegionCatalogTest {
 
     private static RegionCatalog catalog(List<String> aws, List<String> gcp) {
         OrgTeamProperties.Apps apps = new OrgTeamProperties.Apps(new OrgTeamProperties.Apps.Regions(aws, gcp));
-        return new RegionCatalog(new OrgTeamProperties(null, null, apps, null, null));
+        return new RegionCatalog(new OrgTeamProperties(null, null, apps, null, null, null));
     }
 
     @Test

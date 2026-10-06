@@ -58,6 +58,7 @@ class MemberServiceTest {
 
     private final OrganizationRepository organizations = mock(OrganizationRepository.class);
     private final MembershipRepository memberships = mock(MembershipRepository.class);
+    private final MembershipStatePublisher membershipState = mock(MembershipStatePublisher.class);
     private final OutboxWriter outbox = mock(OutboxWriter.class);
 
     private Organization organization;
@@ -71,6 +72,7 @@ class MemberServiceTest {
                 new OrgGuard(organizations, memberships),
                 memberships,
                 new MembershipPolicy(),
+                membershipState,
                 outbox,
                 new OrgTeamMetrics(new SimpleMeterRegistry()),
                 Clock.fixed(NOW, ZoneOffset.UTC));

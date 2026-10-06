@@ -119,12 +119,10 @@ public class AppService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<AppDto> list(String orgId, UUID teamId, CloudProvider cloudProvider, PageQuery pageQuery) {
+    public PageResponse<AppDto> list(String orgId, AppFilter filter, PageQuery pageQuery) {
         return PageResponse.of(
-                apps.search(
-                        orgId,
-                        teamId,
-                        cloudProvider,
+                apps.findAll(
+                        filter.toSpecification(orgId),
                         PageSorting.resolve(
                                 pageQuery, DEFAULT_SORT, Sort.Order.asc(TIEBREAKER), AppService::whitelisted)),
                 AppDto::of);

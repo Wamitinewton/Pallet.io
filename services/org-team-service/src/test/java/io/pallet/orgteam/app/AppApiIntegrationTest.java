@@ -3,6 +3,7 @@ package io.pallet.orgteam.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -382,6 +383,43 @@ class AppApiIntegrationTest extends TeamIntegrationSupport {
                 .andExpect(jsonPath("$.error").value("INVALID_SORT"));
         perform(get(APPS, org.orgId()).param("cloudProvider", "AZURE"), org.orgId(), viewer)
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listSearchesNameAndSlugAndFiltersAppsWithoutATeam() throws Exception {
+        TestOrg org = newTeamOrg();
+        UUID team = seedTeam(org.orgId(), "platform");
+        seedApp(org.orgId(), "storefront-api", team);
+        seedApp(org.orgId(), "billing-api", null);
+        seedApp(org.orgId(), "docs", null);
+        seedApp(org.orgId(), "promo_100", null);
+        seedApp(org.orgId(), "promo-1000", null);
+        jdbc.update(
+                "UPDATE org_team.apps SET name = 'Customer Portal' WHERE org_id = ? AND slug = 'docs'", org.orgId());
+        String viewer = fixtures.newMember(org.orgId(), "VIEWER", "ACTIVE");
+
+        perform(get(APPS, org.orgId()).param("q", "API").param("sort", "name"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.content[*].slug", contains("billing-api", "storefront-api")));
+        perform(get(APPS, org.orgId()).param("q", "portal"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.content[*].slug", contains("docs")));
+        perform(get(APPS, org.orgId()).param("q", "_1"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.content[*].slug", contains("promo_100")));
+        perform(get(APPS, org.orgId()).param("q", "%"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        perform(get(APPS, org.orgId()).param("unassigned", "true"), org.orgId(), viewer)
+                .andExpect(jsonPath(
+                        "$.data.content[*].slug",
+                        containsInAnyOrder("billing-api", "docs", "promo-1000", "promo_100")));
+        perform(get(APPS, org.orgId()).param("unassigned", "true").param("q", "api"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.content[*].slug", contains("billing-api")));
+        perform(get(APPS, org.orgId()).param("unassigned", "false"), org.orgId(), viewer)
+                .andExpect(jsonPath("$.data.totalElements").value(5));
+        perform(
+                        get(APPS, org.orgId()).param("unassigned", "true").param("teamId", team.toString()),
+                        org.orgId(),
+                        viewer)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
     }
 
     @Test

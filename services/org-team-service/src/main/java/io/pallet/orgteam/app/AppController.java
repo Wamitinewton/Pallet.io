@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -68,13 +67,13 @@ class AppController {
     @PreAuthorize("@access.atLeast(#orgId, 'VIEWER')")
     @Operation(
             summary = "List apps",
-            description = "Optionally filtered by team or cloud provider. " + ApiDocs.ANY_MEMBER)
+            description = "Optionally filtered by team (or by having no team), cloud provider, and a search on name or "
+                    + "slug. " + ApiDocs.ANY_MEMBER)
     ApiResponse<PageResponse<AppDto>> list(
             @PathVariable String orgId,
-            @RequestParam(required = false) UUID teamId,
-            @RequestParam(required = false) CloudProvider cloudProvider,
+            @ParameterObject @Valid @ModelAttribute AppFilter filter,
             @ParameterObject @ModelAttribute PageQuery pageQuery) {
-        return ApiResponse.ok("Apps retrieved", appService.list(orgId, teamId, cloudProvider, pageQuery));
+        return ApiResponse.ok("Apps retrieved", appService.list(orgId, filter, pageQuery));
     }
 
     @GetMapping("/{appId}")

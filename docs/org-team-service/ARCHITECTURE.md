@@ -476,6 +476,7 @@ published inline from a request thread.
 | `OrgMemberRemoved` | `org.member.removed` | Member removed or left | `orgId, userId, email` | identity-service (disable account), notification-service |
 | `OrgMemberRoleChanged` | `org.member.role.changed` | Role change; both halves of an ownership transfer | `orgId, userId, previousRole, newRole` (lowercase Keycloak names) | identity-service |
 | `OrgDeleted` | `org.deleted` | Org deleted | `orgId, deletedByUserId` | identity-service, notification-service |
+| `OrgMembershipChanged` | `org.membership.changed` (compacted, ADR-0019) | Every membership write: owner provisioned or team org created, invite accepted, role change, removal or leave, both halves of an ownership transfer (promote first), one `REMOVED` per active member on org deletion; a tombstone per membership row this service deletes (org purge, `REMOVED`-membership retention) | `orgId, userId, role` (lowercase), `status` (`ACTIVE`\|`REMOVED`), `membershipVersion` (the row's `version` after the write's flush), keyed `orgId:userId` | git-integration-service and every later tenant-scoped service's membership read model |
 | `OrgInviteRejected` | `org.invite.rejected` | Accept event for an invite that can no longer be honoured | `orgId, inviteId, userId, email, reason` (`REVOKED`\|`EXPIRED`\|`UNKNOWN_INVITE`\|`ORG_DELETED`) | identity-service (disable the account created for it) |
 | `AppCreated` | `app.created` | App created | `orgId, appId, slug, teamId, cloudProvider, region, createdByUserId` | none yet (reserved) |
 | `AppDeleted` | `app.deleted` | App deleted, or org deleted | `orgId, appId, slug, deletedByUserId` | none yet (reserved) |
@@ -491,7 +492,10 @@ topic: the only consumer of "someone was invited" is "send them an email", which
 already carries.
 
 **Ordering.** The producer keys every record by `orgId` (`PlatformEventPublisher` does), so all
-events for one org are totally ordered within a partition. The relay preserves the outbox's
+events for one org are totally ordered within a partition. The one exception is
+`org.membership.changed`, keyed `orgId:userId` so compaction keeps one record per membership: it is
+ordered per membership, and consumers apply a record only when its `membershipVersion` is higher than
+the one they hold. The relay preserves the outbox's
 insertion order per org. Ordering across topics is **not** guaranteed and no consumer may depend on
 it; where a dependency exists (profile update before accept) the consumer retries instead
 ([Consistency](#consistency-and-failure-modes)).
@@ -572,7 +576,7 @@ Conventions:
 | Method | Path | Requires | Notes |
 |---|---|---|---|
 | `POST` | `/orgs/{orgId}/apps` | DEVELOPER+ | `{name, slug?, cloudProvider, region, teamId?}`. `region` must be on the configured allow-list for the provider. Set once, never changed. Emits `AppCreated`. |
-| `GET` | `/orgs/{orgId}/apps` | any member | Filter `teamId`, `cloudProvider`. |
+| `GET` | `/orgs/{orgId}/apps` | any member | Filter `teamId` or `unassigned=true` (not both: `400`), `cloudProvider`; `q` matches anywhere in name or slug, case-insensitively. |
 | `GET` | `/orgs/{orgId}/apps/{appId}` | any member | |
 | `PATCH` | `/orgs/{orgId}/apps/{appId}` | DEVELOPER+ | `name`, `teamId` only. The request DTO has no provider/region field. |
 | `DELETE` | `/orgs/{orgId}/apps/{appId}` | ADMIN+ | Soft delete; emits `AppDeleted`. `204`. |
@@ -794,7 +798,11 @@ reliably causes it to be *disabled*.
 One transaction, org row locked: `organizations.status = DELETED` (`deleted_at`, `deleted_by`);
 every `ACTIVE` membership → `REMOVED`; every `PENDING` invite → `REVOKED`; every `team_members`
 row deleted; every `ACTIVE` app → `DELETED`. Outbox: one `AppDeleted` per app (bounded by the
-per-org app quota), then `OrgDeleted` last, plus audit. No per-member `OrgMemberRemoved`:
+per-org app quota), then `OrgDeleted`, then one `OrgMembershipChanged` `REMOVED` record per member that
+was `ACTIVE` (bounded by the org's member count, so a large org's deletion appends that many outbox
+rows in one transaction), plus audit. The bulk update bumps each row's `version` itself, since a
+bulk update bypasses JPA's `@Version` and a `REMOVED` record at the member's last `ACTIVE` version
+would be dropped by every consumer. No per-member `OrgMemberRemoved`:
 `identity-service` disables every account under the org from `OrgDeleted` alone, and fanning out N
 member events would only be noise. After commit, every path under the org is `404`. A retention job
 later purges the PII (see [Retention](#retention-and-purge)).
@@ -979,6 +987,12 @@ verify identity has applied a removal; rotate the invite signing key.
 | `REMOVED` memberships | 365 days (kept that long so "previously removed" stays detectable) | sweep |
 | Deleted org's memberships/invites/teams/apps | 30 days after `deleted_at` | purge job hard-deletes the rows, keeps the tombstone (`org_id`, `slug`, `status`, `purged_at`) so the slug stays reserved |
 
+Both deletes of a membership row append an `org.membership.changed` tombstone for it in the same
+transaction. For the purge that is ADR-0019's case: the org no longer exists anywhere. For the
+`REMOVED`-membership sweep it keeps re-invites working: a membership created again after its row was
+swept starts at `version` 0, and a consumer still holding the old `REMOVED` record at a higher
+version would drop every record of the new one.
+
 All windows are `pallet.orgteam.retention.*`. Sweeps are batched and idempotent, run under the same
 advisory-lock discipline so multiple replicas do not duplicate work, and report their deletes as
 metrics. Audit history is `audit-log-service`'s concern, not this service's tables.
@@ -1108,6 +1122,7 @@ external call appears.
 | `pallet.outbox.poll-interval` / `batch-size` / `max-attempts` / `retention` | `PT0.25S` / `100` / `10` / `P7D` | Relay. |
 | `pallet.inbox.retention` | `P14D` | Inbox sweep. |
 | `pallet.orgteam.retention.*` | see [Retention](#retention-and-purge) | Sweeps. |
+| `pallet.orgteam.membership-backfill.batch-size` | `500` | The membership backfill, which runs on every start and does nothing once `membership_backfill_cursor` is complete; advisory-lock key `7305121507`. See RUNBOOK §8. |
 | `spring.datasource.*`, `spring.kafka.*`, `spring.data.redis.*` | env-backed | Infrastructure. |
 
 ## Extension points

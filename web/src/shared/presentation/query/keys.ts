@@ -13,4 +13,6 @@ export const queryScopes = {
     members: (orgId: OrgId) => [...queryScopes.org(orgId), "members"] as const,
     teams: (orgId: OrgId) => [...queryScopes.org(orgId), "teams"] as const,
     apps: (orgId: OrgId) => [...queryScopes.org(orgId), "apps"] as const,
+    /** The organization's GitHub installations, which repository links are made through. */
+    github: (orgId: OrgId) => [...queryScopes.org(orgId), "github"] as const,
 };

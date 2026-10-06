@@ -31,6 +31,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0023](0023-web-app-architecture.md) | Web app: one Next.js deployable as dashboard and BFF, clean architecture enforced by lint, TanStack Query as the only server-state cache | accepted |
 | [0024](0024-edge-rate-limiting-token-bucket.md) | Edge rate limiting as a Redis token bucket: Redis-clock refill, atomic Lua script, `Retry-After` on every 429 | accepted |
 | [0025](0025-web-bff-session.md) | Web BFF session: tokens in encrypted Redis behind an opaque httpOnly cookie, single-flight refresh, `/bff` allow-list proxy with origin-checked writes | accepted |
+| [0026](0026-tenant-runtime-sandboxed-kubernetes-firecracker-deferred.md) | Tenant runtime: sandboxed `RuntimeClass` (gVisor default, Kata + Firecracker tier) behind a `WorkloadRuntime` port, self-managed Firecracker runtime deferred | proposed |
 
 ## Still open (from `PROJECT.md`)
 

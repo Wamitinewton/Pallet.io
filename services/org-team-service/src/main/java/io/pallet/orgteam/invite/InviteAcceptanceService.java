@@ -10,6 +10,7 @@ import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.observability.MetricsCatalog;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
@@ -37,6 +38,7 @@ public class InviteAcceptanceService {
 
     private final OrganizationRepository organizations;
     private final MembershipRepository memberships;
+    private final MembershipStatePublisher membershipState;
     private final InviteRepository invites;
     private final OutboxWriter outbox;
     private final OrgTeamMetrics metrics;
@@ -46,6 +48,7 @@ public class InviteAcceptanceService {
     InviteAcceptanceService(
             OrganizationRepository organizations,
             MembershipRepository memberships,
+            MembershipStatePublisher membershipState,
             InviteRepository invites,
             OutboxWriter outbox,
             OrgTeamMetrics metrics,
@@ -53,6 +56,7 @@ public class InviteAcceptanceService {
             Clock clock) {
         this.organizations = organizations;
         this.memberships = memberships;
+        this.membershipState = membershipState;
         this.invites = invites;
         this.outbox = outbox;
         this.metrics = metrics;
@@ -125,6 +129,7 @@ public class InviteAcceptanceService {
 
         String role = invite.getRole().keycloakName();
         outbox.append(OrgMemberAdded.of(orgId, event.userId(), invite.getEmail()));
+        membershipState.publish(member);
         outbox.append(AuditEvents.inviteAccepted(orgId, event.userId(), inviteId.toString(), role));
         outbox.append(AuditEvents.memberAdded(orgId, event.userId(), role));
         metrics.inviteAccepted();

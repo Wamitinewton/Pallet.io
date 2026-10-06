@@ -19,3 +19,10 @@ export const asInviteId = (value: string) => value as InviteId;
 export const asInstallationId = (value: number) => value as InstallationId;
 export const asRepoId = (value: number) => value as RepoId;
 export const asDeliveryId = (value: string) => value as DeliveryId;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** For an id read from a URL, which only reaches the backend when it could name something. */
+export function isUuid(value: string): boolean {
+    return UUID.test(value);
+}

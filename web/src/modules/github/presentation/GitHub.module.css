@@ -1,0 +1,69 @@
+.panel {
+    overflow: hidden;
+}
+
+.avatar {
+    flex: none;
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+}
+
+.mark {
+    display: grid;
+    place-items: center;
+    flex: none;
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--bg);
+}
+
+.mark svg {
+    width: 60%;
+    height: 60%;
+}
+
+.login {
+    font-family: var(--font-mono);
+}
+
+.linkedBy {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sessionRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.steps {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding-left: 20px;
+}
+
+.choiceTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.choiceBadge {
+    margin-left: auto;
+}
+
+.skeletonAccount {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.callbackActions {
+    display: grid;
+    gap: 10px;
+}

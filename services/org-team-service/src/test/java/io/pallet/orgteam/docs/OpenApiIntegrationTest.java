@@ -220,6 +220,27 @@ class OpenApiIntegrationTest {
     }
 
     @Test
+    void updateAppRequestDocumentsNullTeamIdAndTheNameLimit() {
+        JsonNode properties = spec.at("/components/schemas/UpdateAppRequest/properties");
+        List<String> teamIdTypes = new ArrayList<>();
+        properties.at("/teamId/type").forEach(type -> teamIdTypes.add(type.asString()));
+
+        assertThat(teamIdTypes).containsExactlyInAnyOrder("string", "null");
+        assertThat(properties.at("/name/maxLength").asInt()).isEqualTo(100);
+    }
+
+    @Test
+    void theAppListDocumentsItsFilters() {
+        List<String> names = new ArrayList<>();
+        operations()
+                .get("GET " + BASE + "/orgs/{orgId}/apps")
+                .path("parameters")
+                .forEach(parameter -> names.add(parameter.path("name").asString()));
+
+        assertThat(names).contains("teamId", "unassigned", "cloudProvider", "q");
+    }
+
+    @Test
     void deletingAnOrgDocumentsTheConfirmationHeaderAndTheReauthenticationError() {
         JsonNode delete = operations().get("DELETE " + BASE + "/orgs/{orgId}");
 

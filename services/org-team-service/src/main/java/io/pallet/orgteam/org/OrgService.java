@@ -12,6 +12,7 @@ import io.pallet.orgteam.config.ConstraintViolations;
 import io.pallet.orgteam.member.MemberExceptions.InvalidSortException;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.MetricsCatalog;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
@@ -49,6 +50,7 @@ public class OrgService {
 
     private final OrganizationRepository organizations;
     private final MembershipRepository memberships;
+    private final MembershipStatePublisher membershipState;
     private final OrgCountsRepository counts;
     private final OutboxWriter outbox;
     private final OrgTeamMetrics metrics;
@@ -57,12 +59,14 @@ public class OrgService {
     OrgService(
             OrganizationRepository organizations,
             MembershipRepository memberships,
+            MembershipStatePublisher membershipState,
             OrgCountsRepository counts,
             OutboxWriter outbox,
             OrgTeamMetrics metrics,
             Clock clock) {
         this.organizations = organizations;
         this.memberships = memberships;
+        this.membershipState = membershipState;
         this.counts = counts;
         this.outbox = outbox;
         this.metrics = metrics;
@@ -101,9 +105,10 @@ public class OrgService {
                 Role.OWNER,
                 now);
         owner.markProfileSynced(event.occurredAt());
-        memberships.save(owner);
+        memberships.saveAndFlush(owner);
 
         outbox.append(OrgMemberAdded.of(event.orgId(), event.ownerUserId(), email));
+        membershipState.publish(owner);
         outbox.append(AuditEvents.orgCreated(event.orgId(), event.ownerUserId()));
         metrics.memberAdded();
         metrics.eventProcessed(MetricsCatalog.LISTENER_ORG_PROVISIONED);
@@ -128,9 +133,10 @@ public class OrgService {
         Membership owner =
                 new Membership(orgId, caller.userId(), email, ownerDisplayName(caller, email), Role.OWNER, now);
         owner.markProfileSynced(now);
-        memberships.save(owner);
+        memberships.saveAndFlush(owner);
 
         outbox.append(OrgMemberAdded.of(orgId, caller.userId(), email));
+        membershipState.publish(owner);
         outbox.append(AuditEvents.orgCreated(orgId, caller.userId()));
         metrics.memberAdded();
         return OrgDto.of(org, new OrgDto.Counts(1, 0, 0));

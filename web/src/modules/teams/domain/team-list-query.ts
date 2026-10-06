@@ -82,3 +82,9 @@ export function teamMemberListQuery(page: number): TeamMemberListQuery {
  * by the backend's `ALREADY_IN_TEAM` instead.
  */
 export const TEAM_ROSTER_QUERY: TeamMemberListQuery = { page: 0, size: TEAM_ROSTER_SIZE };
+
+/** The backend's largest page, which is also the most teams an organization may have. */
+export const TEAM_DIRECTORY_SIZE = 100;
+
+/** Every team, by name, in one request: enough for a filter or a select to offer them all. */
+export const TEAM_DIRECTORY_QUERY: TeamListQuery = { sort: DEFAULT_TEAM_SORT, page: 0, size: TEAM_DIRECTORY_SIZE };

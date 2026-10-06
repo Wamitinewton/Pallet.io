@@ -20,6 +20,7 @@ import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
@@ -56,6 +57,7 @@ class InviteAcceptanceServiceTest {
 
     private final OrganizationRepository organizations = mock(OrganizationRepository.class);
     private final MembershipRepository memberships = mock(MembershipRepository.class);
+    private final MembershipStatePublisher membershipState = mock(MembershipStatePublisher.class);
     private final InviteRepository invites = mock(InviteRepository.class);
     private final OutboxWriter outbox = mock(OutboxWriter.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -71,6 +73,7 @@ class InviteAcceptanceServiceTest {
         service = new InviteAcceptanceService(
                 organizations,
                 memberships,
+                membershipState,
                 invites,
                 outbox,
                 new OrgTeamMetrics(meters),

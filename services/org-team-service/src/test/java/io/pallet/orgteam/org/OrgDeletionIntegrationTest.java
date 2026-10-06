@@ -179,7 +179,15 @@ class OrgDeletionIntegrationTest {
                 .isEqualTo(2);
 
         assertThat(outboxTypes(seed.orgId()))
-                .containsExactly("app.deleted", "app.deleted", "org.deleted", "audit.event.recorded");
+                .containsExactly(
+                        "app.deleted",
+                        "app.deleted",
+                        "org.deleted",
+                        "org.membership.changed",
+                        "org.membership.changed",
+                        "org.membership.changed",
+                        "org.membership.changed",
+                        "audit.event.recorded");
         assertThat(jdbc.queryForObject("""
                         SELECT payload->>'deletedByUserId' FROM org_team.outbox_events
                         WHERE org_id = ? AND event_type = 'org.deleted'

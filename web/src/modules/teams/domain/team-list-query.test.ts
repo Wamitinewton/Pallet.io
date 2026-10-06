@@ -3,6 +3,7 @@ import {
     DEFAULT_TEAM_SORT,
     formatTeamSort,
     parseTeamSort,
+    TEAM_DIRECTORY_QUERY,
     TEAM_MEMBER_PAGE_SIZE,
     TEAM_PAGE_SIZE,
     teamListQuery,
@@ -52,5 +53,15 @@ describe("teamMemberListQuery", () => {
     it("asks for one page of people", () => {
         expect(teamMemberListQuery(2)).toEqual({ page: 1, size: TEAM_MEMBER_PAGE_SIZE });
         expect(teamMemberListQuery(-1)).toEqual({ page: 0, size: TEAM_MEMBER_PAGE_SIZE });
+    });
+});
+
+describe("TEAM_DIRECTORY_QUERY", () => {
+    it("asks for every team, by name, in the backend's largest page", () => {
+        expect(toPageRequest(TEAM_DIRECTORY_QUERY)).toEqual({
+            page: 0,
+            size: 100,
+            sort: [{ field: "name", direction: "asc" }],
+        });
     });
 });

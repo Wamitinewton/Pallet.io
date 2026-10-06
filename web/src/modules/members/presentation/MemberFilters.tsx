@@ -2,20 +2,17 @@
 
 import { isRole, ROLES } from "@/shared/domain/role";
 import { ROLE_LABEL } from "@/shared/presentation/roles";
-import { Icon, Input, InputGroup, Segmented, SegmentedItem, Select } from "@/shared/presentation/ui";
-import { useEffect, useRef, useState } from "react";
+import { SearchField, Segmented, SegmentedItem, Select } from "@/shared/presentation/ui";
 import { MEMBER_STATUSES } from "../domain/member";
 import {
     formatMemberSort,
     MAX_MEMBER_SEARCH_LENGTH,
-    normalizeMemberSearch,
     parseMemberSort,
     type MemberFilterChange,
     type MemberListParams,
 } from "../domain/member-list-query";
 import { ALL_ROLES_COPY, SEARCH_LABEL_COPY, SEARCH_PLACEHOLDER_COPY, SORT_LABEL, STATUS_LABEL } from "./member-copy";
 import styles from "./MembersView.module.css";
-import { SEARCH_DEBOUNCE_MS } from "./search-params";
 
 const SORT_OPTIONS = Object.entries(SORT_LABEL);
 
@@ -29,6 +26,10 @@ export function MemberFilters({ params, canViewRemoved, onChange }: MemberFilter
     return (
         <div className={styles.filters} role="search" aria-label="Filter members">
             <SearchField
+                className={styles.search}
+                label={SEARCH_LABEL_COPY}
+                placeholder={SEARCH_PLACEHOLDER_COPY}
+                maxLength={MAX_MEMBER_SEARCH_LENGTH}
                 value={params.q}
                 onSearch={(q) => {
                     onChange({ q });
@@ -83,62 +84,5 @@ export function MemberFilters({ params, canViewRemoved, onChange }: MemberFilter
                 )}
             </div>
         </div>
-    );
-}
-
-interface SearchFieldProps {
-    readonly value: string;
-    readonly onSearch: (q: string) => void;
-}
-
-/**
- * Sends the search once typing pauses. Follows the URL when it changes from elsewhere, such as the back
- * button or clearing the filters, and drops a pending search that the change made stale.
- */
-function SearchField({ value, onSearch }: SearchFieldProps) {
-    const [draft, setDraft] = useState(value);
-    const [followed, setFollowed] = useState(value);
-    const latestDraft = useRef(draft);
-    const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    if (value !== followed) {
-        setFollowed(value);
-        if (value !== normalizeMemberSearch(draft)) setDraft(value);
-    }
-
-    useEffect(() => {
-        latestDraft.current = draft;
-    }, [draft]);
-
-    useEffect(
-        () => () => {
-            clearTimeout(pending.current);
-        },
-        [],
-    );
-
-    return (
-        <InputGroup addon={<Icon name="search" />} className={styles.search}>
-            <Input
-                type="search"
-                aria-label={SEARCH_LABEL_COPY}
-                placeholder={SEARCH_PLACEHOLDER_COPY}
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={MAX_MEMBER_SEARCH_LENGTH}
-                value={draft}
-                onChange={(event) => {
-                    const next = event.currentTarget.value;
-                    setDraft(next);
-                    latestDraft.current = next;
-                    clearTimeout(pending.current);
-                    pending.current = setTimeout(() => {
-                        if (latestDraft.current !== next) return;
-                        const q = normalizeMemberSearch(next);
-                        if (q !== value) onSearch(q);
-                    }, SEARCH_DEBOUNCE_MS);
-                }}
-            />
-        </InputGroup>
     );
 }

@@ -22,6 +22,7 @@ import io.pallet.orgteam.app.AppRepository;
 import io.pallet.orgteam.audit.AuditEvents;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import io.pallet.orgteam.org.OrgExceptions.PersonalOrgImmutableException;
 import io.pallet.orgteam.security.AccessExceptions.InsufficientRoleException;
@@ -46,6 +47,7 @@ class OrgDeletionServiceTest {
 
     private final OrganizationRepository organizations = mock(OrganizationRepository.class);
     private final MembershipRepository memberships = mock(MembershipRepository.class);
+    private final MembershipStatePublisher membershipState = mock(MembershipStatePublisher.class);
     private final TeamMemberRepository teamMembers = mock(TeamMemberRepository.class);
     private final InviteRepository invites = mock(InviteRepository.class);
     private final AppRepository apps = mock(AppRepository.class);
@@ -62,6 +64,7 @@ class OrgDeletionServiceTest {
         service = new OrgDeletionService(
                 organizations,
                 memberships,
+                membershipState,
                 teamMembers,
                 invites,
                 apps,
