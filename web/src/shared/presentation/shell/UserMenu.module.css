@@ -1,0 +1,22 @@
+.trigger {
+    padding: 0 4px;
+}
+
+.who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px 10px;
+}
+
+.name {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.email {
+    color: var(--muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}

@@ -19,6 +19,8 @@ export interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper
     readonly clock?: Clock;
     readonly searchParams?: string | Record<string, string>;
     readonly onUrlUpdate?: OnUrlUpdateFunction;
+    /** Feeds each URL update back into the page, as a browser would, instead of freezing the initial one. */
+    readonly urlMemory?: boolean;
     readonly queryClient?: QueryClient;
 }
 
@@ -43,6 +45,7 @@ export function renderWithProviders(
         clock = fixedClock(TEST_NOW),
         searchParams,
         onUrlUpdate,
+        urlMemory = false,
         queryClient = createTestQueryClient(),
         ...options
     }: RenderWithProvidersOptions = {},
@@ -53,6 +56,7 @@ export function renderWithProviders(
     function Wrapper({ children }: { children: ReactNode }) {
         return (
             <NuqsTestingAdapter
+                hasMemory={urlMemory}
                 {...(searchParams !== undefined && { searchParams })}
                 {...(onUrlUpdate !== undefined && { onUrlUpdate })}
             >

@@ -11,7 +11,8 @@ export interface ConfirmDialogProps {
     description: ReactNode;
     confirmValue: string;
     confirmLabel: ReactNode;
-    onConfirm: () => void;
+    /** Receives exactly what was typed, for an endpoint that checks the confirmation itself. */
+    onConfirm: (typed: string) => void;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     trigger?: ReactNode;
@@ -54,7 +55,7 @@ function ConfirmForm({
             noValidate
             onSubmit={(event) => {
                 event.preventDefault();
-                if (ready && !loading) onConfirm();
+                if (ready && !loading) onConfirm(typed);
             }}
         >
             <DialogBody>

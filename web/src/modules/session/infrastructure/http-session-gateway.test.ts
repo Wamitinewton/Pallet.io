@@ -1,4 +1,4 @@
-import { ApiError, NetworkError } from "@/shared/domain/errors";
+import { ApiError, NetworkError, SessionExpiredError, UnexpectedResponseError } from "@/shared/domain/errors";
 import { describe, expect, it, vi } from "vitest";
 import { httpSessionGateway } from "./http-session-gateway";
 
@@ -54,5 +54,81 @@ describe("httpSessionGateway", () => {
         const { send } = recording(() => Promise.reject(new TypeError("Failed to fetch")));
 
         await expect(httpSessionGateway({ fetch: send }).signOut()).rejects.toBeInstanceOf(NetworkError);
+    });
+
+    it("reads the session summary from the session route", async () => {
+        const { send, requestAt } = recording(() =>
+            Promise.resolve(
+                Response.json({
+                    success: true,
+                    message: "Current session",
+                    data: {
+                        userId: "user-1",
+                        email: "ada@example.com",
+                        keycloakSessionId: "kc-1",
+                        accessExpiresAt: "2026-01-15T12:05:00.000Z",
+                    },
+                }),
+            ),
+        );
+
+        const summary = await httpSessionGateway({ fetch: send }).summary();
+
+        const { url, init, headers } = requestAt(0);
+        expect(url).toBe("/api/session");
+        expect(init).toMatchObject({ method: "GET", credentials: "same-origin", cache: "no-store" });
+        expect(headers.get("X-Pallet-Request")).toBe("1");
+        expect(summary).toEqual({
+            userId: "user-1",
+            email: "ada@example.com",
+            keycloakSessionId: "kc-1",
+            accessExpiresAt: "2026-01-15T12:05:00.000Z",
+        });
+    });
+
+    it("reads a summary whose token named no Keycloak session", async () => {
+        const { send } = recording(() =>
+            Promise.resolve(
+                Response.json({
+                    success: true,
+                    message: "Current session",
+                    data: { userId: "user-1", email: "ada@example.com", accessExpiresAt: "2026-01-15T12:05:00.000Z" },
+                }),
+            ),
+        );
+
+        expect((await httpSessionGateway({ fetch: send }).summary()).keycloakSessionId).toBeUndefined();
+    });
+
+    it("raises an ended session as SessionExpiredError", async () => {
+        const { send } = recording(() => Promise.resolve(errorBody(401, "SESSION_EXPIRED")));
+
+        await expect(httpSessionGateway({ fetch: send }).summary()).rejects.toBeInstanceOf(SessionExpiredError);
+    });
+
+    it("refuses a summary that broke its contract", async () => {
+        const { send } = recording(() => Promise.resolve(Response.json({ success: true, data: { email: "x" } })));
+
+        await expect(httpSessionGateway({ fetch: send }).summary()).rejects.toBeInstanceOf(UnexpectedResponseError);
+    });
+
+    it("posts the password to the reauthenticate route with the CSRF header", async () => {
+        const { send, requestAt } = recording(() => Promise.resolve(Response.json({ success: true })));
+
+        await httpSessionGateway({ fetch: send }).reauthenticate({ password: "correct horse" });
+
+        const { url, init, headers } = requestAt(0);
+        expect(url).toBe("/api/session/reauthenticate");
+        expect(init).toMatchObject({ method: "POST", credentials: "same-origin", cache: "no-store" });
+        expect(init?.body).toBe(JSON.stringify({ password: "correct horse" }));
+        expect(headers.get("X-Pallet-Request")).toBe("1");
+    });
+
+    it("raises a wrong password as an ApiError", async () => {
+        const { send } = recording(() => Promise.resolve(errorBody(401, "INVALID_CREDENTIALS")));
+
+        await expect(httpSessionGateway({ fetch: send }).reauthenticate({ password: "nope" })).rejects.toMatchObject({
+            code: "INVALID_CREDENTIALS",
+        });
     });
 });

@@ -2,7 +2,7 @@
 
 import { authPaths } from "@/modules/session";
 import { classifyRequestFailure, type RequestFailure } from "@/shared/domain/request-failure";
-import { messageFor } from "@/shared/presentation/errors";
+import { messageFor, RequestFailureCallout } from "@/shared/presentation/errors";
 import { useSecondsUntil } from "@/shared/presentation/hooks";
 import { useClock } from "@/shared/presentation/providers";
 import {
@@ -25,7 +25,6 @@ import { resendAvailableAt, VERIFICATION_CODE_LENGTH, verificationCodeSchema } f
 import { classifyVerificationFailure } from "../domain/verification-failure";
 import { EmailAddressStep } from "./EmailAddressStep";
 import { CODE_HINT_COPY, CODE_MISMATCH_COPY, CODE_RESENT_COPY } from "./identity-copy";
-import { RequestFailureCallout } from "./RequestFailureCallout";
 import { useResendVerification, useVerifyEmail } from "./use-verify-email";
 import styles from "./VerifyEmailForm.module.css";
 

@@ -9,14 +9,6 @@ export const CODE_HINT_COPY = "Letters and numbers, not case sensitive. You can 
 export const CODE_MISMATCH_COPY = "That code didn't match or has expired.";
 export const CODE_RESENT_COPY = "We sent a new code. The old one no longer works.";
 
-export const PASSWORD_HINT_COPY = "At least 12 characters. A short sentence is easier to remember than symbols.";
-
-const STRENGTH_LABELS = ["Empty", "Weak", "Fair", "Good", "Strong"] as const;
-
-export function strengthLabel(score: number): string {
-    return STRENGTH_LABELS[score] ?? "Strong";
-}
-
 export function slugAvailableCopy(slug: string): string {
     return `${SLUG_HOST}${slug} is available`;
 }

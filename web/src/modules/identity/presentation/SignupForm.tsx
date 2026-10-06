@@ -1,8 +1,9 @@
 "use client";
 
 import { authPaths } from "@/modules/session";
-import { messageFor } from "@/shared/presentation/errors";
-import { applyServerErrors, useIdempotencyKey } from "@/shared/presentation/forms";
+import { strength } from "@/shared/domain/password-policy";
+import { messageFor, RequestFailureCallout } from "@/shared/presentation/errors";
+import { applyServerErrors, PASSWORD_HINT_COPY, strengthLabel, useIdempotencyKey } from "@/shared/presentation/forms";
 import { useSecondsUntil } from "@/shared/presentation/hooks";
 import { useClock } from "@/shared/presentation/providers";
 import {
@@ -24,12 +25,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { strength } from "../domain/password-policy";
 import { signupSchema, slugFromName, type SignupDetails, type SlugAvailability } from "../domain/signup";
 import { classifySignupFailure, IDEMPOTENCY_KEY_REUSE, type SignupFailure } from "../domain/signup-failure";
-import { EMAIL_TAKEN_COPY, PASSWORD_HINT_COPY, SLUG_OR_EMAIL_TAKEN_COPY, strengthLabel } from "./identity-copy";
+import { EMAIL_TAKEN_COPY, SLUG_OR_EMAIL_TAKEN_COPY } from "./identity-copy";
 import { identityKeys } from "./queries";
-import { RequestFailureCallout } from "./RequestFailureCallout";
 import styles from "./SignupForm.module.css";
 import { SlugField } from "./SlugField";
 import { useSignUp } from "./use-sign-up";

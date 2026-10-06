@@ -8,6 +8,12 @@ export const SESSION_ENDED_COPY =
 
 export const EMAIL_CONFIRMED_COPY = "Email confirmed.";
 
+export const ACCOUNT_READY_COPY = "Your account is ready.";
+
+export function openOrganizationCopy(orgName: string): string {
+    return `Sign in to open ${orgName}.`;
+}
+
 export const PASSWORD_UPDATED_COPY = "Password updated.";
 export const PASSWORD_UPDATED_DETAIL_COPY =
     "Sign in with your new password. Devices that were already signed in stay signed in; you can end those sessions under Your account.";

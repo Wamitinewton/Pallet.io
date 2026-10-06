@@ -1,0 +1,93 @@
+.tabs {
+    margin-bottom: 20px;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.search {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.filterControls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.filterSelect {
+    width: auto;
+    min-width: 150px;
+}
+
+.panel {
+    overflow: hidden;
+}
+
+.stale {
+    opacity: 0.6;
+    transition: opacity 120ms;
+}
+
+.you {
+    margin-left: 6px;
+    color: var(--faint);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.joined {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.count {
+    font-variant-numeric: tabular-nums;
+}
+
+.pagination {
+    margin-top: 16px;
+}
+
+.roleOptions {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 12px;
+}
+
+.skeletonPerson {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.skeletonText {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (max-width: 640px) {
+    .filterControls,
+    .filterSelect {
+        width: 100%;
+    }
+
+    .filterSelect {
+        flex: 1 1 140px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stale {
+        transition: none;
+    }
+}

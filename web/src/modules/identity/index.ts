@@ -1,10 +1,17 @@
+export type { GetMyProfile } from "./application/get-my-profile";
 export type { IdentityUseCases } from "./application/use-cases";
 export { parseForgotPasswordParams, parseResetPasswordParams } from "./domain/password-recovery-params";
 export type { ForgotPasswordParams, ResetPasswordParams } from "./domain/password-recovery-params";
+export type { AccountStatus, Profile } from "./domain/profile";
 export { parseVerifyEmailParams } from "./domain/verify-email-params";
 export type { VerifyEmailParams } from "./domain/verify-email-params";
+export { accountPaths } from "./presentation/account-paths";
+export { AccountMenu } from "./presentation/AccountMenu";
+export { AccountView } from "./presentation/AccountView";
 export { ForgotPasswordScreen } from "./presentation/ForgotPasswordScreen";
 export { IdentityUseCasesProvider } from "./presentation/identity-use-cases";
+export { identityKeys, identityQueries } from "./presentation/queries";
 export { ResetPasswordScreen } from "./presentation/ResetPasswordScreen";
 export { SignupScreen } from "./presentation/SignupScreen";
+export { useMyProfile } from "./presentation/use-my-profile";
 export { VerifyEmailScreen } from "./presentation/VerifyEmailScreen";

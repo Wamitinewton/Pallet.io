@@ -1,3 +1,6 @@
+import type { AccountSession, AccountSessionId } from "../domain/account-session";
+import type { PasswordChange } from "../domain/change-password";
+import type { Profile, ProfileUpdate } from "../domain/profile";
 import type { PasswordReset } from "../domain/reset-password";
 import type { SignupDetails, SignupReceipt, SlugAvailability } from "../domain/signup";
 import type { EmailVerification } from "../domain/verification-code";
@@ -21,4 +24,14 @@ export interface PasswordRepository {
     /** Succeeds whether or not an account exists for `email`; the backend never says which. */
     requestReset(email: string): Promise<void>;
     reset(reset: PasswordReset): Promise<void>;
+}
+
+export interface AccountRepository {
+    getMyProfile(): Promise<Profile>;
+    updateProfile(update: ProfileUpdate): Promise<void>;
+    changePassword(change: PasswordChange): Promise<void>;
+    listSessions(): Promise<readonly AccountSession[]>;
+    revokeSession(id: AccountSessionId): Promise<void>;
+    /** Keeps the session the request was made with. */
+    revokeOtherSessions(): Promise<void>;
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { authPaths } from "@/modules/session";
+import { strength } from "@/shared/domain/password-policy";
 import type { RequestFailure } from "@/shared/domain/request-failure";
-import { messageFor } from "@/shared/presentation/errors";
-import { applyServerErrors } from "@/shared/presentation/forms";
+import { messageFor, RequestFailureCallout } from "@/shared/presentation/errors";
+import { applyServerErrors, PASSWORD_HINT_COPY, strengthLabel } from "@/shared/presentation/forms";
 import { useFocusOnMount, useReplaceAddress, useSecondsUntil } from "@/shared/presentation/hooks";
 import { useClock } from "@/shared/presentation/providers";
 import {
@@ -20,11 +21,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { strength } from "../domain/password-policy";
 import { classifyResetFailure } from "../domain/reset-failure";
 import { newPasswordSchema, type NewPassword } from "../domain/reset-password";
-import { PASSWORD_HINT_COPY, RESET_LINK_EXPIRED_COPY, strengthLabel } from "./identity-copy";
-import { RequestFailureCallout } from "./RequestFailureCallout";
+import { RESET_LINK_EXPIRED_COPY } from "./identity-copy";
 import { useResetPassword } from "./use-password-recovery";
 
 const EMPTY: NewPassword = { newPassword: "", confirmation: "" };

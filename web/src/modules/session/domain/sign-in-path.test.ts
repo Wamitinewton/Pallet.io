@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseSignInParams, parseSignInReason, parseVerified, signInPath } from "./sign-in-path";
+import {
+    MAX_ORGANIZATION_NAME_LENGTH,
+    parseJoinedOrganization,
+    parseSignInParams,
+    parseSignInReason,
+    parseVerified,
+    signInPath,
+} from "./sign-in-path";
 
 describe("signInPath", () => {
     it("builds the bare sign-in path", () => {
@@ -20,6 +27,10 @@ describe("signInPath", () => {
 
     it("marks a completed password reset", () => {
         expect(signInPath({ reset: true })).toBe("/login?reset=1");
+    });
+
+    it("names the organization an invite was accepted for", () => {
+        expect(signInPath({ joined: " Kilima Labs " })).toBe("/login?joined=Kilima+Labs");
     });
 
     it("leaves out a blank email", () => {
@@ -49,6 +60,18 @@ describe("parseVerified", () => {
     });
 });
 
+describe("parseJoinedOrganization", () => {
+    it.each([
+        [" Kilima Labs ", "Kilima Labs"],
+        ["", undefined],
+        ["Kilima\u0000Labs", undefined],
+        ["x".repeat(MAX_ORGANIZATION_NAME_LENGTH + 1), undefined],
+        [["Kilima Labs"], undefined],
+    ])("reads %j as %s", (value, name) => {
+        expect(parseJoinedOrganization(value)).toBe(name);
+    });
+});
+
 describe("parseSignInParams", () => {
     it("reads every parameter the page understands", () => {
         expect(
@@ -57,9 +80,17 @@ describe("parseSignInParams", () => {
                 reason: "expired",
                 verified: "1",
                 reset: "1",
+                joined: "Kilima Labs",
                 email: "ada@example.com",
             }),
-        ).toEqual({ next: "/orgs", reason: "expired", verified: true, reset: true, email: "ada@example.com" });
+        ).toEqual({
+            next: "/orgs",
+            reason: "expired",
+            verified: true,
+            reset: true,
+            joined: "Kilima Labs",
+            email: "ada@example.com",
+        });
     });
 
     it("drops values that aren't what they claim to be", () => {
@@ -70,6 +101,7 @@ describe("parseSignInParams", () => {
             reason: undefined,
             verified: false,
             reset: false,
+            joined: undefined,
             email: undefined,
         });
     });

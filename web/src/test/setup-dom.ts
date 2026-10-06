@@ -1,15 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 
-vi.stubGlobal(
-    "ResizeObserver",
-    class {
-        observe = vi.fn();
-        unobserve = vi.fn();
-        disconnect = vi.fn();
-    },
-);
+/** Per test, since every test ends by unstubbing all globals. */
+beforeEach(() => {
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            observe = vi.fn();
+            unobserve = vi.fn();
+            disconnect = vi.fn();
+        },
+    );
+});
 
 Object.defineProperty(window, "matchMedia", {
     configurable: true,

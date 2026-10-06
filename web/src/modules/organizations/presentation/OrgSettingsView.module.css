@@ -1,0 +1,70 @@
+.general {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.nameField {
+    flex: 1;
+    min-width: 0;
+}
+
+.footEnd {
+    justify-content: flex-end;
+}
+
+.footCenter {
+    justify-content: center;
+}
+
+.slug {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    max-width: 100%;
+}
+
+.organization {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.organizationLink {
+    flex: 1;
+    min-width: 0;
+    padding: 14px 0;
+    color: inherit;
+    border-radius: var(--r-sm);
+}
+
+.organizationLink:hover {
+    text-decoration: none;
+}
+
+.loadingText {
+    flex: 1;
+    min-width: 0;
+}
+
+.danger {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.stepBack {
+    max-width: 48ch;
+}
+
+@media (max-width: 640px) {
+    .general {
+        flex-direction: column;
+    }
+
+    .nameField {
+        width: 100%;
+    }
+}

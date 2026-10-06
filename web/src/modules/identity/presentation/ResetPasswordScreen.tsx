@@ -1,4 +1,4 @@
-import { AuthSoloScreen } from "./AuthSoloScreen";
+import { AuthSoloScreen } from "@/shared/presentation/shell";
 import { ResetPasswordForm, type ResetPasswordFormProps } from "./ResetPasswordForm";
 
 export function ResetPasswordScreen({ token }: ResetPasswordFormProps) {

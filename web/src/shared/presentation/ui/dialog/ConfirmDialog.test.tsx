@@ -39,13 +39,13 @@ describe("ConfirmDialog", () => {
         expect(confirm).toBeEnabled();
     });
 
-    it("confirms on submit once the value matches", async () => {
+    it("confirms on submit once the value matches, with what was typed", async () => {
         const user = userEvent.setup();
         const { input, onConfirm } = renderOpen();
 
         await user.type(input, "kilima-labs{Enter}");
 
-        expect(onConfirm).toHaveBeenCalledOnce();
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith("kilima-labs");
     });
 
     it("doesn't confirm on Enter before the value matches", async () => {

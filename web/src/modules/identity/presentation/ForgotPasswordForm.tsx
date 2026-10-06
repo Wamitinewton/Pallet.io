@@ -3,7 +3,7 @@
 import { authPaths } from "@/modules/session";
 import { emailSchema } from "@/shared/domain/email";
 import { classifyRequestFailure, type RequestFailure } from "@/shared/domain/request-failure";
-import { messageFor } from "@/shared/presentation/errors";
+import { messageFor, RequestFailureCallout } from "@/shared/presentation/errors";
 import { applyServerErrors } from "@/shared/presentation/forms";
 import { useFocusOnMount, useSecondsUntil } from "@/shared/presentation/hooks";
 import { useClock } from "@/shared/presentation/providers";
@@ -26,7 +26,6 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { RESET_LINK_HELP_COPY } from "./identity-copy";
 import styles from "./PasswordRecovery.module.css";
-import { RequestFailureCallout } from "./RequestFailureCallout";
 import { useRequestPasswordReset } from "./use-password-recovery";
 
 const requestSchema = z.object({ email: emailSchema });

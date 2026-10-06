@@ -28,7 +28,9 @@ import type { SignInReason } from "../domain/sign-in-path";
 import { authPaths } from "./auth-paths";
 import styles from "./LoginForm.module.css";
 import {
+    ACCOUNT_READY_COPY,
     EMAIL_CONFIRMED_COPY,
+    openOrganizationCopy,
     PASSWORD_UPDATED_COPY,
     PASSWORD_UPDATED_DETAIL_COPY,
     SESSION_ENDED_COPY,
@@ -48,10 +50,18 @@ export interface LoginFormProps {
     readonly reason?: SignInReason | undefined;
     readonly verified?: boolean | undefined;
     readonly reset?: boolean | undefined;
+    readonly joined?: string | undefined;
     readonly email?: string | undefined;
 }
 
-export function LoginForm({ next, reason, verified = false, reset = false, email: initialEmail = "" }: LoginFormProps) {
+export function LoginForm({
+    next,
+    reason,
+    verified = false,
+    reset = false,
+    joined,
+    email: initialEmail = "",
+}: LoginFormProps) {
     const clock = useClock();
     const { signIn, pending } = useSignIn(next);
     const [attempt, setAttempt] = useState<FailedAttempt>();
@@ -94,17 +104,22 @@ export function LoginForm({ next, reason, verified = false, reset = false, email
                 {failure && messageFor(failure.error, signInErrorCopy, { reference: false })}
             </VisuallyHidden>
 
-            {attempt === undefined && verified && (
+            {attempt === undefined && joined !== undefined && (
+                <Callout tone="green">
+                    <strong>{ACCOUNT_READY_COPY}</strong> {openOrganizationCopy(joined)}
+                </Callout>
+            )}
+            {attempt === undefined && joined === undefined && verified && (
                 <Callout tone="green">
                     <strong>{EMAIL_CONFIRMED_COPY}</strong> Sign in to open your organization.
                 </Callout>
             )}
-            {attempt === undefined && !verified && reset && (
+            {attempt === undefined && joined === undefined && !verified && reset && (
                 <Callout tone="green">
                     <strong>{PASSWORD_UPDATED_COPY}</strong> {PASSWORD_UPDATED_DETAIL_COPY}
                 </Callout>
             )}
-            {attempt === undefined && !verified && !reset && reason === "expired" && (
+            {attempt === undefined && joined === undefined && !verified && !reset && reason === "expired" && (
                 <Callout tone="blue">{SESSION_ENDED_COPY}</Callout>
             )}
 

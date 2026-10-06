@@ -1,19 +1,25 @@
 import { emailSchema } from "@/shared/domain/email";
 import type { OrgId } from "@/shared/domain/ids";
+import { passwordSchema } from "@/shared/domain/password-policy";
+import {
+    MAX_SLUG_LENGTH,
+    SLUG_FORMAT_MESSAGE,
+    SLUG_PATTERN,
+    SLUG_TOO_LONG_MESSAGE,
+    slugFromName,
+} from "@/shared/domain/slug";
 import { z } from "zod";
-import { passwordSchema } from "./password-policy";
 
-/** Mirrors the backend's `SLUG_PATTERN`: lowercase alphanumeric words joined by single hyphens. */
-export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-export const MAX_SLUG_LENGTH = 63;
+export { MAX_SLUG_LENGTH, slugFromName } from "@/shared/domain/slug";
+
 const MAX_SUGGESTIONS = 2;
 const SUGGESTION_SUFFIXES = ["hq", "team", "app"];
 
 export const slugSchema = z
     .string()
     .min(1, "Choose a URL for your organization")
-    .max(MAX_SLUG_LENGTH, `Keep the URL to ${String(MAX_SLUG_LENGTH)} characters or fewer`)
-    .regex(SLUG_PATTERN, "Use lowercase letters, numbers and single hyphens, with no hyphen at either end");
+    .max(MAX_SLUG_LENGTH, SLUG_TOO_LONG_MESSAGE)
+    .regex(SLUG_PATTERN, SLUG_FORMAT_MESSAGE);
 
 export function slugProblem(slug: string): string | undefined {
     return slugSchema.safeParse(slug).error?.issues[0]?.message;
@@ -21,17 +27,6 @@ export function slugProblem(slug: string): string | undefined {
 
 export function isValidSlug(slug: string): boolean {
     return slugProblem(slug) === undefined;
-}
-
-export function slugFromName(name: string): string {
-    return name
-        .normalize("NFKD")
-        .replace(/\p{M}+/gu, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, MAX_SLUG_LENGTH)
-        .replace(/-+$/, "");
 }
 
 /** Alternatives to offer for a taken slug; they are unchecked, so the check runs again once one is picked. */

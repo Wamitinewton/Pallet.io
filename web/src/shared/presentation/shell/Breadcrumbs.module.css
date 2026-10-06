@@ -1,0 +1,44 @@
+.crumbs {
+    min-width: 0;
+}
+
+.crumbs ol {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.crumbs li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.crumbs li + li::before {
+    content: "/";
+    color: var(--line-strong);
+}
+
+.crumbs a {
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.crumbs a:hover {
+    color: var(--ink);
+}
+
+.here {
+    overflow: hidden;
+    color: var(--ink);
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
