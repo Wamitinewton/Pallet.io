@@ -8,6 +8,9 @@ import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+/** Every dashboard page is per-session; prerendering one would also demand the server env at build time. */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
     robots: { index: false, follow: false },
 };
