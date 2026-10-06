@@ -8,9 +8,6 @@ import {
     sameMemberSort,
 } from "../domain/member-list-query";
 
-/** How long typing has to pause before a search reaches the URL and the backend. */
-export const SEARCH_DEBOUNCE_MS = 300;
-
 export const MEMBERS_PAGE_TABS = ["members", "invites"] as const;
 
 export type MembersPageTab = (typeof MEMBERS_PAGE_TABS)[number];

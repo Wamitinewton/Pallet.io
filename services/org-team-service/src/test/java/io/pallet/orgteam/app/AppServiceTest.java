@@ -73,6 +73,7 @@ class AppServiceTest {
                 new OrgTeamProperties.Apps(
                         new OrgTeamProperties.Apps.Regions(List.of("us-east-1"), List.of("us-central1"))),
                 null,
+                null,
                 null);
         service = new AppService(
                 new OrgGuard(organizations, memberships),
@@ -319,7 +320,7 @@ class AppServiceTest {
             assertThat(deleted.slug()).isEqualTo("web");
             assertThat(deleted.deletedByUserId()).isEqualTo(ADMIN);
         });
-        verify(apps, never()).delete(any());
+        verify(apps, never()).delete(any(App.class));
     }
 
     @Test

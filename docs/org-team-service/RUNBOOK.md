@@ -264,6 +264,42 @@ app first.
 2. Tell the owner that teams and their assignments, and every invite that was pending, must be recreated.
 3. Do not publish events by hand. `OrgDeleted` and `AppDeleted` were already delivered, and consumers that acted on
    them (notification-service, future scheduler and deploy services) need their own recovery.
+4. Every service reading `org.membership.changed` still holds the restored members as `REMOVED`. Republish their
+   current state with the backfill ([§8](#8-publish-every-membership-to-orgmembershipchanged-backfill)), resetting
+   its cursor first; the restore bumped each row's `version`, so consumers accept the new records.
 
 **Verify**: `GET /orgs/{orgId}` as the owner returns the organization, the member count matches the restored rows, and
 the owner can sign in.
+
+---
+
+## 8. Publish every membership to `org.membership.changed` (backfill)
+
+**What it is**: memberships that existed before the service published `org.membership.changed` (org-team-service
+checkpoint 21) have no record on the topic until the backfill publishes them. It runs automatically on every start:
+the first start after deploying checkpoint 21 publishes every membership, `batch-size` per transaction under advisory
+lock `7305121507`, recording its position after each batch; a crash resumes from there on the next start. Once
+`completed_at` is set, every later start costs one query and publishes nothing. Several replicas starting together
+are safe: the first takes the lock, the others skip.
+
+Symptom of a backfill that has not finished: another service (git-integration-service first) answers
+`404 ORG_NOT_FOUND` for an org the caller can open in the dashboard, because its membership read model has never
+heard of them.
+
+**Check it**:
+
+```sql
+SELECT last_org_id, last_user_id, published, completed_at FROM org_team.membership_backfill_cursor;
+```
+
+**Run it again** (after §7, or to rebuild a consumer's read model): reset the cursor, then restart one instance.
+
+```sql
+UPDATE org_team.membership_backfill_cursor
+SET last_org_id = '', last_user_id = '', published = 0, completed_at = NULL;
+```
+
+Records already sent are harmless to send again: consumers apply by version, and an equal version is a no-op.
+
+**Verify**: the log line `Membership state backfill complete: N records this run, M in total`, `published` equal
+to `SELECT count(*) FROM org_team.memberships`, and the outbox draining (see [Reading the outbox](#reading-the-outbox)).

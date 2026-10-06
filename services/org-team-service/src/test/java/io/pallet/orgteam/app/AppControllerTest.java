@@ -169,40 +169,52 @@ class AppControllerTest {
 
     @Test
     void listWrapsThePageBindsFiltersAndPaging() throws Exception {
-        given(appService.list(eq("org-1"), eq(TEAM_ID), eq(CloudProvider.GCP), any(PageQuery.class)))
+        AppFilter filter = new AppFilter(TEAM_ID, null, CloudProvider.GCP, "web");
+        given(appService.list(eq("org-1"), eq(filter), any(PageQuery.class)))
                 .willReturn(new PageResponse<>(List.of(APP), 1, 5, 6, 2, false, true));
 
         mvc.perform(get(BASE, "org-1")
                         .with(orgJwt("org-1"))
                         .param("teamId", TEAM_ID.toString())
                         .param("cloudProvider", "GCP")
+                        .param("q", "  web ")
                         .param("page", "1")
                         .param("size", "5")
                         .param("sort", "name,asc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].slug").value("web"))
                 .andExpect(jsonPath("$.data.totalElements").value(6));
-        verify(appService).list("org-1", TEAM_ID, CloudProvider.GCP, new PageQuery(1, 5, "name,asc"));
+        verify(appService).list("org-1", filter, new PageQuery(1, 5, "name,asc"));
         verify(access).atLeast("org-1", "VIEWER");
     }
 
     @Test
-    void listFiltersAreOptionalAndBadOnesAreRejected() throws Exception {
-        given(appService.list(any(), any(), any(), any()))
-                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, true, true));
+    void listBindsTheUnassignedFilter() throws Exception {
+        given(appService.list(any(), any(), any())).willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, true, true));
 
-        mvc.perform(get(BASE, "org-1").with(orgJwt("org-1"))).andExpect(status().isOk());
-        verify(appService).list(eq("org-1"), eq(null), eq(null), any(PageQuery.class));
+        mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("unassigned", "true"))
+                .andExpect(status().isOk());
+        verify(appService).list(eq("org-1"), eq(new AppFilter(null, true, null, null)), any(PageQuery.class));
+    }
+
+    @Test
+    void listFiltersAreOptionalAndBadOnesAreRejected() throws Exception {
+        given(appService.list(any(), any(), any())).willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, true, true));
+
+        mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("q", "   ")).andExpect(status().isOk());
+        verify(appService).list(eq("org-1"), eq(new AppFilter(null, null, null, null)), any(PageQuery.class));
 
         mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("cloudProvider", "AZURE"))
                 .andExpect(status().isBadRequest());
         mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("teamId", "nope"))
                 .andExpect(status().isBadRequest());
+        mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("q", "x".repeat(101)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void anUnsupportedSortIsABadRequest() throws Exception {
-        given(appService.list(any(), any(), any(), any())).willThrow(new InvalidSortException("region"));
+        given(appService.list(any(), any(), any())).willThrow(new InvalidSortException("region"));
 
         mvc.perform(get(BASE, "org-1").with(orgJwt("org-1")).param("sort", "region"))
                 .andExpect(status().isBadRequest())

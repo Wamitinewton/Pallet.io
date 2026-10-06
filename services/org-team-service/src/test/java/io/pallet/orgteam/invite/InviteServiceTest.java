@@ -89,6 +89,7 @@ class InviteServiceTest {
                 null,
                 null,
                 null,
+                null,
                 null);
         service = new InviteService(
                 organizations,

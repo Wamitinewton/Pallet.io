@@ -80,7 +80,7 @@ export interface paths {
         };
         /**
          * List apps
-         * @description Optionally filtered by team or cloud provider. Requires any active member of the organization, judged from your current membership, not your token's roles.
+         * @description Optionally filtered by team (or by having no team), cloud provider, and a search on name or slug. Requires any active member of the organization, judged from your current membership, not your token's roles.
          */
         get: operations["list_2"];
         put?: never;
@@ -685,9 +685,16 @@ export interface components {
             updatedAt?: string;
         };
         UpdateAppRequest: {
+            /**
+             * @description New display name
+             * @example Storefront API
+             */
             name?: string;
-            /** Format: uuid */
-            teamId?: string;
+            /**
+             * Format: uuid
+             * @description New owning team; send null to detach the app from its team
+             */
+            teamId?: string | null;
         };
         UpdateOrgRequest: {
             /**
@@ -1251,11 +1258,17 @@ export interface operations {
     list_2: {
         parameters: {
             query?: {
+                /** @description Only apps running on this cloud provider */
                 cloudProvider?: "AWS" | "GCP";
                 page?: number;
+                /** @description Case-insensitive match anywhere in the app's name or slug */
+                q?: string;
                 size?: number;
                 sort?: string;
+                /** @description Only apps owned by this team */
                 teamId?: string;
+                /** @description Only apps with no owning team; cannot be combined with teamId */
+                unassigned?: boolean;
             };
             header?: never;
             path: {

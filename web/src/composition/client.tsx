@@ -1,5 +1,7 @@
 "use client";
 
+import { AppUseCasesProvider } from "@/modules/apps";
+import { GitHubUseCasesProvider } from "@/modules/github";
 import { IdentityUseCasesProvider } from "@/modules/identity";
 import { InviteUseCasesProvider } from "@/modules/invites";
 import { MemberUseCasesProvider } from "@/modules/members";
@@ -54,9 +56,13 @@ export function UseCasesProvider({ children, transport, sessionGateway }: UseCas
                             <MemberUseCasesProvider value={useCases.members}>
                                 <InviteUseCasesProvider value={useCases.invites}>
                                     <TeamUseCasesProvider value={useCases.teams}>
-                                        <NotificationUseCasesProvider value={useCases.notifications}>
-                                            {children}
-                                        </NotificationUseCasesProvider>
+                                        <AppUseCasesProvider value={useCases.apps}>
+                                            <GitHubUseCasesProvider value={useCases.github}>
+                                                <NotificationUseCasesProvider value={useCases.notifications}>
+                                                    {children}
+                                                </NotificationUseCasesProvider>
+                                            </GitHubUseCasesProvider>
+                                        </AppUseCasesProvider>
                                     </TeamUseCasesProvider>
                                 </InviteUseCasesProvider>
                             </MemberUseCasesProvider>

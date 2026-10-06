@@ -58,6 +58,8 @@ export { PasswordInput, StrengthMeter } from "./password/PasswordInput";
 export type { PasswordInputProps, StrengthMeterProps } from "./password/PasswordInput";
 export { PreviewWindow } from "./preview/PreviewWindow";
 export type { PreviewWindowProps } from "./preview/PreviewWindow";
+export { SEARCH_DEBOUNCE_MS, SearchField } from "./search/SearchField";
+export type { SearchFieldProps } from "./search/SearchField";
 export { Segmented, SegmentedItem } from "./segmented/Segmented";
 export type { SegmentedItemProps, SegmentedProps } from "./segmented/Segmented";
 export { Select } from "./select/Select";

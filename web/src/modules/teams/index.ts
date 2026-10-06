@@ -21,3 +21,4 @@ export { TeamUnavailable } from "./presentation/TeamUnavailable";
 export type { TeamUnavailableProps } from "./presentation/TeamUnavailable";
 export { TeamView } from "./presentation/TeamView";
 export type { TeamViewProps } from "./presentation/TeamView";
+export { useTeamDirectory } from "./presentation/use-team-directory";

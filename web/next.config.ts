@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
     typedRoutes: true,
     reactCompiler: true,
     agentRules: false,
+    images: {
+        remotePatterns: [
+            { protocol: "https", hostname: "github.com", pathname: "/*.png" },
+            { protocol: "https", hostname: "avatars.githubusercontent.com" },
+        ],
+    },
     headers: () =>
         Promise.resolve([
             {
@@ -16,6 +22,10 @@ const nextConfig: NextConfig = {
             },
             {
                 source: "/invites/:token",
+                headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+            },
+            {
+                source: "/github/callback",
                 headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
             },
         ]),

@@ -71,7 +71,7 @@ class TeamServiceTest {
                 teams,
                 teamMembers,
                 outbox,
-                new OrgTeamProperties(null, new OrgTeamProperties.Limits(2, 200), null, null, null),
+                new OrgTeamProperties(null, new OrgTeamProperties.Limits(2, 200), null, null, null, null),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

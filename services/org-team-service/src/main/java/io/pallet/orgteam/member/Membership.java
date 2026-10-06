@@ -113,6 +113,11 @@ public class Membership {
         return status;
     }
 
+    /** Null until the membership is first flushed. */
+    public Long getVersion() {
+        return version;
+    }
+
     public Instant getJoinedAt() {
         return joinedAt;
     }

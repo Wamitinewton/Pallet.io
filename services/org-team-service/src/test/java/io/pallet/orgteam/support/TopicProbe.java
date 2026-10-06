@@ -18,6 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 public final class TopicProbe implements AutoCloseable {
 
+    /** {@code body} is null for a tombstone. */
     public record Received(String topic, String key, Map<String, String> headers, JsonNode body) {
 
         public UUID eventId() {
@@ -58,6 +59,15 @@ public final class TopicProbe implements AutoCloseable {
         return forOrg(orgId);
     }
 
+    /** Waits for records keyed {@code orgId:userId}, as on {@code org.membership.changed}. */
+    public List<Received> awaitMembershipCount(String orgId, int expected) {
+        long deadline = System.nanoTime() + AWAIT_LIMIT.toNanos();
+        while (forMemberships(orgId).size() < expected && System.nanoTime() < deadline) {
+            pollOnce();
+        }
+        return forMemberships(orgId);
+    }
+
     public List<Received> observe(String orgId, Duration window) {
         long deadline = System.nanoTime() + window.toNanos();
         while (System.nanoTime() < deadline) {
@@ -72,12 +82,19 @@ public final class TopicProbe implements AutoCloseable {
             for (Header header : record.headers()) {
                 headers.put(header.key(), new String(header.value(), StandardCharsets.UTF_8));
             }
-            received.add(new Received(record.topic(), record.key(), headers, jsonMapper.readTree(record.value())));
+            JsonNode body = record.value() == null ? null : jsonMapper.readTree(record.value());
+            received.add(new Received(record.topic(), record.key(), headers, body));
         }
     }
 
     private List<Received> forOrg(String orgId) {
         return received.stream().filter(r -> orgId.equals(r.key())).toList();
+    }
+
+    private List<Received> forMemberships(String orgId) {
+        return received.stream()
+                .filter(r -> r.key() != null && r.key().startsWith(orgId + ":"))
+                .toList();
     }
 
     @Override

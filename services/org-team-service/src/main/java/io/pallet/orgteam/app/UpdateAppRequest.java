@@ -8,18 +8,18 @@ import java.util.UUID;
 
 public class UpdateAppRequest {
 
-    @Schema(description = "New display name", example = "Storefront API", maxLength = 100)
     @Size(max = 100) @Pattern(regexp = ".*\\S.*", message = "must not be blank") private String name;
 
-    @Schema(description = "New owning team; send null to detach the app from its team")
     private UUID teamId;
 
     private boolean teamIdPresent;
 
+    @Schema(description = "New display name", example = "Storefront API", maxLength = 100)
     public void setName(String name) {
         this.name = name;
     }
 
+    @Schema(description = "New owning team; send null to detach the app from its team", nullable = true)
     public void setTeamId(UUID teamId) {
         this.teamId = teamId;
         this.teamIdPresent = true;

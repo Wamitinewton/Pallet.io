@@ -2,7 +2,7 @@
 
 import type { OrgId, UserId } from "@/shared/domain/ids";
 import { useDebouncedValue } from "@/shared/presentation/hooks";
-import { Avatar, Field, Input, Person } from "@/shared/presentation/ui";
+import { Avatar, Field, Input, Person, SEARCH_DEBOUNCE_MS } from "@/shared/presentation/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Member } from "../domain/member";
@@ -11,7 +11,6 @@ import { PICKER_NO_MATCHES_COPY, PICKER_SEARCHING_COPY, SEARCH_PLACEHOLDER_COPY 
 import { useMemberUseCases } from "./member-use-cases";
 import styles from "./MemberPicker.module.css";
 import { memberQueries } from "./queries";
-import { SEARCH_DEBOUNCE_MS } from "./search-params";
 
 export interface MemberPickerProps {
     readonly orgId: OrgId;

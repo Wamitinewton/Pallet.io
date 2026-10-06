@@ -4,7 +4,12 @@ import { queryOptions } from "@tanstack/react-query";
 import type { GetTeam } from "../application/get-team";
 import type { ListTeamMembers } from "../application/list-team-members";
 import type { ListTeams } from "../application/list-teams";
-import { TEAM_ROSTER_QUERY, type TeamListQuery, type TeamMemberListQuery } from "../domain/team-list-query";
+import {
+    TEAM_DIRECTORY_QUERY,
+    TEAM_ROSTER_QUERY,
+    type TeamListQuery,
+    type TeamMemberListQuery,
+} from "../domain/team-list-query";
 
 export const teamKeys = {
     all: queryScopes.teams,
@@ -26,6 +31,7 @@ export const teamQueries = {
             queryKey: teamKeys.list(orgId, query),
             queryFn: () => listTeams(orgId, query),
         }),
+    directory: (listTeams: ListTeams, orgId: OrgId) => teamQueries.list(listTeams, orgId, TEAM_DIRECTORY_QUERY),
     detail: (getTeam: GetTeam, orgId: OrgId, teamId: TeamId) =>
         queryOptions({
             queryKey: teamKeys.detail(orgId, teamId),

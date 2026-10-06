@@ -7,8 +7,11 @@ import io.pallet.common.outbox.OutboxRepository;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipRepository.MembershipRow;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.retention.SweepLock.Sweep;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,6 +22,7 @@ public class RetentionSweeps {
     private final TransactionalInbox inbox;
     private final InviteRepository invites;
     private final MembershipRepository memberships;
+    private final MembershipStatePublisher membershipState;
     private final OrgTeamProperties properties;
     private final OutboxProperties outboxProperties;
     private final InboxProperties inboxProperties;
@@ -29,6 +33,7 @@ public class RetentionSweeps {
             TransactionalInbox inbox,
             InviteRepository invites,
             MembershipRepository memberships,
+            MembershipStatePublisher membershipState,
             OrgTeamProperties properties,
             OutboxProperties outboxProperties,
             InboxProperties inboxProperties) {
@@ -37,6 +42,7 @@ public class RetentionSweeps {
         this.inbox = inbox;
         this.invites = invites;
         this.memberships = memberships;
+        this.membershipState = membershipState;
         this.properties = properties;
         this.outboxProperties = outboxProperties;
         this.inboxProperties = inboxProperties;
@@ -59,7 +65,13 @@ public class RetentionSweeps {
 
     public void sweepRemovedMemberships() {
         double window = seconds(properties.retention().removedMemberships());
-        runner.run(Sweep.REMOVED_MEMBERSHIPS, batch -> memberships.deleteRemovedOlderThan(window, batch));
+        // Without a tombstone, a consumer would keep the deleted row's REMOVED version and drop every record of a
+        // re-invited membership, whose version starts again at 0.
+        runner.run(Sweep.REMOVED_MEMBERSHIPS, batch -> {
+            List<MembershipRow> deleted = memberships.deleteRemovedOlderThan(window, batch);
+            deleted.forEach(row -> membershipState.tombstone(row.getOrgId(), row.getUserId()));
+            return deleted.size();
+        });
     }
 
     static double seconds(Duration window) {

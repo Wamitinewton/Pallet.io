@@ -1,0 +1,244 @@
+.panel {
+    overflow: hidden;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.search {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+.filterSelect {
+    width: auto;
+    min-width: 150px;
+}
+
+.sortSelect {
+    width: auto;
+    min-width: 150px;
+    margin-left: auto;
+}
+
+.stale {
+    opacity: 0.6;
+    transition: opacity 120ms;
+}
+
+.appName {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    color: inherit;
+}
+
+.appName:hover {
+    text-decoration: none;
+}
+
+.appName:hover .name {
+    color: var(--blue-text);
+}
+
+.appIcon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--r-md);
+    background: var(--blue-soft);
+    color: var(--blue-text);
+}
+
+.appIcon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.nameBlock {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.name {
+    color: var(--ink);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.slug {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+}
+
+.runsOn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.runsOn svg {
+    width: 15px;
+    height: 15px;
+    color: var(--faint);
+}
+
+.region {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+}
+
+.faint {
+    color: var(--faint);
+}
+
+.updated {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.count {
+    font-variant-numeric: tabular-nums;
+}
+
+.pagination {
+    margin-top: 16px;
+}
+
+.skeletonApp {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.skeletonText {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.title .appIcon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r-lg);
+}
+
+.title .appIcon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.title h1 {
+    overflow-wrap: anywhere;
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 6px 0 0;
+    padding: 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    list-style: none;
+}
+
+.meta li {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.meta svg {
+    width: 14px;
+    height: 14px;
+}
+
+.headActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.tabs {
+    margin-bottom: 24px;
+}
+
+.settings {
+    max-width: 720px;
+}
+
+.footSpread {
+    justify-content: space-between;
+}
+
+.optional {
+    color: var(--faint);
+    font-weight: 400;
+}
+
+.mono {
+    font-family: var(--font-mono);
+}
+
+.teamApp {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.teamApps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (max-width: 640px) {
+    .filterSelect,
+    .sortSelect {
+        flex: 1 1 140px;
+    }
+
+    .sortSelect {
+        margin-left: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stale {
+        transition: none;
+    }
+}

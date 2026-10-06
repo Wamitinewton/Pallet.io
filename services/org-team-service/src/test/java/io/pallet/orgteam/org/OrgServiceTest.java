@@ -24,6 +24,7 @@ import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.orgteam.member.MemberExceptions.InvalidSortException;
 import io.pallet.orgteam.member.Membership;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.member.MembershipStatus;
 import io.pallet.orgteam.member.Role;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
@@ -59,6 +60,7 @@ class OrgServiceTest {
 
     private final OrganizationRepository organizations = mock(OrganizationRepository.class);
     private final MembershipRepository memberships = mock(MembershipRepository.class);
+    private final MembershipStatePublisher membershipState = mock(MembershipStatePublisher.class);
     private final OrgCountsRepository counts = mock(OrgCountsRepository.class);
     private final OutboxWriter outbox = mock(OutboxWriter.class);
 
@@ -69,6 +71,7 @@ class OrgServiceTest {
         service = new OrgService(
                 organizations,
                 memberships,
+                membershipState,
                 counts,
                 outbox,
                 new OrgTeamMetrics(new SimpleMeterRegistry()),
@@ -142,7 +145,7 @@ class OrgServiceTest {
 
         verify(organizations).insertIfAbsent("org-1", "Acme", "acme", "user-1", "PERSONAL", NOW);
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
-        verify(memberships).save(membership.capture());
+        verify(memberships).saveAndFlush(membership.capture());
         assertThat(membership.getValue().getOrgId()).isEqualTo("org-1");
         assertThat(membership.getValue().getUserId()).isEqualTo("user-1");
         assertThat(membership.getValue().getRole()).isEqualTo(Role.OWNER);
@@ -173,7 +176,7 @@ class OrgServiceTest {
         service.provision(event("Grace.Hopper@example.com", displayName));
 
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
-        verify(memberships).save(membership.capture());
+        verify(memberships).saveAndFlush(membership.capture());
         assertThat(membership.getValue().getDisplayName()).isEqualTo("grace.hopper");
     }
 
@@ -323,7 +326,7 @@ class OrgServiceTest {
         assertThat(dto.counts()).isEqualTo(new OrgDto.Counts(1, 0, 0));
 
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
-        verify(memberships).save(membership.capture());
+        verify(memberships).saveAndFlush(membership.capture());
         assertThat(membership.getValue().getOrgId()).isEqualTo(org.getOrgId());
         assertThat(membership.getValue().getUserId()).isEqualTo("user-1");
         assertThat(membership.getValue().getRole()).isEqualTo(Role.OWNER);
@@ -352,7 +355,7 @@ class OrgServiceTest {
         service.createTeamOrg(caller("Grace.Hopper@example.com", displayName), "Acme", null);
 
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
-        verify(memberships).save(membership.capture());
+        verify(memberships).saveAndFlush(membership.capture());
         assertThat(membership.getValue().getDisplayName()).isEqualTo("grace.hopper");
     }
 
@@ -363,7 +366,7 @@ class OrgServiceTest {
         service.createTeamOrg(caller("ada@example.com", "n".repeat(300)), "Acme", null);
 
         ArgumentCaptor<Membership> membership = ArgumentCaptor.forClass(Membership.class);
-        verify(memberships).save(membership.capture());
+        verify(memberships).saveAndFlush(membership.capture());
         assertThat(membership.getValue().getDisplayName()).hasSize(255);
     }
 

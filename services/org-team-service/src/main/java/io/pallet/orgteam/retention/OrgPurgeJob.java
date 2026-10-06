@@ -4,6 +4,8 @@ import io.pallet.orgteam.app.AppRepository;
 import io.pallet.orgteam.config.OrgTeamProperties;
 import io.pallet.orgteam.invite.InviteRepository;
 import io.pallet.orgteam.member.MembershipRepository;
+import io.pallet.orgteam.member.MembershipRepository.MembershipRow;
+import io.pallet.orgteam.member.MembershipStatePublisher;
 import io.pallet.orgteam.observability.OrgTeamMetrics;
 import io.pallet.orgteam.org.OrganizationRepository;
 import io.pallet.orgteam.retention.SweepLock.Sweep;
@@ -29,6 +31,7 @@ public class OrgPurgeJob {
     private final TeamRepository teams;
     private final InviteRepository invites;
     private final MembershipRepository memberships;
+    private final MembershipStatePublisher membershipState;
     private final SweepLock lock;
     private final SweepRunner runner;
     private final OrgTeamMetrics metrics;
@@ -42,6 +45,7 @@ public class OrgPurgeJob {
             TeamRepository teams,
             InviteRepository invites,
             MembershipRepository memberships,
+            MembershipStatePublisher membershipState,
             SweepLock lock,
             SweepRunner runner,
             OrgTeamMetrics metrics,
@@ -53,6 +57,7 @@ public class OrgPurgeJob {
         this.teams = teams;
         this.invites = invites;
         this.memberships = memberships;
+        this.membershipState = membershipState;
         this.lock = lock;
         this.runner = runner;
         this.metrics = metrics;
@@ -98,7 +103,9 @@ public class OrgPurgeJob {
         rows += apps.deleteAllForOrg(orgId);
         rows += teams.deleteAllForOrg(orgId);
         rows += invites.deleteAllForOrg(orgId);
-        rows += memberships.deleteAllForOrg(orgId);
+        List<MembershipRow> purgedMemberships = memberships.deleteAllForOrg(orgId);
+        purgedMemberships.forEach(row -> membershipState.tombstone(orgId, row.getUserId()));
+        rows += purgedMemberships.size();
         organizations.markPurged(orgId, PURGED_NAME);
         return rows + 1;
     }

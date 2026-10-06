@@ -30,13 +30,13 @@ describe("createQueryClient", () => {
         expect(createQueryClient().getDefaultOptions().mutations?.retry).toBe(false);
     });
 
-    it("dehydrates pending queries so a page can stream its prefetches", () => {
+    it("leaves a pending query out of the snapshot, so a layout never ships its page's prefetch half-done", () => {
         const client = createQueryClient();
         const shouldDehydrate = client.getDefaultOptions().dehydrate?.shouldDehydrateQuery;
         void client.query({ queryKey: ["slow"], queryFn: () => new Promise(() => undefined) });
         const query = client.getQueryCache().find({ queryKey: ["slow"] });
 
-        expect(query && shouldDehydrate?.(query)).toBe(true);
+        expect(query && shouldDehydrate?.(query)).toBe(false);
     });
 });
 

@@ -55,16 +55,19 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
     @Query(value = "DELETE FROM org_team.team_members WHERE org_id = :orgId AND user_id = :userId", nativeQuery = true)
     void deleteTeamAssignments(String orgId, String userId);
 
-    @Modifying
+    /**
+     * A bulk update skips JPA's {@code @Version}, so the version is bumped here: each {@code REMOVED} record must
+     * carry a version above the member's last {@code ACTIVE} one or consumers drop it.
+     */
     @Query(value = """
             UPDATE org_team.memberships
             SET status = 'REMOVED', removed_at = :now, removed_by = :actorUserId, version = version + 1
             WHERE org_id = :orgId AND status = 'ACTIVE'
+            RETURNING org_id AS "orgId", user_id AS "userId", role, status, version
             """, nativeQuery = true)
-    void removeAllActive(String orgId, String actorUserId, Instant now);
+    List<MembershipRow> removeAllActive(String orgId, String actorUserId, Instant now);
 
     @CrossTenant("retention sweep spans every organization")
-    @Modifying
     @Query(value = """
             DELETE FROM org_team.memberships
             WHERE ctid IN (
@@ -72,10 +75,36 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
                 WHERE status = 'REMOVED' AND removed_at < now() - make_interval(secs => :windowSeconds)
                 ORDER BY removed_at
                 LIMIT :batchSize)
+            RETURNING org_id AS "orgId", user_id AS "userId", role, status, version
             """, nativeQuery = true)
-    int deleteRemovedOlderThan(double windowSeconds, int batchSize);
+    List<MembershipRow> deleteRemovedOlderThan(double windowSeconds, int batchSize);
 
-    @Modifying
-    @Query("delete from Membership m where m.orgId = :orgId")
-    int deleteAllForOrg(String orgId);
+    @Query(value = """
+            DELETE FROM org_team.memberships
+            WHERE org_id = :orgId
+            RETURNING org_id AS "orgId", user_id AS "userId", role, status, version
+            """, nativeQuery = true)
+    List<MembershipRow> deleteAllForOrg(String orgId);
+
+    interface MembershipRow {
+
+        String getOrgId();
+
+        String getUserId();
+
+        String getRole();
+
+        String getStatus();
+
+        long getVersion();
+
+        default MembershipState toState() {
+            return new MembershipState(
+                    getOrgId(),
+                    getUserId(),
+                    Role.valueOf(getRole()),
+                    MembershipStatus.valueOf(getStatus()),
+                    getVersion());
+        }
+    }
 }

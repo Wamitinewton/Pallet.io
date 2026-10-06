@@ -23,7 +23,10 @@ import io.pallet.orgteam.support.TopicProbe.Received;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -266,7 +269,7 @@ class EndToEndCrossServiceIntegrationTest {
                     .containsExactlyInAnyOrder(Topics.APP_DELETED, Topics.ORG_DELETED);
             assertThat(outboxTypes(org))
                     .containsSubsequence(Topics.APP_DELETED, Topics.ORG_DELETED)
-                    .endsWith(Topics.ORG_DELETED, "audit.event.recorded");
+                    .endsWith(Topics.ORG_DELETED, Topics.ORG_MEMBERSHIP_CHANGED, "audit.event.recorded");
 
             mvc.perform(as(get(ORG, org.orgId()), org, org.owner()))
                     .andExpect(status().isNotFound())
@@ -409,6 +412,40 @@ class EndToEndCrossServiceIntegrationTest {
                                 Integer.class))
                         .as("outbox rows not yet published")
                         .isZero());
+        assertMembershipTopicMatchesTheTable(orgIds);
+    }
+
+    private void assertMembershipTopicMatchesTheTable(List<String> orgIds) {
+        try (TopicProbe probe = probe(Topics.ORG_MEMBERSHIP_CHANGED)) {
+            for (String orgId : orgIds) {
+                int published = jdbc.queryForObject(
+                        "SELECT count(*) FROM org_team.outbox_events WHERE org_id = ? AND event_type = ?",
+                        Integer.class,
+                        orgId,
+                        Topics.ORG_MEMBERSHIP_CHANGED);
+                Map<String, JsonNode> latest = new HashMap<>();
+                probe.awaitMembershipCount(orgId, published).forEach(record -> latest.put(record.key(), record.body()));
+
+                Map<String, String> fromTopic = new HashMap<>();
+                latest.forEach((key, body) -> fromTopic.put(
+                        key,
+                        body.get("role").asString() + "/" + body.get("status").asString() + "/"
+                                + body.get("membershipVersion").asLong()));
+                Map<String, String> fromTable = new HashMap<>();
+                jdbc.query(
+                        "SELECT user_id, role, status, version FROM org_team.memberships WHERE org_id = ?",
+                        row -> {
+                            fromTable.put(
+                                    orgId + ":" + row.getString("user_id"),
+                                    row.getString("role").toLowerCase(Locale.ROOT) + "/" + row.getString("status") + "/"
+                                            + row.getLong("version"));
+                        },
+                        orgId);
+                assertThat(fromTopic)
+                        .as("org.membership.changed folded per key for " + orgId)
+                        .isEqualTo(fromTable);
+            }
+        }
     }
 
     private List<String> outboxTypes(Org org) {

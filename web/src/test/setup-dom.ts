@@ -36,6 +36,7 @@ Element.prototype.releasePointerCapture = vi.fn();
 afterEach(() => {
     cleanup();
     localStorage.clear();
+    sessionStorage.clear();
     document.documentElement.removeAttribute("data-theme");
     document.documentElement.removeAttribute("style");
 });

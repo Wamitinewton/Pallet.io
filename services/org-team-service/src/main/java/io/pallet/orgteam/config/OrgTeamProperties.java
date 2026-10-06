@@ -19,7 +19,8 @@ public record OrgTeamProperties(
         @Valid @NotNull @DefaultValue Limits limits,
         @Valid @NotNull @DefaultValue Apps apps,
         @Valid @NotNull @DefaultValue Security security,
-        @Valid @NotNull @DefaultValue Retention retention) {
+        @Valid @NotNull @DefaultValue Retention retention,
+        @Valid @NotNull @DefaultValue MembershipBackfill membershipBackfill) {
 
     public record Invites(
             @NotNull @PositiveDuration @DefaultValue("PT72H")
@@ -75,4 +76,7 @@ public record OrgTeamProperties(
             @NotNull @PositiveDuration @DefaultValue("P1D") Duration dailySweepInterval,
             @Positive @DefaultValue("500") int sweepBatchSize,
             @Positive @DefaultValue("25") int orgPurgeBatchSize) {}
+
+    public record MembershipBackfill(
+            @Positive @DefaultValue("500") int batchSize) {}
 }

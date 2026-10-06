@@ -55,6 +55,8 @@ pallet:
       daily-sweep-interval: P1D
       sweep-batch-size: 500
       org-purge-batch-size: 25
+    membership-backfill:
+      batch-size: 500
 
 springdoc:
   api-docs:
