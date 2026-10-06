@@ -1,8 +1,8 @@
 "use client";
 
 import type { RequestFailure } from "@/shared/domain/request-failure";
-import { messageFor, tooManyAttemptsCopy } from "@/shared/presentation/errors";
-import { Button, Callout, Icon, Row, Stack } from "@/shared/presentation/ui";
+import { Button, Callout, Icon, Row, Stack } from "../ui";
+import { messageFor, tooManyAttemptsCopy } from "./error-copy";
 
 export interface RequestFailureCalloutProps {
     readonly failure: RequestFailure;

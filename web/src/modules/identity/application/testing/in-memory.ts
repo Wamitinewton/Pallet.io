@@ -1,8 +1,17 @@
-import { asOrgId } from "@/shared/domain/ids";
+import { asOrgId, asUserId } from "@/shared/domain/ids";
+import type { AccountSession, AccountSessionId } from "../../domain/account-session";
+import type { PasswordChange } from "../../domain/change-password";
+import type { Profile, ProfileUpdate } from "../../domain/profile";
 import type { PasswordReset } from "../../domain/reset-password";
 import type { SignupDetails, SignupReceipt, SlugAvailability } from "../../domain/signup";
 import type { EmailVerification } from "../../domain/verification-code";
-import type { CancellableRequest, PasswordRepository, SignupRepository, VerificationRepository } from "../ports";
+import type {
+    AccountRepository,
+    CancellableRequest,
+    PasswordRepository,
+    SignupRepository,
+    VerificationRepository,
+} from "../ports";
 
 export interface RecordedSignup {
     readonly details: SignupDetails;
@@ -60,5 +69,51 @@ export class ScriptedPasswordRepository implements PasswordRepository {
     reset(reset: PasswordReset) {
         this.resets.push(reset);
         return this.nextReset();
+    }
+}
+
+export class ScriptedAccountRepository implements AccountRepository {
+    readonly profileUpdates: ProfileUpdate[] = [];
+    readonly passwordChanges: PasswordChange[] = [];
+    readonly revoked: AccountSessionId[] = [];
+    otherSessionsRevoked = 0;
+    profile: Profile = {
+        userId: asUserId("user-1"),
+        email: "amani@kilimalabs.co",
+        displayName: "Amani Otieno",
+        status: "ACTIVE",
+    };
+    sessions: readonly AccountSession[] = [];
+    nextUpdateProfile: () => Promise<void> = () => Promise.resolve();
+    nextChangePassword: () => Promise<void> = () => Promise.resolve();
+    nextRevokeSession: () => Promise<void> = () => Promise.resolve();
+    nextRevokeOtherSessions: () => Promise<void> = () => Promise.resolve();
+
+    getMyProfile() {
+        return Promise.resolve(this.profile);
+    }
+
+    updateProfile(update: ProfileUpdate) {
+        this.profileUpdates.push(update);
+        return this.nextUpdateProfile();
+    }
+
+    changePassword(change: PasswordChange) {
+        this.passwordChanges.push(change);
+        return this.nextChangePassword();
+    }
+
+    listSessions() {
+        return Promise.resolve(this.sessions);
+    }
+
+    revokeSession(id: AccountSessionId) {
+        this.revoked.push(id);
+        return this.nextRevokeSession();
+    }
+
+    revokeOtherSessions() {
+        this.otherSessionsRevoked++;
+        return this.nextRevokeOtherSessions();
     }
 }

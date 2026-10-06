@@ -1,10 +1,13 @@
 import type { Credentials } from "../domain/credentials";
-import type { IssuedTokens, Session, SessionId } from "../domain/session";
+import type { Reauthentication } from "../domain/reauthentication";
+import type { IssuedTokens, Session, SessionId, SessionSummary } from "../domain/session";
 
-/** The browser's view of the session: it can start and end one, and never sees a token. */
+/** The browser's view of the session: it can start, read and end one, and never sees a token. */
 export interface SessionGateway {
     signIn(credentials: Credentials): Promise<void>;
     signOut(): Promise<void>;
+    summary(): Promise<SessionSummary>;
+    reauthenticate(reauthentication: Reauthentication): Promise<void>;
 }
 
 export interface SessionStore {

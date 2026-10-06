@@ -1,6 +1,13 @@
 import { asUserId } from "@/shared/domain/ids";
 import { asIsoInstant } from "@/shared/domain/instant";
-import { parseSessionId, type IssuedTokens, type Session, type SessionId } from "../session";
+import {
+    parseSessionId,
+    summarize,
+    type IssuedTokens,
+    type Session,
+    type SessionId,
+    type SessionSummary,
+} from "../session";
 
 export const SESSION_ID = sessionId("a");
 export const USER_ID = asUserId("2f6c3e1a-0000-4000-8000-000000000001");
@@ -35,4 +42,8 @@ export function issuedTokens(overrides: Partial<IssuedTokens> = {}): IssuedToken
         claims: { subject: USER_ID, email: "ada@example.com", sessionId: "kc-1" },
         ...overrides,
     };
+}
+
+export function sessionSummary(overrides: Partial<Session> = {}): SessionSummary {
+    return summarize(aSession(overrides));
 }

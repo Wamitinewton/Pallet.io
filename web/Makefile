@@ -1,5 +1,16 @@
 .DEFAULT_GOAL := help
 PNPM := pnpm
+NODE_VERSION := v$(shell cat .nvmrc)
+
+# Corepack's Linux default, set explicitly: a sandboxed terminal (VS Code's Flatpak) moves XDG_CACHE_HOME,
+# and a pnpm that an older corepack unpacked there points at a bin file pnpm no longer ships.
+export COREPACK_HOME ?= $(HOME)/.cache/node/corepack
+
+ifneq ($(filter-out help,$(or $(MAKECMDGOALS),$(.DEFAULT_GOAL))),)
+ifneq ($(shell node --version 2>/dev/null),$(NODE_VERSION))
+$(error Node $(NODE_VERSION) is required (found $(or $(shell node --version 2>/dev/null),none)). Run `nvm use` in web/)
+endif
+endif
 
 .PHONY: help
 help: ## List targets

@@ -10,13 +10,14 @@ export interface SignOutController {
     readonly pending: boolean;
 }
 
-export function useSignOut(): SignOutController {
+/** Signs out, then leaves for `destination`, which must be a page a signed-out visitor can open. */
+export function useSignOut(destination: string = SIGN_IN_PATH): SignOutController {
     const { signOut } = useSessionActions();
     const navigate = useNavigateAcrossSession();
     const mutation = useMutation({
         mutationFn: signOut,
         onSettled: () => {
-            navigate(SIGN_IN_PATH);
+            navigate(destination);
         },
     });
 

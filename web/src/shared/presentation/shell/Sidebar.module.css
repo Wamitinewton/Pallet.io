@@ -1,0 +1,77 @@
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100%;
+}
+
+.brand {
+    padding: 4px 8px;
+}
+
+.nav,
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.group {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.label {
+    padding: 10px 10px 6px;
+    color: var(--faint);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--r-md);
+    color: var(--text);
+    font-weight: 500;
+}
+
+.link svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--faint);
+}
+
+.link:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.link[data-active] {
+    background: var(--blue-soft);
+    color: var(--blue-text);
+}
+
+.link[data-active] svg {
+    color: var(--blue-text);
+}
+
+.count {
+    margin-left: auto;
+    color: var(--faint);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.foot {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}

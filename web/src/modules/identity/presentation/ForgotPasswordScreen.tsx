@@ -1,4 +1,4 @@
-import { AuthSoloScreen } from "./AuthSoloScreen";
+import { AuthSoloScreen } from "@/shared/presentation/shell";
 import { ForgotPasswordForm, type ForgotPasswordFormProps } from "./ForgotPasswordForm";
 
 export function ForgotPasswordScreen({ email }: ForgotPasswordFormProps) {

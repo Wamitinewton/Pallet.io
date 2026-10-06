@@ -1,0 +1,57 @@
+.toggle {
+    display: none;
+}
+
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    background: var(--scrim);
+}
+
+.drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 45;
+    width: min(var(--sidebar-w), 86vw);
+    padding: 16px 12px;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow-pop);
+    overflow-y: auto;
+    animation: slide-in 200ms ease;
+}
+
+.title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.close {
+    position: absolute;
+    top: 14px;
+    right: 10px;
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateX(-100%);
+    }
+}
+
+@media (max-width: 960px) {
+    .toggle {
+        display: inline-flex;
+    }
+}
+
+@media (min-width: 961px) {
+    .backdrop,
+    .drawer {
+        display: none;
+    }
+}

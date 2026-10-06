@@ -1,13 +1,17 @@
 import type { Credentials } from "../../domain/credentials";
-import type { IssuedTokens, Session, SessionId } from "../../domain/session";
-import { issuedTokens, sessionId } from "../../domain/testing/fixtures";
+import type { Reauthentication } from "../../domain/reauthentication";
+import type { IssuedTokens, Session, SessionId, SessionSummary } from "../../domain/session";
+import { issuedTokens, sessionId, sessionSummary } from "../../domain/testing/fixtures";
 import type { RefreshLock, SessionGateway, SessionIdGenerator, SessionStore, TokenIssuer } from "../ports";
 
 export class ScriptedSessionGateway implements SessionGateway {
     readonly signedIn: Credentials[] = [];
+    readonly reauthentications: Reauthentication[] = [];
     signOuts = 0;
+    nextReauthenticate: () => Promise<void> = () => Promise.resolve();
     nextSignIn: () => Promise<void> = () => Promise.resolve();
     nextSignOut: () => Promise<void> = () => Promise.resolve();
+    nextSummary: () => Promise<SessionSummary> = () => Promise.resolve(sessionSummary());
 
     signIn(credentials: Credentials) {
         this.signedIn.push(credentials);
@@ -17,6 +21,15 @@ export class ScriptedSessionGateway implements SessionGateway {
     signOut() {
         this.signOuts++;
         return this.nextSignOut();
+    }
+
+    summary() {
+        return this.nextSummary();
+    }
+
+    reauthenticate(reauthentication: Reauthentication) {
+        this.reauthentications.push(reauthentication);
+        return this.nextReauthenticate();
     }
 }
 

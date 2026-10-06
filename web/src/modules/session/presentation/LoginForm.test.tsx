@@ -148,6 +148,14 @@ describe("LoginForm", () => {
         expect(screen.getByText(/Sign in with your new password\./)).toHaveTextContent(/under Your account/);
     });
 
+    it("greets someone who just accepted an invite with the organization they joined", () => {
+        renderWithProviders(<LoginForm joined="Kilima Labs" />);
+
+        expect(screen.getByText("Your account is ready.", { selector: "strong" })).toBeInTheDocument();
+        expect(screen.getByText(/Sign in to open Kilima Labs\./)).toBeInTheDocument();
+        expect(emailInput()).toHaveValue("");
+    });
+
     it("explains an expired session on arrival", () => {
         renderWithProviders(<LoginForm reason="expired" />);
 

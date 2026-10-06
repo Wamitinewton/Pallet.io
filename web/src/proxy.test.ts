@@ -19,6 +19,16 @@ describe("proxy route guard", () => {
         expect(visit("/account", cookie).headers.has("Location")).toBe(false);
     });
 
+    it("hands the requested path to the layouts, replacing any the client sent", () => {
+        const response = proxy(
+            new NextRequest("http://localhost:5173/orgs/o-1/apps?page=2", {
+                headers: { Cookie: "pallet_session=x", "X-Pallet-Requested-Path": "/forged" },
+            }),
+        );
+
+        expect(response.headers.get("x-middleware-request-x-pallet-requested-path")).toBe("/orgs/o-1/apps?page=2");
+    });
+
     it("guards only the dashboard paths", () => {
         expect(config.matcher).toEqual(["/orgs/:path*", "/account/:path*", "/notifications/:path*"]);
     });

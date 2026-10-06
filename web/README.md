@@ -71,6 +71,103 @@ the old one into `PALLET_SESSION_RETIRED_ENCRYPTION_KEYS` (`<id>:<key>,...`); ex
 and are re-encrypted on their next write. `PALLET_TRUSTED_PROXY_HOPS` must equal the number of proxies in
 front of the app that append to `X-Forwarded-For` (`0` locally: no client IP is forwarded).
 
+## Signed-in shell and organization context
+
+Everything under `(dashboard)` renders inside `DashboardShell`. Its layout resolves the session (none, or
+expired, goes to `/login?reason=expired&next=...`; `proxy.ts` hands it the requested path in
+`x-pallet-requested-path`, since layouts never see it) and prefetches the profile, my organizations and the
+unread count in parallel. The open organization is only ever the `[orgId]` segment, and the caller's role only
+`members/me`: `orgs/[orgId]/layout.tsx` reads both in parallel, answers `ORG_NOT_FOUND` and `NOT_A_MEMBER`
+alike with `orgs/not-found.tsx` (a layout's `notFound()` is caught one segment up), and provides
+`useOrgAccess()`. A screen decides whether to show a control with `useOrgAccess().can(capability)`, backed by
+`shared/domain/permissions.ts`, which mirrors every `@PreAuthorize` in org-team-service and
+git-integration-service; the backend's `403` stays the authority. `pallet_last_org` (not a secret) only picks
+where `/orgs` lands. An empty organization list right after sign-up is the projection lag, not an error:
+`/orgs` waits for it (`ProvisioningState`).
+
+## Account and sessions
+
+`/account` edits the display name, changes the password and lists the account's Keycloak sessions. A rename
+lands in the profile query before identity answers, so the page and the user menu change together, and rolls
+back on failure; members lists catch up when org-team-service projects `UserProfileUpdated`. A wrong current
+password is `401 INVALID_CREDENTIALS`, which the BFF passes through as an answer about the request, never as a
+revoked session. "This device" is the row whose id matches `keycloakSessionId` from `GET /api/session`; no
+session id is ever drawn. Ending a session removes its row at once, and `SESSION_NOT_FOUND` counts as ended.
+The `#security` fragment selects the password and sessions tab, including from the user menu while already on
+the page.
+
+## Organizations and step-up
+
+`/orgs/[orgId]/settings` renames the organization (`org.rename`), lists every organization of mine a hundred at a
+time, creates a team organization (also from the switcher) and deletes one (`org.delete`, team organizations
+only). A rename lands in the organization query from the `PATCH` response and re-reads my list, so the switcher
+follows. Deletion sends what was typed as `X-Confirm-Slug`; on `204` everything under `['org', orgId]` is
+removed rather than invalidated, `pallet_last_org` is cleared if it pointed there, and the page leaves for
+`/orgs`.
+
+An owner action that needs a recent sign-in answers `403 REAUTHENTICATION_REQUIRED`; refreshing never helps,
+since a refresh keeps the original `auth_time`. `useStepUp().runWithStepUp(action)` (`StepUpProvider`, mounted
+once in `composition/client.tsx`) runs the action, and only on that code asks for the password and runs it
+exactly once more; cancelling rejects with the original error. The password goes to
+`/api/session/reauthenticate`, which signs in again as the session's email, refuses tokens for any other `sub`,
+swaps them in under the same session id, then revokes the previous Keycloak session with the new bearer and the
+old refresh token, so step-up never leaves a second session in the account's list.
+
+## Members
+
+`/orgs/[orgId]/members` keeps its list state in the URL (`q`, `role`, `status`, `sort`, `page`, `size`) through
+one set of `nuqs` parsers that the page's server prefetch and the client both read, so the first paint and the
+client ask for the same page. `member-list-query.ts` owns the backend's sort whitelist (an unknown `sort` is
+dropped before any request), the page sizes, and the rule that `status=REMOVED` is only ever asked for by
+someone with `members.viewRemoved`. Any filter change returns to page 1; the search reaches the URL 300ms after
+typing stops. A row's menu offers exactly what `memberActions()` derives from `permissions.ts`. A role change
+shows on every cached list at once and rolls back on refusal; removal refreshes the lists, the organization's
+counts and teams; leaving drops everything under `['org', orgId]` and goes to `/orgs`; an ownership transfer
+runs through step-up and re-reads `members/me`, so every control on screen follows the caller's new role.
+Cache keys other modules invalidate (`['org', orgId, 'teams']`, my organizations) come from
+`shared/presentation/query/keys.ts`, so no module imports another to refresh it. `MemberPicker` is the combobox
+teams use to add people.
+
+## Invites
+
+The invites tab sits on the members page, but `invites` depends on `members` (the caller's access, and the
+member directory that names whoever sent an invite), so `members` can't import it back. `MembersView` takes an
+`invites` slot (the panel and the button beside the title) that the route page fills, and shows the tabs only
+when `invites.manage` allows them, which is never in a personal organization. `InvitesProvider` owns the one
+invite dialog, so the page's button and a row's "Invite again" share it. `InvitesTab` renders nothing for
+anyone else, before any query hook runs, so a developer never sends a request that can only answer `403`.
+
+URL state: the members page's `tab`, plus `inviteStatus` (`PENDING` by default, or `ACCEPTED`, `REVOKED`,
+`EXPIRED`, `ALL`) and `invitePage`, named apart from the members list's `status` and `page`. A row offers
+resend and revoke only while `isActionable()` holds by the injected clock, and only on invites whose role the
+caller could grant (`canManageInvite()`, as `MembershipPolicy.checkCanInvite` checks resends and revokes).
+Inviter names come from one read of up to a hundred active members, owners and admins first; anyone missing
+reads as "A former member".
+
+Create maps `ALREADY_A_MEMBER`, `MEMBER_PREVIOUSLY_REMOVED` and `INVITE_ALREADY_PENDING` onto the email field,
+and offers to resend the pending invite for the last one; `QUOTA_EXCEEDED` and `PERSONAL_ORG_IMMUTABLE` aren't
+about the address, so they show above the form. Resend updates the row in every cached list; a cooldown
+`429` turns the row's button into a countdown from `Retry-After`, and `QUOTA_EXCEEDED` shows the backend's own
+message, which names the limit. Revoke is optimistic on pending lists. When the invite was accepted, revoked
+or had lapsed first, `revokeInvite` reports what it became instead of failing. No response carries the invite
+token or link, so the dashboard never handles them.
+
+### Accepting an invite
+
+The emailed link opens `/invites/[token]`, a public page served with `Referrer-Policy: no-referrer`. The
+page prefetches the preview without any session (`getPublicServerUseCases`), so a dead session can't fail
+it, and the first paint already says what the invite is. `previewInvite` and both accept use cases answer
+outcomes rather than throwing for a dead link: `INVALID_TOKEN` and `INVITE_NO_LONGER_VALID` read as
+**expired** when the token's own `exp` has passed by the injected clock and as **withdrawn** otherwise. The
+token's claims are read unverified, and only for that expiry and for the `orgId` to wait for after joining;
+the invited address in it is never read.
+
+A signed-out visitor sets a password (`POST /identity/invites/{token}/accept`) and goes to
+`/login?joined=<orgName>`. A `409 CONFLICT` (the address already has an account) switches to signing in,
+with `next` pointing back at the invite. A signed-in visitor joins as that account only when
+`NEXT_PUBLIC_INVITE_EXISTING_ACCOUNT` is on, which waits for `identity-service/15`. Joining then polls my
+organizations until the membership is projected, and `INVITE_EMAIL_MISMATCH` offers to sign out.
+
 ## API contracts
 
 Request and response types come from each service's OpenAPI spec, never written by hand. With the stack up,

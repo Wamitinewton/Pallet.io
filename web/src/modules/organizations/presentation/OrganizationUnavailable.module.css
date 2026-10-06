@@ -1,0 +1,15 @@
+.item {
+    padding: 0;
+}
+
+.link {
+    display: block;
+    width: 100%;
+    padding: 14px 20px;
+    color: inherit;
+}
+
+.link:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+}

@@ -2,6 +2,7 @@ import "server-only";
 
 import { makeEndSession, type EndSession } from "@/modules/session/application/end-session";
 import type { SessionStore, TokenIssuer } from "@/modules/session/application/ports";
+import { makeReauthenticate } from "@/modules/session/application/reauthenticate";
 import { makeReplaceTokens, type ReplaceTokens } from "@/modules/session/application/replace-tokens";
 import { makeResolveSession, type ResolveSession } from "@/modules/session/application/resolve-session";
 import { makeStartSession, type StartSession } from "@/modules/session/application/start-session";
@@ -9,6 +10,7 @@ import { createGatewayProxy, type GatewayProxy } from "@/modules/session/infrast
 import { identityTokenIssuer } from "@/modules/session/infrastructure/identity-token-issuer";
 import { createLoginHandler } from "@/modules/session/infrastructure/login-handler";
 import { createLogoutHandler } from "@/modules/session/infrastructure/logout-handler";
+import { createReauthenticateHandler } from "@/modules/session/infrastructure/reauthenticate-handler";
 import { lazyRedisConnection, type RedisConnection } from "@/modules/session/infrastructure/redis-client";
 import { redisSessionStore } from "@/modules/session/infrastructure/redis-session-store";
 import { redisRefreshLock } from "@/modules/session/infrastructure/refresh-lock";
@@ -37,6 +39,7 @@ export interface SessionRuntime {
     readonly sessionSummary: (request: Request) => Promise<Response>;
     readonly login: (request: Request) => Promise<Response>;
     readonly logout: (request: Request) => Promise<Response>;
+    readonly reauthenticate: (request: Request) => Promise<Response>;
     readonly logger: Logger;
 }
 
@@ -103,6 +106,15 @@ export function buildSessionRuntime(env: ServerEnv, overrides: SessionRuntimeOve
         sessionSummary: createSessionSummaryHandler({ cookie, resolveSession, trustedProxyHops, clock }),
         login: createLoginHandler({ cookie, startSession, publicOrigin, trustedProxyHops, clock, logger }),
         logout: createLogoutHandler({ cookie, endSession, publicOrigin, trustedProxyHops, logger }),
+        reauthenticate: createReauthenticateHandler({
+            cookie,
+            resolveSession,
+            reauthenticate: makeReauthenticate({ store, issuer, replaceTokens }),
+            publicOrigin,
+            trustedProxyHops,
+            clock,
+            logger,
+        }),
         logger,
     };
 }

@@ -1,0 +1,36 @@
+.page {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 12px;
+    min-height: 100vh;
+    padding: 24px 16px;
+    text-align: center;
+}
+
+.text {
+    max-width: 44ch;
+    color: var(--muted);
+}
+
+.reference {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.button {
+    min-height: 36px;
+    margin-top: 8px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: var(--blue);
+    color: var(--on-blue);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: var(--blue-hover);
+}

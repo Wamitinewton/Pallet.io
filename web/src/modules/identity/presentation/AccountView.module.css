@@ -1,0 +1,71 @@
+.head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.who {
+    min-width: 0;
+}
+
+.who h1 {
+    overflow-wrap: anywhere;
+}
+
+.email {
+    margin-top: 4px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.tabs {
+    margin-bottom: 24px;
+}
+
+.security {
+    scroll-margin-top: 80px;
+}
+
+.confirmed {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.confirmed svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    color: var(--green-text);
+}
+
+.footEnd {
+    justify-content: flex-end;
+}
+
+.session {
+    flex: 1;
+    min-width: 0;
+}
+
+.device {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.device svg {
+    width: 18px;
+    height: 18px;
+}
+
+.thisDevice .device {
+    background: var(--green-soft);
+    color: var(--green-text);
+}

@@ -1,0 +1,78 @@
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.panel {
+    overflow: hidden;
+}
+
+.stale {
+    opacity: 0.6;
+    transition: opacity 120ms;
+}
+
+.email {
+    color: var(--ink);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.email[data-past] {
+    color: var(--muted);
+}
+
+.meta {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.small {
+    color: var(--muted);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.lapsed {
+    color: var(--amber-text);
+    font-weight: 500;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.count {
+    font-variant-numeric: tabular-nums;
+}
+
+.pagination {
+    margin-top: 16px;
+}
+
+.roleOptions {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.resendPending {
+    margin-top: 8px;
+}
+
+.skeletonText {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stale {
+        transition: none;
+    }
+}

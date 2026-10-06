@@ -1,0 +1,37 @@
+.heading {
+    gap: 14px;
+}
+
+.title {
+    margin-top: 4px;
+    font-size: 24px;
+}
+
+.inviter {
+    color: var(--ink);
+}
+
+.email {
+    overflow-wrap: anywhere;
+}
+
+.form,
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.separator {
+    margin: 4px 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+.lede {
+    margin-top: 4px;
+}
+
+.panel:focus {
+    outline: none;
+}
