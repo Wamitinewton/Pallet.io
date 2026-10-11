@@ -123,6 +123,8 @@ describe("OverviewView", () => {
         expect(screen.getByRole("link", { name: "6 members" })).toHaveAttribute("href", "/orgs/org-kilima/members");
         expect(screen.getByRole("link", { name: "3 teams" })).toHaveAttribute("href", "/orgs/org-kilima/teams");
         expect(screen.getByText("pallet.dev/kilima-labs")).toBeInTheDocument();
+        // A read still in flight here lands in the next test's handlers and inflates its counts.
+        await settled();
     });
 
     it("lists the newest apps with their latest push, reading no more than five links", async () => {
