@@ -34,8 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class PayloadParser {
 
-    static final int MAX_MESSAGE_LENGTH = 256;
-    static final int MAX_AUTHOR_LENGTH = 256;
+    public static final int MAX_MESSAGE_LENGTH = 256;
+    public static final int MAX_AUTHOR_LENGTH = 256;
     static final int MAX_REF_NAME_BYTES = 255;
     static final int MAX_PATH_LENGTH = 4096;
 
@@ -310,7 +310,7 @@ public class PayloadParser {
         return sha.chars().allMatch(c -> c == '0');
     }
 
-    static String firstLine(String text) {
+    public static String firstLine(String text) {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
@@ -320,7 +320,7 @@ public class PayloadParser {
         return text;
     }
 
-    static String truncate(String text, int maxLength) {
+    public static String truncate(String text, int maxLength) {
         if (text.length() <= maxLength) {
             return text;
         }

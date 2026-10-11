@@ -25,7 +25,6 @@ import {
     Th,
     VisuallyHidden,
 } from "@/shared/presentation/ui";
-import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { installationSettingsUrl, type InstallationLink } from "../domain/installation";
 import {
@@ -46,11 +45,10 @@ import {
     STATUS_LABEL,
     SUSPENDED_FOOT_COPY,
 } from "./github-copy";
-import { useGitHubUseCases } from "./github-use-cases";
 import styles from "./GitHub.module.css";
 import { GitHubAvatar } from "./GitHubAvatar";
-import { githubQueries } from "./queries";
 import { UnlinkInstallationDialog } from "./UnlinkInstallationDialog";
+import { useOrgInstallations } from "./use-org-installations";
 
 const LOADING_ROWS = 2;
 
@@ -63,8 +61,7 @@ export interface InstallationListProps {
 
 export function InstallationList({ orgId, orgName, connectAction }: InstallationListProps) {
     const canManage = useOrgAccess().can("github.installations.manage");
-    const { listOrgInstallations } = useGitHubUseCases();
-    const installations = useQuery(githubQueries.installations(listOrgInstallations, orgId));
+    const installations = useOrgInstallations(orgId);
     const members = useMemberDirectory(orgId);
     const [unlinking, setUnlinking] = useState<InstallationLink>();
 

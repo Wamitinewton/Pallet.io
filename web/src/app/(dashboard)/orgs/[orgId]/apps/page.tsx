@@ -1,6 +1,7 @@
 import { getServerUseCases, rethrowServerFailure } from "@/composition/server";
-import { appListQuery, appQueries, AppsView, loadAppSearchParams } from "@/modules/apps";
+import { appListQuery, appQueries, loadAppSearchParams } from "@/modules/apps";
 import { organizationQueries, orgIdFromParam } from "@/modules/organizations";
+import { AppsWithRepositoriesView } from "@/modules/repo-links";
 import { teamQueries } from "@/modules/teams";
 import { getServerQueryClient } from "@/shared/presentation/query/get-server-query-client";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
@@ -10,7 +11,10 @@ export const metadata: Metadata = {
     title: "Apps",
 };
 
-/** The table and the team names draw their own states, so a failed prefetch only costs a client fetch. */
+/**
+ * The table and the team names draw their own states, so a failed prefetch only costs a client fetch. Each
+ * row's repository is read in the browser, so the server doesn't spend a page of requests before first paint.
+ */
 const ignore = () => undefined;
 
 export default async function AppsPage({ params, searchParams }: PageProps<"/orgs/[orgId]/apps">) {
@@ -29,7 +33,7 @@ export default async function AppsPage({ params, searchParams }: PageProps<"/org
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>
-            <AppsView orgId={orgId} orgName={organization.name} />
+            <AppsWithRepositoriesView orgId={orgId} orgName={organization.name} />
         </HydrationBoundary>
     );
 }

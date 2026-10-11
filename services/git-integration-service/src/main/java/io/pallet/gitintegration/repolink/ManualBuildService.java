@@ -109,7 +109,8 @@ public class ManualBuildService {
         }
         requireWithinLimit(orgId, appId);
         String branch = requested == null ? link.productionBranch() : requested;
-        String sha = verifier.branchHead(link.installationId(), link.repoId(), branch);
+        String sha = verifier.branchHead(link.installationId(), link.repoId(), branch)
+                .sha();
         return Objects.requireNonNull(transaction.execute(status -> {
             RepoLink locked = links.lockActive(orgId, appId).orElseThrow(RepoLinkNotFoundException::new);
             if (locked.installationId() != link.installationId()

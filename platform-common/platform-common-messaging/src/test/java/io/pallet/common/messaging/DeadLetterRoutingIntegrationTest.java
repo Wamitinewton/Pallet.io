@@ -48,6 +48,7 @@ import tools.jackson.databind.JsonNode;
 class DeadLetterRoutingIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))
             .withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false");
 

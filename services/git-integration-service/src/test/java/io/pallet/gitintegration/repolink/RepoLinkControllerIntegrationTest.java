@@ -104,6 +104,10 @@ class RepoLinkControllerIntegrationTest {
         assertThat(link.path("productionBranch").asString()).isEqualTo("main");
         assertThat(link.path("autoDeploy").asBoolean()).isTrue();
         assertThat(link.path("lastAcceptedHead").path("sha").asString()).isEqualTo(HEAD);
+        assertThat(link.path("lastAcceptedHead").path("message").asString())
+                .isEqualTo(GitHubApiStub.BRANCH_COMMIT_MESSAGE);
+        assertThat(link.path("lastAcceptedHead").path("author").asString())
+                .isEqualTo(GitHubApiStub.BRANCH_COMMIT_AUTHOR);
         assertThat(link.path("verification").path("githubLogin").asString()).isEqualTo(GITHUB_LOGIN);
         assertThat(row())
                 .containsEntry("status", "ACTIVE")

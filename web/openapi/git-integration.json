@@ -255,8 +255,22 @@
             "format": "date-time",
             "type": "string"
           },
+          "author": {
+            "description": "The commit author's GitHub login, else their name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "branch": {
             "type": "string"
+          },
+          "message": {
+            "description": "The commit's first line; null for a head stored before it was kept.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sha": {
             "type": "string"

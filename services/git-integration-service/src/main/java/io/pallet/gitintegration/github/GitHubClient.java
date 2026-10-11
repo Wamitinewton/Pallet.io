@@ -178,18 +178,19 @@ public class GitHubClient {
      * @return empty when the branch doesn't exist
      * @throws GitHubExceptions.GitHubNotFoundException if GitHub refused the repository-scoped mint
      */
-    public Optional<String> branchHead(long installationId, long repoId, String branch) {
+    public Optional<Branch.Commit> branchHead(long installationId, long repoId, String branch) {
         return branchHead(installationId, repoId, branch, null).map(GitHubResponse::body);
     }
 
     /**
      * {@link #branchHead(long, long, String)}, conditional on {@code etag}: a branch that still matches it comes back
-     * as {@link GitHubResponse#notModified()}, which costs no budget. The body of any other answer is the head SHA.
+     * as {@link GitHubResponse#notModified()}, which costs no budget. The body of any other answer is the head commit.
      *
      * @param etag the {@code ETag} of an earlier read of this branch, or null
      * @return empty when the branch doesn't exist
      */
-    public Optional<GitHubResponse<String>> branchHead(long installationId, long repoId, String branch, String etag) {
+    public Optional<GitHubResponse<Branch.Commit>> branchHead(
+            long installationId, long repoId, String branch, String etag) {
         GitHubRequest<Branch> request = GitHubRequest.get(
                         "repository.branch.get", Branch.class, "/repositories/{id}/branches/{branch}", repoId, branch)
                 .onNotFound(BranchMissingException::new);
@@ -210,7 +211,7 @@ public class GitHubClient {
                 || !SHA.matcher(body.commit().sha()).matches()) {
             throw new IllegalStateException("GitHub answered GET /repositories/{id}/branches/{branch} without a SHA");
         }
-        return Optional.of(GitHubResponse.of(body.commit().sha(), response.etag(), null));
+        return Optional.of(GitHubResponse.of(body.commit(), response.etag(), null));
     }
 
     /**

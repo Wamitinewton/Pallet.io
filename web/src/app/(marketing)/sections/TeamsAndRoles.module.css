@@ -1,0 +1,50 @@
+.highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 10px 0 0;
+    padding: 0;
+    color: var(--ink);
+    font-weight: 500;
+    list-style: none;
+}
+
+.highlights li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.highlightIcon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--blue-text);
+}
+
+.panel {
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.panel .table {
+    font-size: 14.5px;
+}
+
+.roleCell {
+    width: 130px;
+}
+
+.can {
+    color: var(--text);
+    line-height: 1.55;
+}
+
+.table tbody tr {
+    height: 64px;
+}

@@ -1,0 +1,164 @@
+.grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.address {
+    font-family: var(--font-mono);
+}
+
+.statsSkeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 20px;
+}
+
+.rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 16px;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+}
+
+.rows > li:last-child .row {
+    border-bottom: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+.row:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+}
+
+.name {
+    overflow: hidden;
+    color: var(--ink);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.fact svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    color: var(--faint);
+}
+
+.skeletonRow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.skeletonRow:last-child {
+    border-bottom: 0;
+}
+
+.item {
+    align-items: flex-start;
+}
+
+.glyph {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: var(--r-md);
+}
+
+.glyph svg {
+    width: 16px;
+    height: 16px;
+}
+
+.glyph[data-tone="red"] {
+    background: var(--red-soft);
+    color: var(--red-text);
+}
+
+.glyph[data-tone="amber"] {
+    background: var(--amber-soft);
+    color: var(--amber-text);
+}
+
+.glyph[data-tone="blue"] {
+    background: var(--blue-soft);
+    color: var(--blue-text);
+}
+
+.itemText {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.itemTitle {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.itemDescription {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.itemAction {
+    font-size: 13px;
+}
+
+.incomplete {
+    margin: 0 20px 16px;
+}
+
+@media (max-width: 960px) {
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .row,
+    .skeletonRow {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .incomplete {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+}

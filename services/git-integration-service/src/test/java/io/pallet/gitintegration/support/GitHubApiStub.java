@@ -64,6 +64,11 @@ public final class GitHubApiStub implements BeforeEachCallback {
     public static final String META_PATH = "/meta";
     public static final int PAGE_SIZE = 100;
 
+    /** The head commit every stubbed branch answers with, its message carrying a body after the first line. */
+    public static final String BRANCH_COMMIT_MESSAGE = "Tune startup probe";
+
+    public static final String BRANCH_COMMIT_AUTHOR = "fixture-dev";
+
     /** One entry of the app's webhook delivery log. */
     public record LoggedDelivery(long id, String guid, Instant deliveredAt, String status, String event) {
 
@@ -258,8 +263,8 @@ public final class GitHubApiStub implements BeforeEachCallback {
     }
 
     public void stubBranch(long repoId, String branch, String sha) {
-        Server.INSTANCE.stubFor(get(urlPathEqualTo(branchPath(repoId, branch)))
-                .willReturn(json("{\"name\":\"" + branch + "\",\"commit\":{\"sha\":\"" + sha + "\"}}")));
+        Server.INSTANCE.stubFor(
+                get(urlPathEqualTo(branchPath(repoId, branch))).willReturn(json(branchBody(branch, sha))));
     }
 
     /** {@code status} is {@code ahead}, {@code behind}, {@code identical}, or {@code diverged}. */
@@ -338,8 +343,7 @@ public final class GitHubApiStub implements BeforeEachCallback {
                 .willReturn(aResponse().withStatus(304).withHeader("ETag", etag)));
         Server.INSTANCE.stubFor(get(urlPathEqualTo(branchPath(repoId, branch)))
                 .atPriority(2)
-                .willReturn(json("{\"name\":\"" + branch + "\",\"commit\":{\"sha\":\"" + sha + "\"}}")
-                        .withHeader("ETag", etag)));
+                .willReturn(json(branchBody(branch, sha)).withHeader("ETag", etag)));
     }
 
     /**
@@ -408,6 +412,12 @@ public final class GitHubApiStub implements BeforeEachCallback {
 
     public static String commitPath(long repoId, String sha) {
         return repositoryPath(repoId) + "/commits/" + sha;
+    }
+
+    private static String branchBody(String branch, String sha) {
+        return "{\"name\":\"" + branch + "\",\"commit\":{\"sha\":\"" + sha + "\",\"commit\":{\"message\":\""
+                + BRANCH_COMMIT_MESSAGE + "\\n\\nLonger rationale\",\"author\":{\"name\":\"Fixture Dev\"}},"
+                + "\"author\":{\"login\":\"" + BRANCH_COMMIT_AUTHOR + "\"}}}";
     }
 
     public static String branchPath(long repoId, String branch) {

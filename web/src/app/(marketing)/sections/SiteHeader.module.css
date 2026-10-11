@@ -1,0 +1,64 @@
+.header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: saturate(1.6) blur(10px);
+}
+
+.bar {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    min-height: 64px;
+}
+
+.nav {
+    display: flex;
+    gap: 4px;
+}
+
+.nav a {
+    padding: 6px 10px;
+    border-radius: var(--r-sm);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+    transition:
+        color 120ms,
+        background-color 120ms;
+}
+
+.nav a:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+@media (max-width: 960px) {
+    .nav {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .bar {
+        gap: 12px;
+    }
+
+    .actions {
+        gap: 2px;
+    }
+
+    .actions .signUp {
+        display: none;
+    }
+}

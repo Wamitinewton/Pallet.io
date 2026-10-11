@@ -24,6 +24,7 @@ import io.pallet.gitintegration.repolink.RepoLinkExceptions.RepoLinkNotFoundExce
 import io.pallet.gitintegration.repolink.dto.PatchRepoLinkRequest;
 import io.pallet.gitintegration.repolink.dto.PutRepoLinkRequest;
 import io.pallet.gitintegration.repolink.dto.RepoLinkDto;
+import io.pallet.gitintegration.scm.ScmProvider.HeadCommit;
 import io.pallet.gitintegration.security.AccessExceptions.AppNotFoundException;
 import io.pallet.gitintegration.security.AccessExceptions.InstallationNotFoundException;
 import io.pallet.gitintegration.security.ResourceScope;
@@ -132,10 +133,11 @@ public class RepoLinkService {
                 throw new RepoLinkExistsException();
             }
             heads.deleteAll(orgId, appId);
-            heads.insert(orgId, appId, access.branch(), access.headSha());
+            HeadCommit head = access.head();
+            heads.insert(orgId, appId, access.branch(), head.sha(), head.message(), head.author());
             RepoLink link = requireLink(orgId, appId);
             if (request.deployNowOrDefault()) {
-                outbox.append(pushes.linked(link, access.headSha()));
+                outbox.append(pushes.linked(link, head.sha()));
                 metrics.published(GitPushReceived.TRIGGER_LINKED);
             }
             outbox.append(AuditEvents.repoLinkCreated(
@@ -316,7 +318,8 @@ public class RepoLinkService {
 
     private RepoLinkDto view(RepoLink link) {
         RepoLinkDto.Head head = heads.findHead(link.orgId(), link.appId(), link.productionBranch())
-                .map(found -> new RepoLinkDto.Head(found.branch(), found.headSha(), found.advancedAt()))
+                .map(found -> new RepoLinkDto.Head(
+                        found.branch(), found.headSha(), found.advancedAt(), found.headMessage(), found.headAuthor()))
                 .orElse(null);
         RepoLinkDto.Verification verification = link.verifiedGithubLogin() == null
                 ? null

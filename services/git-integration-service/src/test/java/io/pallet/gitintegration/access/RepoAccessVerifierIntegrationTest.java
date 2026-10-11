@@ -11,6 +11,7 @@ import io.pallet.gitintegration.access.RepoAccessExceptions.RepositoryNotAccessi
 import io.pallet.gitintegration.access.RepoAccessExceptions.RepositoryPermissionTooLowException;
 import io.pallet.gitintegration.access.RepoAccessVerifier.VerifiedAccess;
 import io.pallet.gitintegration.repolink.RepoLinkApi;
+import io.pallet.gitintegration.scm.ScmProvider.HeadCommit;
 import io.pallet.gitintegration.session.GitHubAuthorizationService;
 import io.pallet.gitintegration.session.GitHubUserSession;
 import io.pallet.gitintegration.session.GitHubUserSessionStore;
@@ -136,7 +137,9 @@ class RepoAccessVerifierIntegrationTest {
         assertThat(access.githubLogin()).isEqualTo(session.githubLogin());
         assertThat(access.fullName()).isEqualTo("octo-org/repo-" + REPO);
         assertThat(access.branch()).isEqualTo("main");
-        assertThat(access.headSha()).isEqualTo(HEAD);
+        assertThat(access.head())
+                .isEqualTo(
+                        new HeadCommit(HEAD, GitHubApiStub.BRANCH_COMMIT_MESSAGE, GitHubApiStub.BRANCH_COMMIT_AUTHOR));
     }
 
     @Test

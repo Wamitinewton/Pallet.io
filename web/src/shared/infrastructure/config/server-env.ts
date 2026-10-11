@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const ENCRYPTION_KEY_BYTES = 32;
 
-const httpUrl = z
+export const httpUrl = z
     .url({ protocol: /^https?$/, error: "must be an http(s) URL" })
     .transform((url) => url.replace(/\/+$/, ""));
 

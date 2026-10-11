@@ -82,6 +82,14 @@ final class RecoveryScenario {
         return headColumn(appId, "etag");
     }
 
+    Optional<String> message(UUID appId) {
+        return headColumn(appId, "head_message");
+    }
+
+    Optional<String> author(UUID appId) {
+        return headColumn(appId, "head_author");
+    }
+
     /** Every {@code GitPushReceived} in the outbox for the org, in the order it was appended. */
     List<JsonNode> published(String orgId) {
         return jdbc.query("""

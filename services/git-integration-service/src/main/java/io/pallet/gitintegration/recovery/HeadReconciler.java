@@ -259,7 +259,7 @@ class HeadReconciler {
                     .filter(link -> sameTarget(link, pair))
                     .map(link -> pushes.reconcile(
                             link,
-                            read.sha(),
+                            read.head(),
                             read.etag(),
                             runNonce,
                             lookup -> Optional.ofNullable(answers.get(lookup))))

@@ -12,6 +12,7 @@ import io.pallet.gitintegration.config.GitIntegrationProperties;
 import io.pallet.gitintegration.github.GitHubExceptions.GitHubForbiddenException;
 import io.pallet.gitintegration.github.GitHubExceptions.GitHubNotFoundException;
 import io.pallet.gitintegration.scm.ScmProvider;
+import io.pallet.gitintegration.scm.ScmProvider.HeadCommit;
 import io.pallet.gitintegration.session.GitHubAuthorizationService;
 import io.pallet.gitintegration.session.GitHubUserSession;
 import io.pallet.gitintegration.session.RepositoryAccess;
@@ -30,7 +31,7 @@ public class RepoAccessVerifier {
             long repoId,
             String fullName,
             String branch,
-            String headSha,
+            HeadCommit head,
             long githubUserId,
             String githubLogin,
             RepoPermission permission) {}
@@ -81,12 +82,12 @@ public class RepoAccessVerifier {
                     return new RepositoryPermissionTooLowException(minPermission);
                 });
         String checked = branch == null ? repository.defaultBranch() : branch;
-        String headSha = branchHead(installationId, repoId, checked);
+        HeadCommit head = branchHead(installationId, repoId, checked);
         return new VerifiedAccess(
                 repoId,
                 repository.fullName(),
                 checked,
-                headSha,
+                head,
                 session.githubUserId(),
                 session.githubLogin(),
                 permission);
@@ -98,7 +99,7 @@ public class RepoAccessVerifier {
      * @throws RepositoryNotAccessibleException if GitHub refuses a token narrowed to the repository
      * @throws BranchNotFoundException if the branch doesn't exist
      */
-    public String branchHead(long installationId, long repoId, String branch) {
+    public HeadCommit branchHead(long installationId, long repoId, String branch) {
         try {
             return scm.branchHead(installationId, repoId, branch).orElseThrow(BranchNotFoundException::new);
         } catch (GitHubNotFoundException | GitHubForbiddenException e) {

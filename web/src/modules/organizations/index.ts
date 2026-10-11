@@ -15,7 +15,6 @@ export { LAST_ORGANIZATION_COOKIE } from "./presentation/last-organization";
 export { NewOrganizationDialog } from "./presentation/NewOrganizationDialog";
 export type { NewOrganizationDialogProps } from "./presentation/NewOrganizationDialog";
 export { OrganizationUseCasesProvider } from "./presentation/organization-use-cases";
-export { OrganizationOverview } from "./presentation/OrganizationOverview";
 export { OrganizationUnavailable } from "./presentation/OrganizationUnavailable";
 export { OrgSettingsView } from "./presentation/OrgSettingsView";
 export { OrgSwitcher } from "./presentation/OrgSwitcher";

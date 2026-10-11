@@ -8,6 +8,7 @@ import { PageBreadcrumbs } from "@/shared/presentation/shell";
 import { Button, EmptyState, Icon, Page, PageHead, Pagination, Panel, PanelFoot } from "@/shared/presentation/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, type ReactNode } from "react";
+import type { App } from "../domain/app";
 import { appListQuery, CLEARED_APP_FILTERS, isFiltered } from "../domain/app-list-query";
 import {
     appCountCopy,
@@ -40,9 +41,14 @@ const LOADING_ROWS = 4;
 export interface AppsViewProps {
     readonly orgId: OrgId;
     readonly orgName: string;
+    /**
+     * The repository column for each app on screen. The repository-links module draws it, and depends on this
+     * module, so it hands the column in rather than this module importing it.
+     */
+    readonly renderRepository?: (app: App) => ReactNode;
 }
 
-export function AppsView({ orgId, orgName }: AppsViewProps) {
+export function AppsView({ orgId, orgName, renderRepository }: AppsViewProps) {
     const access = useOrgAccess();
     const { listApps } = useAppUseCases();
     const { params, changeFilters, goToPage } = useAppListParams();
@@ -133,6 +139,7 @@ export function AppsView({ orgId, orgName }: AppsViewProps) {
                 teams={teamsById}
                 sort={query.sort}
                 busy={apps.isPlaceholderData}
+                {...(renderRepository !== undefined && { renderRepository })}
             />
         );
     };

@@ -94,6 +94,13 @@ public final class PushScenario {
                 .findFirst();
     }
 
+    /** The head's stored {@code head_message} and {@code head_author}. */
+    public Map<String, Object> headCommit(UUID appId) {
+        return jdbc.queryForMap(
+                "SELECT head_message, head_author FROM git_integration.branch_heads WHERE app_id = ? AND branch = 'main'",
+                appId);
+    }
+
     public WebhookFixtures.Delivery push(String before, String after) {
         return push("push-main.json", before, after);
     }

@@ -34,6 +34,12 @@ public class BranchHead {
     @Column(length = MAX_ETAG_LENGTH)
     private String etag;
 
+    @Column(name = "head_message")
+    private String headMessage;
+
+    @Column(name = "head_author")
+    private String headAuthor;
+
     protected BranchHead() {}
 
     public UUID appId() {
@@ -54,6 +60,15 @@ public class BranchHead {
 
     public String etag() {
         return etag;
+    }
+
+    /** The head commit's first line, untrusted; null when the source carried none or the head predates storing it. */
+    public String headMessage() {
+        return headMessage;
+    }
+
+    public String headAuthor() {
+        return headAuthor;
     }
 
     @Embeddable

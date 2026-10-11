@@ -1,6 +1,8 @@
 import { getServerUseCases, rethrowServerFailure } from "@/composition/server";
 import { appIdFromParam, appQueries, AppView, isAppUnavailable } from "@/modules/apps";
+import { githubQueries } from "@/modules/github";
 import { organizationQueries, orgIdFromParam } from "@/modules/organizations";
+import { ManualBuildButton, repoLinkQueries, RepositoryPanel } from "@/modules/repo-links";
 import { teamQueries } from "@/modules/teams";
 import { getServerQueryClient } from "@/shared/presentation/query/get-server-query-client";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
@@ -15,7 +17,7 @@ function settleAppFailure(error: unknown): Promise<never> {
     return rethrowServerFailure(error);
 }
 
-/** The team names draw their own state, so a failed prefetch only costs a client fetch. */
+/** The team names and the repository tab draw their own states, so a failed prefetch only costs a client fetch. */
 const ignore = () => undefined;
 
 export async function generateMetadata({ params }: AppPageProps): Promise<Metadata> {
@@ -34,7 +36,7 @@ export default async function AppPage({ params }: AppPageProps) {
     const appId = appIdFromParam(appParam);
     if (appId === undefined) notFound();
 
-    const { organizations, apps, teams } = getServerUseCases();
+    const { organizations, apps, teams, repoLinks, github } = getServerUseCases();
     const queryClient = getServerQueryClient();
 
     const organization = await queryClient
@@ -43,11 +45,19 @@ export default async function AppPage({ params }: AppPageProps) {
     await Promise.all([
         queryClient.query(appQueries.detail(apps.getApp, orgId, appId)).catch(settleAppFailure),
         queryClient.query(teamQueries.directory(teams.listTeams, orgId)).catch(ignore),
+        queryClient.query(repoLinkQueries.link(repoLinks.getRepoLink, orgId, appId)).catch(ignore),
+        queryClient.query(githubQueries.installations(github.listOrgInstallations, orgId)).catch(ignore),
     ]);
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>
-            <AppView orgId={orgId} orgName={organization.name} appId={appId} />
+            <AppView
+                orgId={orgId}
+                orgName={organization.name}
+                appId={appId}
+                repository={<RepositoryPanel orgId={orgId} orgName={organization.name} appId={appId} />}
+                actions={<ManualBuildButton orgId={orgId} appId={appId} />}
+            />
         </HydrationBoundary>
     );
 }

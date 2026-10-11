@@ -8,6 +8,7 @@ import {
     formatAppSort,
     isFiltered,
     MAX_APP_SEARCH_LENGTH,
+    NEWEST_APPS_QUERY,
     NO_TEAM_PARAM,
     parseAppSort,
     teamAppsQuery,
@@ -122,6 +123,24 @@ describe("teamAppsQuery", () => {
             sort: { field: "name", direction: "asc" },
             page: 0,
             size: 10,
+        });
+    });
+});
+
+describe("NEWEST_APPS_QUERY", () => {
+    it("asks for the five most recently created apps, on a sort the backend accepts", () => {
+        expect(NEWEST_APPS_QUERY).toEqual({
+            q: "",
+            team: { kind: "any" },
+            cloudProvider: null,
+            sort: { field: "createdAt", direction: "desc" },
+            page: 0,
+            size: 5,
+        });
+        expect(toPageRequest(NEWEST_APPS_QUERY)).toEqual({
+            page: 0,
+            size: 5,
+            sort: [{ field: "createdAt", direction: "desc" }],
         });
     });
 });

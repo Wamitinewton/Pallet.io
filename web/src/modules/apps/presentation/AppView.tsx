@@ -16,21 +16,19 @@ import {
     TabsTrigger,
     VisuallyHidden,
 } from "@/shared/presentation/ui";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo, type ReactNode } from "react";
 import { isAppUnavailable, type App } from "../domain/app";
 import { APPS_TITLE_COPY, LOADING_APP_COPY, TAB_LABEL, TABS_LABEL_COPY, TEAM_LABEL_COPY } from "./app-copy";
 import { appsPath, orgOverviewPath } from "./app-paths";
-import { useAppUseCases } from "./app-use-cases";
 import { AppFactsPanel } from "./AppFactsPanel";
 import styles from "./Apps.module.css";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import { AppTeam, byTeamId } from "./AppTeam";
 import { AppUnavailable } from "./AppUnavailable";
 import { DeleteAppPanel } from "./DeleteAppPanel";
-import { appQueries } from "./queries";
 import { RunsOn } from "./RunsOn";
 import { APP_PAGE_TABS, type AppPageTab } from "./search-params";
+import { useApp } from "./use-app";
 import { useAppTab } from "./use-app-params";
 
 /**
@@ -51,8 +49,7 @@ export interface AppViewProps extends AppViewSlots {
 }
 
 export function AppView({ orgId, orgName, appId, ...slots }: AppViewProps) {
-    const { getApp } = useAppUseCases();
-    const app = useQuery(appQueries.detail(getApp, orgId, appId));
+    const app = useApp(orgId, appId);
 
     if (app.data !== undefined) return <AppPage orgId={orgId} orgName={orgName} app={app.data} {...slots} />;
     if (isAppUnavailable(app.error)) return <AppUnavailable orgId={orgId} />;
