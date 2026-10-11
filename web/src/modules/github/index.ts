@@ -1,5 +1,6 @@
 export type { GitHubUseCases } from "./application/use-cases";
 export type { GitHubSession } from "./domain/github-session";
+export { installationSettingsUrl } from "./domain/installation";
 export type { GitHubAccountType, InstallationLink, InstallationStatus } from "./domain/installation";
 export { githubPath } from "./presentation/github-paths";
 export { GitHubUseCasesProvider } from "./presentation/github-use-cases";
@@ -9,6 +10,8 @@ export { GitHubCallback } from "./presentation/GitHubCallback";
 export { GitHubView } from "./presentation/GitHubView";
 export type { GitHubViewProps } from "./presentation/GitHubView";
 export { githubKeys, githubQueries } from "./presentation/queries";
+export { forgetGitHubSession, isGitHubSessionGone } from "./presentation/use-github-mutations";
 export { useStartAuthorization } from "./presentation/use-github-redirect";
 export type { GitHubHandoffController } from "./presentation/use-github-redirect";
 export { useGitHubSession } from "./presentation/use-github-session";
+export { useOrgInstallations } from "./presentation/use-org-installations";

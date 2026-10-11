@@ -1,0 +1,125 @@
+.hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(60% 55% at 85% 20%, color-mix(in srgb, var(--blue) 14%, transparent), transparent 70%),
+        radial-gradient(40% 45% at 5% 95%, color-mix(in srgb, var(--green) 10%, transparent), transparent 70%);
+}
+
+.backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(color-mix(in srgb, var(--ink) 9%, transparent) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 64px;
+    align-items: center;
+    padding-block: 88px 104px;
+}
+
+.copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 4px 14px 4px 5px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.title {
+    font-size: clamp(38px, 5.2vw, 62px);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.03;
+}
+
+.title em {
+    background: linear-gradient(
+        100deg,
+        var(--blue-text) 10%,
+        color-mix(in srgb, var(--blue-text) 55%, var(--green-text))
+    );
+    background-clip: text;
+    color: var(--blue-text);
+    font-style: normal;
+    -webkit-text-fill-color: transparent;
+}
+
+.lede {
+    max-width: 52ch;
+    margin-top: 22px;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.65;
+    text-wrap: pretty;
+}
+
+.cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 34px;
+}
+
+.fine {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 18px;
+    color: var(--faint);
+    font-size: 13px;
+}
+
+.fine svg {
+    color: var(--green-text);
+}
+
+@media (forced-colors: active) {
+    .title em {
+        -webkit-text-fill-color: currentColor;
+    }
+}
+
+@media (max-width: 960px) {
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 48px;
+        padding-block: 56px 72px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pill {
+        border-radius: 14px;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .cta {
+        flex-direction: column;
+        align-self: stretch;
+    }
+}

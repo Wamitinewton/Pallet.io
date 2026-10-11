@@ -94,6 +94,8 @@ class HeadReconcilerIntegrationTest {
         });
         assertThat(scenario.head(appId)).contains(B);
         assertThat(scenario.etag(appId)).contains(ETAG);
+        assertThat(scenario.message(appId)).contains(GitHubApiStub.BRANCH_COMMIT_MESSAGE);
+        assertThat(scenario.author(appId)).contains(GitHubApiStub.BRANCH_COMMIT_AUTHOR);
 
         double notModifiedBefore = checkedCount(Checked.NOT_MODIFIED);
         Run second = reconciler.run().orElseThrow();
@@ -150,6 +152,20 @@ class HeadReconcilerIntegrationTest {
                         assertThat(request.containsHeader("If-None-Match")).isFalse());
         assertThat(scenario.head(headless)).contains(A);
         assertThat(scenario.etag(headless)).contains(ETAG);
+    }
+
+    @Test
+    void anUnchangedHeadStoredWithoutItsCommitDetailsGainsThemWithoutBuilding() {
+        String orgId = scenario.orgOn(installationId);
+        UUID appId = scenario.linkApp(orgId, installationId, repoId, A);
+        github.stubBranch(repoId, "main", A, ETAG);
+
+        Run run = reconciler.run().orElseThrow();
+
+        assertThat(run.checked()).containsEntry(Checked.UNCHANGED, 1);
+        assertThat(scenario.published(orgId)).isEmpty();
+        assertThat(scenario.message(appId)).contains(GitHubApiStub.BRANCH_COMMIT_MESSAGE);
+        assertThat(scenario.author(appId)).contains(GitHubApiStub.BRANCH_COMMIT_AUTHOR);
     }
 
     @Test

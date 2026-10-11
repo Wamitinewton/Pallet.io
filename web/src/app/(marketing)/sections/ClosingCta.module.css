@@ -1,0 +1,77 @@
+.section {
+    padding-block: 24px 96px;
+}
+
+.card {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    overflow: hidden;
+    padding: 48px;
+    border: 1px solid rgb(255 255 255 / 0.06);
+    border-radius: 16px;
+    background:
+        radial-gradient(70% 120% at 100% 0%, color-mix(in srgb, var(--blue) 45%, transparent), transparent 60%), #0e1628;
+    color: #eef2f9;
+}
+
+.watermark {
+    position: absolute;
+    right: -40px;
+    bottom: -70px;
+    z-index: -1;
+    width: 260px;
+    opacity: 0.12;
+}
+
+.copy {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.title {
+    color: #eef2f9;
+    font-size: clamp(24px, 3vw, 32px);
+    letter-spacing: -0.02em;
+}
+
+.text {
+    color: #b7c0d1;
+    font-size: 16px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.actions .secondary {
+    border-color: transparent;
+    background: #ffffff;
+    color: #0e1628;
+}
+
+.actions .secondary:hover {
+    background: #e7ecf4;
+}
+
+@media (max-width: 640px) {
+    .section {
+        padding-bottom: 64px;
+    }
+
+    .card {
+        padding: 32px 20px;
+    }
+
+    .actions {
+        flex-direction: column;
+        width: 100%;
+    }
+}

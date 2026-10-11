@@ -74,6 +74,9 @@ class PushProcessingIntegrationTest {
 
         assertThat(row).containsEntry("status", "PROCESSED").containsEntry("attempts", 0);
         assertThat(scenario.head(appId)).contains(NEXT);
+        assertThat(scenario.headCommit(appId))
+                .containsEntry("head_message", "Tune startup probe")
+                .containsEntry("head_author", "fixture-dev");
         List<Published> events = scenario.published(orgId);
         assertThat(events).singleElement().satisfies(event -> {
             assertThat(event.eventId()).isEqualTo(PushEventFactory.eventId(delivery, appId));

@@ -43,22 +43,26 @@ public interface BranchHeadRepository extends Repository<BranchHead, BranchHead.
      * missing head the repo link, locked, after the chain rule accepted {@code headSha}.
      *
      * @param etag the {@code ETag} of the branch read that returned {@code headSha}, or null; a row's {@code etag}
-     *     always describes its own {@code head_sha}
+     *     always describes its own {@code head_sha}, as do its {@code message} and {@code author}
      */
     @Modifying(clearAutomatically = true)
     @Query(value = """
-            INSERT INTO git_integration.branch_heads (app_id, branch, head_sha, advanced_at, etag)
-            SELECT r.app_id, :branch, :headSha, now(), :etag FROM git_integration.repo_links r
+            INSERT INTO git_integration.branch_heads
+                   (app_id, branch, head_sha, advanced_at, etag, head_message, head_author)
+            SELECT r.app_id, :branch, :headSha, now(), :etag, :message, :author FROM git_integration.repo_links r
              WHERE r.org_id = :orgId AND r.app_id = :appId
             ON CONFLICT (app_id, branch) DO UPDATE
-               SET head_sha = EXCLUDED.head_sha, advanced_at = EXCLUDED.advanced_at, etag = EXCLUDED.etag
+               SET head_sha = EXCLUDED.head_sha, advanced_at = EXCLUDED.advanced_at, etag = EXCLUDED.etag,
+                   head_message = EXCLUDED.head_message, head_author = EXCLUDED.head_author
             """, nativeQuery = true)
     int advance(
             @Param("orgId") String orgId,
             @Param("appId") UUID appId,
             @Param("branch") String branch,
             @Param("headSha") String headSha,
-            @Param("etag") String etag);
+            @Param("etag") String etag,
+            @Param("message") String message,
+            @Param("author") String author);
 
     /**
      * Takes GitHub's head as the branch's first, publishing nothing. Loses to a head a push created meanwhile.
@@ -67,8 +71,9 @@ public interface BranchHeadRepository extends Repository<BranchHead, BranchHead.
      */
     @Modifying(clearAutomatically = true)
     @Query(value = """
-            INSERT INTO git_integration.branch_heads (app_id, branch, head_sha, advanced_at, etag)
-            SELECT r.app_id, :branch, :headSha, now(), :etag FROM git_integration.repo_links r
+            INSERT INTO git_integration.branch_heads
+                   (app_id, branch, head_sha, advanced_at, etag, head_message, head_author)
+            SELECT r.app_id, :branch, :headSha, now(), :etag, :message, :author FROM git_integration.repo_links r
              WHERE r.org_id = :orgId AND r.app_id = :appId
             ON CONFLICT (app_id, branch) DO NOTHING
             """, nativeQuery = true)
@@ -77,12 +82,20 @@ public interface BranchHeadRepository extends Repository<BranchHead, BranchHead.
             @Param("appId") UUID appId,
             @Param("branch") String branch,
             @Param("headSha") String headSha,
-            @Param("etag") String etag);
+            @Param("etag") String etag,
+            @Param("message") String message,
+            @Param("author") String author);
 
-    /** Stores the {@code ETag} of a read that found the head still at {@code headSha}; any other head keeps its own. */
+    /**
+     * Stores the {@code ETag} of a read that found the head still at {@code headSha}; any other head keeps its own. The
+     * read's {@code message} and {@code author} fill in what the head lacks, such as one stored before they were kept.
+     */
     @Modifying(clearAutomatically = true)
     @Query(value = """
-            UPDATE git_integration.branch_heads b SET etag = :etag
+            UPDATE git_integration.branch_heads b
+               SET etag = :etag,
+                   head_message = COALESCE(b.head_message, :message),
+                   head_author = COALESCE(b.head_author, :author)
               FROM git_integration.repo_links r
              WHERE r.app_id = b.app_id AND r.org_id = :orgId AND b.app_id = :appId AND b.branch = :branch
                AND b.head_sha = :headSha
@@ -92,7 +105,9 @@ public interface BranchHeadRepository extends Repository<BranchHead, BranchHead.
             @Param("appId") UUID appId,
             @Param("branch") String branch,
             @Param("headSha") String headSha,
-            @Param("etag") String etag);
+            @Param("etag") String etag,
+            @Param("message") String message,
+            @Param("author") String author);
 
     @Modifying(clearAutomatically = true)
     @Query(value = """
@@ -113,15 +128,17 @@ public interface BranchHeadRepository extends Repository<BranchHead, BranchHead.
 
     @Modifying(clearAutomatically = true)
     @Query(value = """
-            INSERT INTO git_integration.branch_heads (app_id, branch, head_sha, advanced_at)
-            SELECT r.app_id, :branch, :headSha, now() FROM git_integration.repo_links r
+            INSERT INTO git_integration.branch_heads (app_id, branch, head_sha, advanced_at, head_message, head_author)
+            SELECT r.app_id, :branch, :headSha, now(), :message, :author FROM git_integration.repo_links r
              WHERE r.org_id = :orgId AND r.app_id = :appId
             """, nativeQuery = true)
     void insert(
             @Param("orgId") String orgId,
             @Param("appId") UUID appId,
             @Param("branch") String branch,
-            @Param("headSha") String headSha);
+            @Param("headSha") String headSha,
+            @Param("message") String message,
+            @Param("author") String author);
 
     @CrossTenant("teardown of repo links it already holds locked, across the orgs one GitHub event affected")
     @Modifying(clearAutomatically = true)

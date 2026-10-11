@@ -130,3 +130,15 @@ export function teamAppsQuery(teamId: TeamId): AppListQuery {
         size: TEAM_APPS_SIZE,
     };
 }
+
+export const NEWEST_APPS_SIZE = 5;
+
+/** The organization's newest apps: creation is the only recency the backend sorts on. */
+export const NEWEST_APPS_QUERY: AppListQuery = {
+    q: "",
+    team: ANY_TEAM,
+    cloudProvider: null,
+    sort: { field: "createdAt", direction: "desc" },
+    page: 0,
+    size: NEWEST_APPS_SIZE,
+};

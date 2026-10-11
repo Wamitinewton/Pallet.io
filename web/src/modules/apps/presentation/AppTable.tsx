@@ -3,7 +3,7 @@
 import type { OrgId } from "@/shared/domain/ids";
 import { Badge, Icon, RelativeTime, Skeleton, Table, TableWrap, Td, Th } from "@/shared/presentation/ui";
 import Link from "next/link";
-import type { AriaAttributes } from "react";
+import type { AriaAttributes, ReactNode } from "react";
 import type { App } from "../domain/app";
 import type { AppSort, AppSortField } from "../domain/app-list-query";
 import { COLUMN_LABEL, NO_REPOSITORY_COPY } from "./app-copy";
@@ -19,9 +19,12 @@ export interface AppTableProps {
     readonly sort: AppSort;
     /** True while an earlier page stays on screen as the next one loads. */
     readonly busy?: boolean;
+    readonly renderRepository?: (app: App) => ReactNode;
 }
 
-export function AppTable({ orgId, apps, teams, sort, busy = false }: AppTableProps) {
+const noRepository = () => <Badge outline>{NO_REPOSITORY_COPY}</Badge>;
+
+export function AppTable({ orgId, apps, teams, sort, busy = false, renderRepository = noRepository }: AppTableProps) {
     return (
         <TableWrap>
             <Table aria-label={COLUMN_LABEL.app} aria-busy={busy} className={busy ? styles.stale : undefined}>
@@ -40,9 +43,7 @@ export function AppTable({ orgId, apps, teams, sort, busy = false }: AppTablePro
                                     </span>
                                 </Link>
                             </Td>
-                            <Td>
-                                <Badge outline>{NO_REPOSITORY_COPY}</Badge>
-                            </Td>
+                            <Td>{renderRepository(app)}</Td>
                             <Td hideOnMobile>
                                 <RunsOn app={app} />
                             </Td>

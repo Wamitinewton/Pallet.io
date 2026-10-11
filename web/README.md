@@ -168,6 +168,20 @@ with `next` pointing back at the invite. A signed-in visitor joins as that accou
 `NEXT_PUBLIC_INVITE_EXISTING_ACCOUNT` is on, which waits for `identity-service/15`. Joining then polls my
 organizations until the membership is projected, and `INVITE_EMAIL_MISMATCH` offers to sign out.
 
+## Landing page
+
+`/` is the public front door, in `src/app/(marketing)/`: one component per section under `sections/`, each
+with its CSS module beside it. It is static: no session read and no data fetch at render. The only browser
+work is the theme toggle and `SessionLink`, which asks `GET /api/session` after hydration and swaps "Sign in"
+for "Open dashboard"; the illustrations are markup animated in CSS, and they rest in their final state under
+`prefers-reduced-motion`.
+
+Metadata, `opengraph-image.tsx`, `sitemap.ts`, `robots.ts` and `manifest.ts` sit at the root of `src/app/`.
+They render at build time, so they take their absolute URLs from `PALLET_PUBLIC_BASE_URL` in the build
+environment, read on its own (`siteUrl()`) because the rest of the server environment doesn't exist then. Set
+it when building an image for a real host; unset means `http://localhost:5173`. `robots.txt` keeps every
+signed-in, secret-bearing and proxy route out of search.
+
 ## API contracts
 
 Request and response types come from each service's OpenAPI spec, never written by hand. With the stack up,

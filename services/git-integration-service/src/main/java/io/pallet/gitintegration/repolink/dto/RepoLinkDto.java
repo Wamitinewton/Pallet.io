@@ -43,7 +43,19 @@ public record RepoLinkDto(
         warnings = List.copyOf(warnings);
     }
 
-    public record Head(String branch, String sha, Instant advancedAt) {}
+    /** {@code message} is the commit's first line and {@code author} a GitHub login or name, both untrusted text. */
+    public record Head(
+            String branch,
+            String sha,
+            Instant advancedAt,
+
+            @Schema(
+                    nullable = true,
+                    description = "The commit's first line; null for a head stored before it was kept.")
+            String message,
+
+            @Schema(nullable = true, description = "The commit author's GitHub login, else their name.")
+            String author) {}
 
     /** Who vouched for the link on GitHub, and when that was last confirmed. */
     public record Verification(

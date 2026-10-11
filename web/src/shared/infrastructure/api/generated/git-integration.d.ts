@@ -370,7 +370,11 @@ export interface components {
         Head: {
             /** Format: date-time */
             advancedAt?: string;
+            /** @description The commit author's GitHub login, else their name. */
+            author?: string | null;
             branch?: string;
+            /** @description The commit's first line; null for a head stored before it was kept. */
+            message?: string | null;
             sha?: string;
         };
         InstallationLinkResponse: {

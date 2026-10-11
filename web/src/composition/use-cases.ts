@@ -25,6 +25,10 @@ import { httpNotificationRepository } from "@/modules/notifications/infrastructu
 import type { OrganizationUseCases } from "@/modules/organizations";
 import { makeOrganizationUseCases } from "@/modules/organizations/application/use-cases";
 import { httpOrganizationRepository } from "@/modules/organizations/infrastructure/http-organization-repository";
+import type { RepoLinkUseCases } from "@/modules/repo-links";
+import { makeRepoLinkUseCases } from "@/modules/repo-links/application/use-cases";
+import { httpRepoLinkRepository } from "@/modules/repo-links/infrastructure/http-repo-link-repository";
+import { httpRepositoryPickerRepository } from "@/modules/repo-links/infrastructure/http-repository-picker-repository";
 import type { TeamUseCases } from "@/modules/teams";
 import { makeTeamUseCases } from "@/modules/teams/application/use-cases";
 import { httpTeamRepository } from "@/modules/teams/infrastructure/http-team-repository";
@@ -44,6 +48,7 @@ export interface UseCases {
     readonly teams: TeamUseCases;
     readonly apps: AppUseCases;
     readonly github: GitHubUseCases;
+    readonly repoLinks: RepoLinkUseCases;
     readonly notifications: NotificationUseCases;
 }
 
@@ -69,6 +74,10 @@ export function makeUseCases({ clients, clock }: UseCaseDependencies): UseCases 
             installations: httpInstallationRepository(clients.gitIntegration),
             intents: sessionStorageReturnIntentStore(),
             clock,
+        }),
+        repoLinks: makeRepoLinkUseCases({
+            links: httpRepoLinkRepository(clients.gitIntegration),
+            repositories: httpRepositoryPickerRepository(clients.gitIntegration),
         }),
         notifications: makeNotificationUseCases({ notifications: httpNotificationRepository(clients.notification) }),
     };

@@ -9,6 +9,7 @@ import io.pallet.gitintegration.delivery.payload.PushPayload;
 import io.pallet.gitintegration.repolink.RepoLink;
 import io.pallet.gitintegration.repolink.RepoLinkRepository;
 import io.pallet.gitintegration.scm.ScmProvider.CompareStatus;
+import io.pallet.gitintegration.scm.ScmProvider.HeadCommit;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -85,16 +86,19 @@ public class PushProcessor {
      * accepted one publishes a {@code RECONCILED} push. A branch with no head adopts GitHub's without publishing:
      * changing a branch must not deploy, the next push does.
      *
-     * @param etag the {@code ETag} of the read that returned {@code githubHead}, stored with the head it describes
+     * @param etag the {@code ETag} of the read that returned {@code githubCommit}, stored with the head it describes
      * @param answers compare answers the caller already has
      */
     public Reconciled reconcile(
             PushTarget link,
-            String githubHead,
+            HeadCommit githubCommit,
             String etag,
             UUID runNonce,
             Function<CompareLookup, Optional<CompareStatus>> answers) {
         String branch = link.productionBranch();
+        String githubHead = githubCommit.sha();
+        String message = githubCommit.message();
+        String author = githubCommit.author();
         String storedEtag = etag == null || etag.length() > BranchHead.MAX_ETAG_LENGTH ? null : etag;
         Optional<Step> locked = step(link, branch, null, githubHead, false, answers);
         if (locked.isEmpty()) {
@@ -102,7 +106,7 @@ public class PushProcessor {
         }
         Step step = locked.get();
         if (step.head().isEmpty()) {
-            heads.adopt(link.orgId(), link.appId(), branch, githubHead, storedEtag);
+            heads.adopt(link.orgId(), link.appId(), branch, githubHead, storedEtag, message, author);
             return Reconciled.of(Reconciled.Outcome.ADOPTED);
         }
         String head = step.head().get();
@@ -113,12 +117,12 @@ public class PushProcessor {
             case NEEDS_COMPARE -> new Reconciled(Reconciled.Outcome.NEEDS_COMPARE, step.compare());
             case ACCEPT -> {
                 outbox.append(events.reconciled(link, head, githubHead, runNonce));
-                heads.advance(link.orgId(), link.appId(), branch, githubHead, storedEtag);
+                heads.advance(link.orgId(), link.appId(), branch, githubHead, storedEtag, message, author);
                 metrics.published(GitPushReceived.TRIGGER_RECONCILED);
                 yield Reconciled.of(Reconciled.Outcome.ACCEPTED);
             }
             case DUPLICATE -> {
-                heads.recordEtag(link.orgId(), link.appId(), branch, githubHead, storedEtag);
+                heads.recordEtag(link.orgId(), link.appId(), branch, githubHead, storedEtag, message, author);
                 yield Reconciled.of(Reconciled.Outcome.UNCHANGED);
             }
             case STALE -> Reconciled.of(Reconciled.Outcome.STALE);
@@ -186,7 +190,18 @@ public class PushProcessor {
                 reasons.add(skipped.get());
             }
             if (verdict.decision() == ChainDecision.ACCEPT) {
-                heads.advance(link.orgId(), link.appId(), branch, push.after(), null);
+                Optional<PushPayload.HeadCommit> commit =
+                        push.headCommit().filter(head -> head.sha().equals(push.after()));
+                heads.advance(
+                        link.orgId(),
+                        link.appId(),
+                        branch,
+                        push.after(),
+                        null,
+                        commit.map(PushPayload.HeadCommit::message)
+                                .filter(message -> !message.isBlank())
+                                .orElse(null),
+                        commit.map(PushPayload.HeadCommit::author).orElse(null));
             }
         }
         if (published) {

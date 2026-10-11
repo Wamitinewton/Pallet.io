@@ -29,7 +29,7 @@ public interface ScmProvider {
      *
      * @return empty when the branch doesn't exist
      */
-    Optional<String> branchHead(long installationId, long repoId, String branch);
+    Optional<HeadCommit> branchHead(long installationId, long repoId, String branch);
 
     /**
      * {@link #branchHead(long, long, String)}, conditional on the {@code etag} of an earlier read, spending no budget
@@ -146,13 +146,19 @@ public interface ScmProvider {
     }
 
     /**
-     * A conditional branch read. {@code notModified} means the branch still matches the {@code etag} it was read with,
-     * and carries no SHA; otherwise a null {@code sha} means the branch doesn't exist.
+     * A branch's head commit. {@code message} is its first line and {@code author} the host account's login, else the
+     * commit's author name; both are untrusted text, cut to a bounded length, and null when the host gave none.
      */
-    record BranchHeadRead(String sha, String etag, boolean notModified) {
+    record HeadCommit(String sha, String message, String author) {}
+
+    /**
+     * A conditional branch read. {@code notModified} means the branch still matches the {@code etag} it was read with,
+     * and carries no head; otherwise a null {@code head} means the branch doesn't exist.
+     */
+    record BranchHeadRead(HeadCommit head, String etag, boolean notModified) {
 
         public boolean missing() {
-            return !notModified && sha == null;
+            return !notModified && head == null;
         }
     }
 

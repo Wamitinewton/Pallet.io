@@ -51,3 +51,6 @@ export function toPageRequest({ page, size }: InviteListQuery): PageRequest {
 export const ALL_PENDING_QUERY: InviteListQuery = { status: "PENDING", page: 0, size: INVITE_LOOKUP_SIZE };
 
 export const RECENT_INVITES_QUERY: InviteListQuery = { status: null, page: 0, size: INVITE_LOOKUP_SIZE };
+
+/** One row is enough: the page's `totalItems` is the count. */
+export const PENDING_COUNT_QUERY: InviteListQuery = { status: "PENDING", page: 0, size: 1 };

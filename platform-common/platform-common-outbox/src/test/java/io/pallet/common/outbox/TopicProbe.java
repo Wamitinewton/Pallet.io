@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.kafka.clients.consumer.CloseOptions;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -84,6 +85,6 @@ public final class TopicProbe implements AutoCloseable {
 
     @Override
     public void close() {
-        consumer.close(Duration.ofSeconds(2));
+        consumer.close(CloseOptions.timeout(Duration.ofSeconds(5)));
     }
 }

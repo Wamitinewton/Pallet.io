@@ -1,8 +1,10 @@
 package io.pallet.gitintegration.scm;
 
+import io.pallet.gitintegration.delivery.PayloadParser;
 import io.pallet.gitintegration.github.CheckRunWrite;
 import io.pallet.gitintegration.github.GitHubClient;
 import io.pallet.gitintegration.github.GitHubResponse;
+import io.pallet.gitintegration.github.dto.Branch;
 import io.pallet.gitintegration.github.dto.CollaboratorPermission;
 import io.pallet.gitintegration.github.dto.GitHubUser;
 import io.pallet.gitintegration.github.dto.Installation;
@@ -78,14 +80,15 @@ class GitHubScmProvider implements ScmProvider {
     }
 
     @Override
-    public Optional<String> branchHead(long installationId, long repoId, String branch) {
-        return github.branchHead(installationId, repoId, branch);
+    public Optional<HeadCommit> branchHead(long installationId, long repoId, String branch) {
+        return github.branchHead(installationId, repoId, branch).map(GitHubScmProvider::headCommit);
     }
 
     @Override
     public BranchHeadRead branchHead(long installationId, long repoId, String branch, String etag) {
         return github.branchHead(installationId, repoId, branch, etag)
-                .map(read -> new BranchHeadRead(read.body(), read.etag(), read.notModified()))
+                .map(read -> new BranchHeadRead(
+                        read.notModified() ? null : headCommit(read.body()), read.etag(), read.notModified()))
                 .orElseGet(() -> new BranchHeadRead(null, null, false));
     }
 
@@ -142,6 +145,32 @@ class GitHubScmProvider implements ScmProvider {
                 report.detailsUrl(),
                 report.title(),
                 report.summary());
+    }
+
+    /** Cut the same way as a push's head commit, so a head reads alike whichever path stored it. */
+    private static HeadCommit headCommit(Branch.Commit commit) {
+        String message =
+                Optional.ofNullable(commit.commit()).map(Branch.Detail::message).orElse(null);
+        String author = Optional.ofNullable(commit.author())
+                .map(Branch.Account::login)
+                .filter(login -> !login.isBlank())
+                .or(() -> Optional.ofNullable(commit.commit())
+                        .map(Branch.Detail::author)
+                        .map(Branch.Person::name)
+                        .filter(name -> !name.isBlank()))
+                .orElse(null);
+        return new HeadCommit(
+                commit.sha(),
+                firstLine(message, PayloadParser.MAX_MESSAGE_LENGTH),
+                firstLine(author, PayloadParser.MAX_AUTHOR_LENGTH));
+    }
+
+    private static String firstLine(String text, int maxLength) {
+        if (text == null) {
+            return null;
+        }
+        String line = PayloadParser.truncate(PayloadParser.firstLine(text), maxLength);
+        return line.isBlank() ? null : line;
     }
 
     /** A custom role's name means nothing here, so it counts as the base permission GitHub reports under it. */

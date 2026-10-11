@@ -7,6 +7,7 @@ import { InviteUseCasesProvider } from "@/modules/invites";
 import { MemberUseCasesProvider } from "@/modules/members";
 import { NotificationUseCasesProvider } from "@/modules/notifications";
 import { OrganizationUseCasesProvider } from "@/modules/organizations";
+import { RepoLinkUseCasesProvider } from "@/modules/repo-links";
 import { SessionActionsProvider, StepUpProvider, type SessionActions, type SessionGateway } from "@/modules/session";
 import { makeConfirmPassword } from "@/modules/session/application/confirm-password";
 import { makeReadSessionSummary } from "@/modules/session/application/read-session-summary";
@@ -58,9 +59,11 @@ export function UseCasesProvider({ children, transport, sessionGateway }: UseCas
                                     <TeamUseCasesProvider value={useCases.teams}>
                                         <AppUseCasesProvider value={useCases.apps}>
                                             <GitHubUseCasesProvider value={useCases.github}>
-                                                <NotificationUseCasesProvider value={useCases.notifications}>
-                                                    {children}
-                                                </NotificationUseCasesProvider>
+                                                <RepoLinkUseCasesProvider value={useCases.repoLinks}>
+                                                    <NotificationUseCasesProvider value={useCases.notifications}>
+                                                        {children}
+                                                    </NotificationUseCasesProvider>
+                                                </RepoLinkUseCasesProvider>
                                             </GitHubUseCasesProvider>
                                         </AppUseCasesProvider>
                                     </TeamUseCasesProvider>

@@ -1,8 +1,14 @@
 export type { GetUnreadCount } from "./application/get-unread-count";
+export type { ListNotifications } from "./application/list-notifications";
+export type { MarkAllRead } from "./application/mark-all-read";
+export type { MarkRead, MarkReadOutcome } from "./application/mark-read";
 export type { NotificationUseCases } from "./application/use-cases";
+export type { Notification, ReadFilter } from "./domain/notification";
 export { notificationPaths } from "./presentation/notification-paths";
 export { NotificationUseCasesProvider } from "./presentation/notification-use-cases";
 export { NotificationBell } from "./presentation/NotificationBell";
+export { NotificationsView } from "./presentation/NotificationsView";
 export { UNREAD_COUNT_REFRESH_MS, notificationKeys, notificationQueries } from "./presentation/queries";
+export { loadNotificationSearchParams } from "./presentation/search-params";
 export { useUnreadCount } from "./presentation/use-unread-count";
 export type { UnreadCountOptions } from "./presentation/use-unread-count";
