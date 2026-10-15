@@ -164,6 +164,9 @@ Every event on the backbone is a flat JSON record carrying the common envelope (
 |---|---|---|---|
 | `notification.requested` | any service | notification-service | org id, notificationType, recipient, channel, template variables, dedupe key |
 | `git.push.received` | git-integration-service | build-queue-service | repo, branch, commit sha, org id |
+| `build.queued` | build-queue-service | none yet | build id, app id, branch, commit sha, push event id, superseded build id |
+| `build.dispatched` | build-queue-service | build-service | build id, attempt, app id, commit sha, repo id, root directory, start-by deadline, max duration |
+| `build.cancelled` | build-queue-service | none yet | build id, app id, commit sha, reason, superseding build id |
 | `build.started` | build-service | deploy-orchestrator-service, log-service, notification-service | build id, app id |
 | `build.succeeded` | build-service | deploy-orchestrator-service, registry-service | build id, image tag, digest |
 | `build.failed` | build-service | deploy-orchestrator-service, notification-service | build id, error message |

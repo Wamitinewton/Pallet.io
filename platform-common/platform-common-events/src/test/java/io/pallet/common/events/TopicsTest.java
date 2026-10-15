@@ -49,6 +49,17 @@ class TopicsTest {
     }
 
     @Test
+    void buildQueueTopicsAreCataloguedUncompactedWithDeadLetters() {
+        assertThat(List.of(Topics.BUILD_QUEUED, Topics.BUILD_DISPATCHED, Topics.BUILD_CANCELLED))
+                .containsExactly("build.queued", "build.dispatched", "build.cancelled")
+                .allSatisfy(topic -> {
+                    assertThat(Topics.all()).contains(topic);
+                    assertThat(Topics.isCompacted(topic)).isFalse();
+                    assertThat(Topics.deadLetter(topic)).isEqualTo(topic + ".DLT");
+                });
+    }
+
+    @Test
     void allContainsEveryDeclaredTopicConstant() {
         assertThat(Topics.all()).isEqualTo(declaredTopicConstants());
     }
