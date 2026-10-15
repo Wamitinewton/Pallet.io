@@ -1,6 +1,7 @@
 package io.pallet.identity.invite;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.pallet.common.error.BadRequestException;
 import io.pallet.common.error.ConflictException;
 import io.pallet.common.events.OrgInviteAccepted;
 import io.pallet.common.messaging.PlatformEventPublisher;
@@ -16,6 +17,7 @@ import io.pallet.identity.token.SignedActionToken;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -24,6 +26,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.event.TransactionPhase;
@@ -34,8 +37,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Orchestrates {@code POST /invites/{token}/accept} — the sync-free handoff this service and
  * {@code org-team-service} share (see {@code docs/identity-service/ARCHITECTURE.md} §The boundary
  * problem this design solves). The token is minted and validated for org/role state entirely by
- * {@code org-team-service}; this service only verifies its signature and expiry, then creates the
- * Keycloak account.
+ * {@code org-team-service}; this service only verifies its signature and expiry, then either creates
+ * the Keycloak account or, when the invited email already has one, accepts as that signed-in account
+ * (ADR-0018).
  */
 @Service
 class InviteAcceptService {
@@ -85,8 +89,12 @@ class InviteAcceptService {
         this.meterRegistry = meterRegistry;
     }
 
+    /**
+     * @param password required only when the invited email has no account yet
+     * @param caller the bearer token, or null for an anonymous request
+     */
     @Monitored
-    void accept(String token, String password) {
+    void accept(String token, String password, Jwt caller) {
         Map<String, String> claims =
                 SignedActionToken.verify(INVITE_TOKEN_PURPOSE, token, inviteProperties.signingKey());
         String jti = requiredClaim(claims, "jti");
@@ -98,6 +106,15 @@ class InviteAcceptService {
         if (consumedInviteTokenRepository.existsById(jti)) {
             meterRegistry.counter(REPLAYED_METRIC).increment();
             throw new InviteAlreadyConsumedException(jti);
+        }
+
+        Optional<IdentityUser> existingAccount = identityUserRepository.findByEmailIgnoreCase(email);
+        if (existingAccount.isPresent()) {
+            acceptAsExistingAccount(existingAccount.get(), caller, orgId, jti, role);
+            return;
+        }
+        if (password == null || password.isBlank()) {
+            throw new BadRequestException("Choose a password to create your account.");
         }
 
         String keycloakUserId = createInvitedAccount(orgId, email, role, password);
@@ -115,6 +132,32 @@ class InviteAcceptService {
                 meterRegistry.counter(REPLAYED_METRIC).increment();
             }
             compensateOrphanedKeycloakUser(keycloakUserId, e);
+            throw e;
+        }
+    }
+
+    /**
+     * Identity is proven only by the validated bearer token's subject, never by a body field. No
+     * Keycloak call: the account and its credentials already exist, and org membership is
+     * {@code org-team-service}'s to record.
+     */
+    private void acceptAsExistingAccount(IdentityUser account, Jwt caller, String orgId, String jti, String role) {
+        if (caller == null) {
+            throw new InviteSignInRequiredException(jti);
+        }
+        if (!account.getKeycloakUserId().equals(caller.getSubject())) {
+            throw new InviteEmailMismatchException(jti, caller.getSubject());
+        }
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                consumedInviteTokenRepository.save(new ConsumedInviteToken(jti, null));
+                applicationEventPublisher.publishEvent(new InviteAcceptedEvent(
+                        orgId, jti, account.getKeycloakUserId(), account.getEmail(), account.getDisplayName(), role));
+            });
+        } catch (RuntimeException e) {
+            if (consumedInviteTokenRepository.existsById(jti)) {
+                meterRegistry.counter(REPLAYED_METRIC).increment();
+            }
             throw e;
         }
     }
@@ -185,7 +228,7 @@ class InviteAcceptService {
     private void persistLocally(
             String orgId, String jti, String keycloakUserId, String email, String displayName, String role) {
         identityUserRepository.save(new IdentityUser(orgId, keycloakUserId, email, displayName));
-        consumedInviteTokenRepository.save(new ConsumedInviteToken(jti));
+        consumedInviteTokenRepository.save(new ConsumedInviteToken(jti, keycloakUserId));
         applicationEventPublisher.publishEvent(
                 new InviteAcceptedEvent(orgId, jti, keycloakUserId, email, displayName, role));
     }

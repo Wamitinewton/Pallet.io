@@ -42,17 +42,8 @@ export function expiredLede(inviterName: string | undefined): string {
     return `Invites stay open for ${String(INVITE_LIMITS.ttlDays)} days. Ask ${who} or another admin to send you a new one.`;
 }
 
-export function accountExistsCopy(orgName: string): string {
-    return `This email already has a Pallet account. Sign in, then open the invite link again to join. ${orgName} will show up in your organization switcher.`;
-}
-
 export function signInToJoinCopy(orgName: string): string {
     return `This email already has a Pallet account. Sign in with it and you'll come straight back here to join ${orgName}.`;
-}
-
-export function signedInElsewhereCopy(email: string | undefined, orgName: string): string {
-    const who = email === undefined ? "You're signed in" : `You're signed in as ${email}`;
-    return `${who}. Joining ${orgName} with an account you already have isn't available yet. If the invite was sent to another address, sign out to accept it with a new account.`;
 }
 
 export function joinAsCopy(orgName: string, email: string | undefined): string {

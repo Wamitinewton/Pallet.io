@@ -2,4 +2,7 @@ package io.pallet.identity.invite;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ConsumedInviteTokenRepository extends JpaRepository<ConsumedInviteToken, String> {}
+public interface ConsumedInviteTokenRepository extends JpaRepository<ConsumedInviteToken, String> {
+
+    boolean existsByJtiAndCreatedUserId(String jti, String createdUserId);
+}

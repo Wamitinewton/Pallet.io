@@ -1,4 +1,3 @@
-import { features } from "@/composition/features";
 import { getPublicServerUseCases, hasActiveSession, readServerSessionSummary } from "@/composition/server";
 import { InviteAcceptScreen, inviteQueries } from "@/modules/invites";
 import { sessionQueries } from "@/modules/session";
@@ -27,7 +26,7 @@ export default async function InvitePage({ params }: PageProps<"/invites/[token]
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>
-            <InviteAcceptScreen token={token} signedIn={signedIn} canJoinAsSignedIn={features.inviteExistingAccount} />
+            <InviteAcceptScreen token={token} signedIn={signedIn} />
         </HydrationBoundary>
     );
 }

@@ -163,10 +163,10 @@ token's claims are read unverified, and only for that expiry and for the `orgId`
 the invited address in it is never read.
 
 A signed-out visitor sets a password (`POST /identity/invites/{token}/accept`) and goes to
-`/login?joined=<orgName>`. A `409 CONFLICT` (the address already has an account) switches to signing in,
-with `next` pointing back at the invite. A signed-in visitor joins as that account only when
-`NEXT_PUBLIC_INVITE_EXISTING_ACCOUNT` is on, which waits for `identity-service/15`. Joining then polls my
-organizations until the membership is projected, and `INVITE_EMAIL_MISMATCH` offers to sign out.
+`/login?joined=<orgName>`. A `401 INVITE_SIGN_IN_REQUIRED` (the address already has an account, or the
+rarer `409 CONFLICT`) switches to signing in, with `next` pointing back at the invite. A signed-in visitor
+joins as that account through the same endpoint with the session's token and no password. Joining then
+polls my organizations until the membership is projected, and `INVITE_EMAIL_MISMATCH` offers to sign out.
 
 ## Landing page
 

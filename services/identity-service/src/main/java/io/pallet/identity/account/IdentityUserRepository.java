@@ -11,6 +11,8 @@ public interface IdentityUserRepository extends JpaRepository<IdentityUser, UUID
 
     Optional<IdentityUser> findByEmail(String email);
 
+    Optional<IdentityUser> findByEmailIgnoreCase(String email);
+
     Optional<IdentityUser> findByKeycloakUserId(String keycloakUserId);
 
     List<IdentityUser> findByOrgId(String orgId);

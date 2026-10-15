@@ -14,10 +14,9 @@ import { useInvitePreview, type UnacceptedOutcome } from "./use-invite-acceptanc
 export interface InviteAcceptViewProps {
     readonly token: string;
     readonly signedIn: boolean;
-    readonly canJoinAsSignedIn: boolean;
 }
 
-export function InviteAcceptView({ token, signedIn, canJoinAsSignedIn }: InviteAcceptViewProps) {
+export function InviteAcceptView({ token, signedIn }: InviteAcceptViewProps) {
     const preview = useInvitePreview(token);
 
     if (preview.isPending) return <InviteLoading />;
@@ -36,14 +35,7 @@ export function InviteAcceptView({ token, signedIn, canJoinAsSignedIn }: InviteA
     if (preview.data.kind === "unavailable") {
         return <InviteUnavailable reason={preview.data.reason} signedIn={signedIn} />;
     }
-    return (
-        <OpenInvite
-            token={token}
-            preview={preview.data.preview}
-            signedIn={signedIn}
-            canJoinAsSignedIn={canJoinAsSignedIn}
-        />
-    );
+    return <OpenInvite token={token} preview={preview.data.preview} signedIn={signedIn} />;
 }
 
 type Stage =
@@ -66,7 +58,7 @@ function stageAfter(outcome: UnacceptedOutcome): Stage {
 }
 
 /** A signed-out visitor creates an account; a signed-in one, or an address that already has one, signs in to join. */
-function OpenInvite({ token, preview, signedIn, canJoinAsSignedIn }: OpenInviteProps) {
+function OpenInvite({ token, preview, signedIn }: OpenInviteProps) {
     const headingId = useId();
     const [stage, setStage] = useState<Stage>(() =>
         signedIn ? { kind: "existing", announce: false } : { kind: "new" },
@@ -98,7 +90,6 @@ function OpenInvite({ token, preview, signedIn, canJoinAsSignedIn }: OpenInviteP
                         token={token}
                         preview={preview}
                         signedIn={signedIn}
-                        canJoinAsSignedIn={canJoinAsSignedIn}
                         onUnavailable={becomeUnavailable}
                         announce={stage.announce}
                     />

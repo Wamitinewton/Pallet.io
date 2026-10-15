@@ -159,9 +159,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "password"
-        ],
         "type": "object"
       },
       "LoginRequest": {
@@ -1139,6 +1136,7 @@
     },
     "/api/v1/identity/invites/{token}/accept": {
       "post": {
+        "description": "Creates the invited email's account when it has none (password required). When it has one, the caller must be signed in as that account (bearer token) and the password is ignored.",
         "operationId": "accept",
         "parameters": [
           {
@@ -1158,8 +1156,7 @@
                 "$ref": "#/components/schemas/InviteAcceptRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -1244,7 +1241,7 @@
           }
         },
         "security": [],
-        "summary": "Accept an org invite and create an account",
+        "summary": "Accept an org invite",
         "tags": [
           "Invites"
         ]

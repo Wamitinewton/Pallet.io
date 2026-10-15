@@ -22,11 +22,16 @@ public class ConsumedInviteToken {
     @Column(name = "consumed_at", nullable = false)
     private Instant consumedAt;
 
+    @Column(name = "created_user_id")
+    private String createdUserId;
+
     protected ConsumedInviteToken() {}
 
-    public ConsumedInviteToken(String jti) {
+    /** {@code createdUserId} is the Keycloak user this invite created, or null when an existing account accepted it. */
+    public ConsumedInviteToken(String jti, String createdUserId) {
         this.jti = jti;
         this.consumedAt = Instant.now();
+        this.createdUserId = createdUserId;
     }
 
     public String getJti() {
@@ -35,5 +40,9 @@ public class ConsumedInviteToken {
 
     public Instant getConsumedAt() {
         return consumedAt;
+    }
+
+    public String getCreatedUserId() {
+        return createdUserId;
     }
 }

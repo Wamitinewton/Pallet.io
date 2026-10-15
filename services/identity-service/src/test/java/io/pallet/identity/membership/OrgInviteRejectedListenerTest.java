@@ -21,6 +21,7 @@ import io.pallet.common.test.annotations.UnitTest;
 import io.pallet.identity.account.IdentityUserRepository;
 import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.config.IdentityServiceProperties;
+import io.pallet.identity.invite.ConsumedInviteTokenRepository;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
@@ -54,6 +55,9 @@ class OrgInviteRejectedListenerTest {
     private IdentityUserRepository identityUserRepository;
 
     @Mock
+    private ConsumedInviteTokenRepository consumedInviteTokenRepository;
+
+    @Mock
     private RevokedSessionRegistry revokedSessionRegistry;
 
     @Mock
@@ -81,6 +85,7 @@ class OrgInviteRejectedListenerTest {
                 mock(Keycloak.class),
                 propertiesFor("http://127.0.0.1:1"),
                 identityUserRepository,
+                consumedInviteTokenRepository,
                 revokedSessionRegistry,
                 auditPublisher,
                 jsonMapper,
@@ -90,6 +95,7 @@ class OrgInviteRejectedListenerTest {
                 "org-1", "invite-1", "kc-user-1", "user@example.test", OrgInviteRejected.REASON_REVOKED)));
 
         verifyNoInteractions(externalCall);
+        verifyNoInteractions(consumedInviteTokenRepository);
         verifyNoInteractions(identityUserRepository);
         verifyNoInteractions(auditPublisher);
     }
@@ -97,6 +103,8 @@ class OrgInviteRejectedListenerTest {
     @Test
     void keycloakFailureReleasesTheGuardAndRethrowsWithoutTouchingTheLocalRepository() throws IOException {
         when(idempotencyGuard.markProcessed(anyString(), any())).thenReturn(true);
+        when(consumedInviteTokenRepository.existsByJtiAndCreatedUserId("invite-1", "kc-user-1"))
+                .thenReturn(true);
         String serverUrl = "http://127.0.0.1:" + closedPort();
         OrgInviteRejectedListener listener = new OrgInviteRejectedListener(
                 idempotencyGuard,
@@ -104,6 +112,7 @@ class OrgInviteRejectedListenerTest {
                 keycloakClientFor(serverUrl),
                 propertiesFor(serverUrl),
                 identityUserRepository,
+                consumedInviteTokenRepository,
                 revokedSessionRegistry,
                 auditPublisher,
                 jsonMapper,

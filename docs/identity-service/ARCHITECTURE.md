@@ -241,6 +241,7 @@ classDiagram
     class ConsumedInviteToken {
         String jti
         Instant consumedAt
+        String createdUserId
     }
 
     class EmailVerificationCode {
@@ -281,7 +282,9 @@ mirrored here.
 `ConsumedInviteToken` exists purely for replay protection: the signed invite token is
 self-verifying (no DB lookup needed to know it's *valid*), but nothing stops the same valid token
 being POSTed to the accept endpoint twice within its expiry window without a local record of
-"this `jti` already fired."
+"this `jti` already fired." Its `createdUserId` is the Keycloak user the invite created, or null when
+an existing account accepted it; `OrgInviteRejectedListener` disables an account only when the
+rejected invite's row names that account here.
 
 `EmailVerificationCode` is a different shape of single-use artifact from `OneTimeActionToken`
 on purpose. `OneTimeActionToken` holds a long, effectively-unguessable opaque token embedded in a
@@ -333,6 +336,7 @@ erDiagram
     CONSUMED_INVITE_TOKENS {
         varchar jti PK
         timestamptz consumed_at
+        varchar created_user_id "null: accepted by an existing account"
     }
     EMAIL_VERIFICATION_CODES {
         uuid id PK
@@ -513,9 +517,11 @@ may hold a personal org and other memberships untouched by that removal — the 
 "disable the account" / "rewrite the realm role" actions assumed exactly the single-org world this
 ADR ends. `OrgDeletedListener` keeps a narrower job: retire the local `OrgBootstrapRecord` for the
 deleted org (it's stale bootstrap data regardless), but makes no Keycloak call, since a deleted
-`TEAM` org's former members keep their accounts. `OrgInviteRejectedListener` is unaffected — it
-disables an account that was created fresh purely for the now-repudiated invite, which is still
-exactly correct.
+`TEAM` org's former members keep their accounts. `OrgInviteRejectedListener` still disables an
+account created fresh purely for the now-repudiated invite, and only that: it first checks that
+`consumed_invite_tokens` records the event's `userId` as the account this invite created. An existing
+account that accepted an invite is never disabled by that invite's rejection, even when the invite is
+for the org its `org_id` attribute names.
 
 Why `identity-service` publishes `OrgMemberAdded` itself for the *owner* at sign-up was considered
 and rejected: `org.member.added` is `org-team-service`'s fact about its own membership aggregate,
@@ -637,17 +643,25 @@ presenting a valid invite token is already equivalent proof of email ownership.
 
 **The diagram above is the no-existing-account branch.** Per
 [ADR-0018](../adr/0018-multi-org-per-account-and-per-request-authorization.md),
-`InviteAcceptController` first checks `identityUserRepository.existsByEmail(claims.email())` —
-the same proactive-check style `SignupService.ensureSlugAndEmailAreAvailable()` already uses,
-replacing `InviteAcceptService`'s previous catch-the-409-from-Keycloak approach for this path. If
-an account exists: no `password` field is read from the body, no Keycloak call is made at all, and
-the caller must already be authenticated (via the normal `platform-common-security` filter chain,
-not this controller's own token param) as the account matching `claims.email()` — a mismatch is
-`403`, and an unauthenticated caller gets a response telling the dashboard to send them to
-`/identity/auth/login` first, then retry the same accept URL. On success: insert
-`consumed_invite_tokens(jti)`, publish `OrgInviteAccepted{orgId, inviteId, userId, email,
-displayName, role}` with the **existing** `userId`, publish `AuditEventRecorded`. Nothing is
-written to `identity.users` in this branch — the account already has a row.
+`InviteAcceptService`, after the replay check, looks up `claims.email()` case-insensitively
+(`identityUserRepository.findByEmailIgnoreCase`) before any Keycloak call — the same proactive-check
+style `SignupService.ensureSlugAndEmailAreAvailable()` uses. The accept path stays `permitAll`, and
+the resource server still validates a bearer token whenever one is sent. If an account exists:
+`password` is ignored, no Keycloak call is made, and the caller's validated token subject must be that
+account's Keycloak user id:
+
+| Caller | Response | Invite consumed |
+|---|---|---|
+| No bearer token | `401 INVITE_SIGN_IN_REQUIRED` | no |
+| Signed in as another account | `403 INVITE_EMAIL_MISMATCH` | no |
+| Signed in as the invited account | `201` | yes |
+
+Neither code is `AUTHENTICATION_REQUIRED`, which the web BFF reads as a dead session. On success:
+insert `consumed_invite_tokens(jti, created_user_id = null)`, publish `OrgInviteAccepted{orgId,
+inviteId, userId, email, displayName, role}` with the **existing** `userId` and the account's own
+display name, publish `AuditEventRecorded`. Nothing is written to `identity.users`. With no existing
+account, a missing `password` is `400 BAD_REQUEST`; `409 CONFLICT` for an existing email only
+remains if Keycloak holds the address and `identity.users` doesn't.
 
 ### Email verification
 

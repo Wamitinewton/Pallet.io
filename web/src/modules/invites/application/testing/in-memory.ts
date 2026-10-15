@@ -4,10 +4,10 @@ import type { Page } from "@/shared/domain/page";
 import type { NewInvite } from "../../domain/create-invite";
 import type { Invite } from "../../domain/invite";
 import {
-    ACCOUNT_EXISTS,
     INVITE_ALREADY_CONSUMED,
     INVITE_NOT_FOUND,
     INVITE_NOT_PENDING,
+    INVITE_SIGN_IN_REQUIRED,
 } from "../../domain/invite-errors";
 import type { InviteListQuery } from "../../domain/invite-list-query";
 import type { InvitePreview } from "../../domain/invite-preview";
@@ -96,7 +96,7 @@ export class InMemoryInviteAcceptanceRepository implements InviteAcceptanceRepos
 
     acceptWithNewAccount(token: InviteToken, password: string): Promise<void> {
         this.newAccounts.push({ token, password });
-        if (this.accountExists) return Promise.reject(refusal(409, ACCOUNT_EXISTS));
+        if (this.accountExists) return Promise.reject(refusal(401, INVITE_SIGN_IN_REQUIRED));
         return this.consume();
     }
 
