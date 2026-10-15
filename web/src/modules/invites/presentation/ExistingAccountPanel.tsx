@@ -9,12 +9,10 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { InvitePreview, UnavailableReason } from "../domain/invite-preview";
 import {
-    accountExistsCopy,
     emailMismatchCopy,
     joinAsCopy,
     SIGN_IN_TO_ACCEPT_COPY,
     SIGN_OUT_COPY,
-    signedInElsewhereCopy,
     signInToJoinCopy,
 } from "./acceptance-copy";
 import { invitePath } from "./invite-paths";
@@ -26,8 +24,6 @@ export interface ExistingAccountPanelProps {
     readonly token: string;
     readonly preview: InvitePreview;
     readonly signedIn: boolean;
-    /** Whether identity-service accepts an invite for a signed-in account yet (its checkpoint 15). */
-    readonly canJoinAsSignedIn: boolean;
     readonly onUnavailable: (reason: UnavailableReason) => void;
     /** Takes focus when it replaces the new-account form. */
     readonly announce?: boolean;
@@ -38,7 +34,6 @@ export function ExistingAccountPanel({
     token,
     preview,
     signedIn,
-    canJoinAsSignedIn,
     onUnavailable,
     announce = false,
 }: ExistingAccountPanelProps) {
@@ -46,12 +41,10 @@ export function ExistingAccountPanel({
 
     return (
         <div ref={panel} tabIndex={-1} className={styles.panel}>
-            {!signedIn ? (
-                <SignInToAccept token={token} preview={preview} canJoinAsSignedIn={canJoinAsSignedIn} />
-            ) : canJoinAsSignedIn ? (
+            {signedIn ? (
                 <JoinAsSignedIn token={token} preview={preview} onUnavailable={onUnavailable} />
             ) : (
-                <SignedInElsewhere token={token} preview={preview} />
+                <SignInToAccept token={token} preview={preview} />
             )}
         </div>
     );
@@ -62,11 +55,11 @@ interface PanelProps {
     readonly preview: InvitePreview;
 }
 
-function SignInToAccept({ token, preview, canJoinAsSignedIn }: PanelProps & { readonly canJoinAsSignedIn: boolean }) {
+function SignInToAccept({ token, preview }: PanelProps) {
     return (
         <>
             <Callout tone="blue" icon="info">
-                {canJoinAsSignedIn ? signInToJoinCopy(preview.orgName) : accountExistsCopy(preview.orgName)}
+                {signInToJoinCopy(preview.orgName)}
             </Callout>
             <Button asChild variant="primary" size="lg" block>
                 <Link href={authPaths.signIn({ next: invitePath(token) })}>{SIGN_IN_TO_ACCEPT_COPY}</Link>
@@ -81,18 +74,6 @@ function SignOutButton({ token }: { readonly token: string }) {
         <Button variant="secondary" size="lg" block onClick={signOut} loading={pending}>
             {SIGN_OUT_COPY}
         </Button>
-    );
-}
-
-function SignedInElsewhere({ token, preview }: PanelProps) {
-    const session = useSessionSummary();
-    return (
-        <>
-            <Callout tone="blue" icon="info">
-                {signedInElsewhereCopy(session.data?.email, preview.orgName)}
-            </Callout>
-            <SignOutButton token={token} />
-        </>
     );
 }
 
@@ -125,7 +106,7 @@ function JoinAsSignedIn({
         );
     }
     if (outcome?.kind === "sign-in-required") {
-        return <SignInToAccept token={token} preview={preview} canJoinAsSignedIn />;
+        return <SignInToAccept token={token} preview={preview} />;
     }
 
     return (

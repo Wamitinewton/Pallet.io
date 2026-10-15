@@ -12,6 +12,7 @@ import io.pallet.identity.account.IdentityUser;
 import io.pallet.identity.account.IdentityUserRepository;
 import io.pallet.identity.audit.AuditPublisher;
 import io.pallet.identity.config.IdentityServiceProperties;
+import io.pallet.identity.invite.ConsumedInviteTokenRepository;
 import jakarta.ws.rs.NotFoundException;
 import java.time.Duration;
 import java.util.List;
@@ -29,10 +30,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Disables the account created for an invite that {@code org-team-service} refused to honour. The
- * event names a Keycloak user id, so the user's {@code org_id} attribute is checked against the
- * event's {@code orgId} before anything changes: a malformed or mistargeted event can never
- * disable an account belonging to another organization.
+ * Disables the account created for an invite that {@code org-team-service} refused to honour. Only
+ * an account this invite itself created qualifies: an existing account that accepted the invite
+ * (ADR-0018) is left alone. The user's {@code org_id} attribute is also checked against the event's
+ * {@code orgId}, so a malformed or mistargeted event can never disable another organization's account.
  */
 @Component
 class OrgInviteRejectedListener {
@@ -58,6 +59,7 @@ class OrgInviteRejectedListener {
     private final Keycloak keycloakAdminClient;
     private final IdentityServiceProperties properties;
     private final IdentityUserRepository identityUserRepository;
+    private final ConsumedInviteTokenRepository consumedInviteTokenRepository;
     private final RevokedSessionRegistry revokedSessionRegistry;
     private final AuditPublisher auditPublisher;
     private final JsonMapper jsonMapper;
@@ -69,6 +71,7 @@ class OrgInviteRejectedListener {
             Keycloak keycloakAdminClient,
             IdentityServiceProperties properties,
             IdentityUserRepository identityUserRepository,
+            ConsumedInviteTokenRepository consumedInviteTokenRepository,
             RevokedSessionRegistry revokedSessionRegistry,
             AuditPublisher auditPublisher,
             JsonMapper jsonMapper,
@@ -78,6 +81,7 @@ class OrgInviteRejectedListener {
         this.keycloakAdminClient = keycloakAdminClient;
         this.properties = properties;
         this.identityUserRepository = identityUserRepository;
+        this.consumedInviteTokenRepository = consumedInviteTokenRepository;
         this.revokedSessionRegistry = revokedSessionRegistry;
         this.auditPublisher = auditPublisher;
         this.jsonMapper = jsonMapper;
@@ -90,6 +94,11 @@ class OrgInviteRejectedListener {
         OrgInviteRejected event = jsonMapper.treeToValue(record.value(), OrgInviteRejected.class);
 
         if (!idempotencyGuard.markProcessed(event.eventId().toString(), GUARD_RETENTION)) {
+            return;
+        }
+
+        if (!consumedInviteTokenRepository.existsByJtiAndCreatedUserId(event.inviteId(), event.userId())) {
+            logNoOp(event);
             return;
         }
 
@@ -159,7 +168,7 @@ class OrgInviteRejectedListener {
 
     private void logNoOp(OrgInviteRejected event) {
         log.info(
-                "OrgInviteRejected for invite {} in org {} matched no Keycloak user of that org - no-op",
+                "OrgInviteRejected for invite {} in org {} matched no account that invite created - no-op",
                 event.inviteId(),
                 event.orgId());
         meterRegistry.counter(NOOP_METRIC, EVENT_TAG, EVENT_NAME).increment();

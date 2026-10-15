@@ -257,6 +257,42 @@ class OrgInviteRejectedListenerIntegrationTest {
     }
 
     @Test
+    void anInviteAcceptedByAnExistingAccountNeverDisablesIt() throws Exception {
+        InvitedAccount account = acceptInvite();
+        String accessToken = JsonMapper.builder()
+                .build()
+                .readTree(passwordGrant(account.email()).body())
+                .get("access_token")
+                .asString();
+        // Same org as the account's founding org_id, so only the created-by-this-invite check stops the disable.
+        String secondInviteId = UUID.randomUUID().toString();
+        mvc.perform(post(
+                                "/api/v1/identity/invites/{token}/accept",
+                                inviteToken(account.orgId(), account.email(), secondInviteId))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+        double before = noopCount();
+
+        publisher.publish(OrgInviteRejected.of(
+                account.orgId(),
+                secondInviteId,
+                account.keycloakUserId(),
+                account.email(),
+                OrgInviteRejected.REASON_ALREADY_ACCEPTED));
+
+        await().atMost(AWAIT_TIMEOUT)
+                .untilAsserted(() -> assertThat(noopCount()).isGreaterThan(before));
+        assertThat(isEnabledInKeycloak(account.keycloakUserId())).isTrue();
+        assertThat(identityUserRepository
+                        .findByKeycloakUserId(account.keycloakUserId())
+                        .orElseThrow()
+                        .getStatus())
+                .isNotEqualTo(UserStatus.DISABLED);
+    }
+
+    @Test
     void unknownUserIsANoOpAndDoesNotBlockLaterMessages() throws Exception {
         double before = noopCount();
         publisher.publish(OrgInviteRejected.of(

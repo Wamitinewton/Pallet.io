@@ -40,9 +40,7 @@ function acceptReplies(reply: () => Response | Promise<Response>) {
 }
 
 function renderView(props: Partial<InviteAcceptViewProps> = {}) {
-    return renderWithProviders(
-        <InviteAcceptView token={TOKEN} signedIn={false} canJoinAsSignedIn={false} {...props} />,
-    );
+    return renderWithProviders(<InviteAcceptView token={TOKEN} signedIn={false} {...props} />);
 }
 
 beforeEach(() => {
@@ -116,15 +114,20 @@ describe("InviteAcceptView", () => {
     });
 
     describe("for an address that already has an account", () => {
-        it("switches to signing in when creating the account answers CONFLICT", async () => {
-            acceptReplies(() => error(409, "CONFLICT", { message: "An account with this email already exists" }));
+        it.each([
+            [401, "INVITE_SIGN_IN_REQUIRED"],
+            [409, "CONFLICT"],
+        ])("switches to signing in when creating the account answers %i %s", async (status, code) => {
+            acceptReplies(() => error(status, code));
             const { user } = renderView();
 
             await user.type(await screen.findByLabelText("Password"), PASSWORD);
             await user.click(acceptButton());
 
             expect(
-                await screen.findByText(/This email already has a Pallet account\. Sign in, then open the invite link/),
+                await screen.findByText(
+                    /This email already has a Pallet account\. Sign in with it and you'll come straight back here to join Kilima Labs/,
+                ),
             ).toBeInTheDocument();
             expect(screen.queryByRole("form", { name: "Set a password to finish" })).not.toBeInTheDocument();
             expect(screen.getByRole("link", { name: "Sign in to accept" })).toHaveAttribute(
@@ -136,20 +139,10 @@ describe("InviteAcceptView", () => {
             });
         });
 
-        it("explains to a signed-in visitor that joining with it isn't available yet", async () => {
-            renderView({ signedIn: true });
-
-            expect(
-                await screen.findByText(/You're signed in as amani@kilimalabs\.co\. Joining Kilima Labs/),
-            ).toBeInTheDocument();
-            expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
-            expect(screen.queryByRole("form", { name: "Set a password to finish" })).not.toBeInTheDocument();
-        });
-
         it("joins as the signed-in account and opens the organization once it appears", async () => {
             const bodies = acceptReplies(accepted);
             server.use(http.get(bffUrl("/org-team/orgs"), () => page([orgSummaryDto({ myRole: "DEVELOPER" })])));
-            const { user } = renderView({ signedIn: true, canJoinAsSignedIn: true });
+            const { user } = renderView({ signedIn: true });
 
             await user.click(await screen.findByRole("button", { name: "Join Kilima Labs as amani@kilimalabs.co" }));
 
@@ -161,7 +154,7 @@ describe("InviteAcceptView", () => {
 
         it("tells a signed-in account the invite was sent to someone else", async () => {
             acceptReplies(() => error(403, "INVITE_EMAIL_MISMATCH"));
-            const { user } = renderView({ signedIn: true, canJoinAsSignedIn: true });
+            const { user } = renderView({ signedIn: true });
 
             await user.click(await screen.findByRole("button", { name: "Join Kilima Labs as amani@kilimalabs.co" }));
 

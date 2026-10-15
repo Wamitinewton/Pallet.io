@@ -4,9 +4,8 @@ import io.pallet.common.error.AppException;
 import org.springframework.http.HttpStatus;
 
 /**
- * The signed invite token behind this request was already used to create an account. Replaying
- * accept isn't idempotent the way sign-up is — a second attempt would try to create a second
- * Keycloak user for an email that, by definition, already has one.
+ * The signed invite token behind this request was already accepted. Replaying accept isn't
+ * idempotent the way sign-up is: a second attempt would publish a second {@code OrgInviteAccepted}.
  */
 public class InviteAlreadyConsumedException extends AppException {
 

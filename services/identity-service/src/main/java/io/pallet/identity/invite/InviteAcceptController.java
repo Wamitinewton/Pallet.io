@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,12 +29,16 @@ class InviteAcceptController {
     }
 
     @PostMapping("/invites/{token}/accept")
-    @Operation(summary = "Accept an org invite and create an account")
+    @Operation(
+            summary = "Accept an org invite",
+            description = "Creates the invited email's account when it has none (password required). When it has"
+                    + " one, the caller must be signed in as that account (bearer token) and the password is ignored.")
     @SecurityRequirements
     ResponseEntity<ApiResponse<Void>> accept(
             @Parameter(description = "Signed invite token from the invite email") @PathVariable String token,
-            @Valid @RequestBody InviteAcceptRequest request) {
-        inviteAcceptService.accept(token, request.password());
+            @Valid @RequestBody(required = false) InviteAcceptRequest request,
+            @AuthenticationPrincipal Jwt caller) {
+        inviteAcceptService.accept(token, request == null ? null : request.password(), caller);
         return ResponseEntity.status(CREATED).body(ApiResponse.ok("Invite accepted"));
     }
 }

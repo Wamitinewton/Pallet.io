@@ -127,7 +127,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept an org invite and create an account */
+        /**
+         * Accept an org invite
+         * @description Creates the invited email's account when it has none (password required). When it has one, the caller must be signed in as that account (bearer token) and the password is ignored.
+         */
         post: operations["accept"];
         delete?: never;
         options?: never;
@@ -296,7 +299,7 @@ export interface components {
             email: string;
         };
         InviteAcceptRequest: {
-            password: string;
+            password?: string;
         };
         LoginRequest: {
             /** Format: email */
@@ -1000,7 +1003,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": components["schemas"]["InviteAcceptRequest"];
             };
