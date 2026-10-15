@@ -5,8 +5,9 @@ import java.util.Set;
 /**
  * The Pallet event catalog. Topic names follow {@code domain.fact} in the past
  * tense: a statement that something already happened, never an instruction. A
- * rollback trigger is still modelled as an event with one intended consumer
- * rather than a synchronous call, so no producer blocks waiting on a reply.
+ * rollback trigger or a build dispatch is still modelled as an event with one
+ * intended consumer rather than a synchronous call, so no producer blocks
+ * waiting on a reply.
  *
  * <p>In this catalog the topic name equals the event type for every entry, so a
  * publisher can use {@link PlatformEvent#eventType()} as the topic directly (see
@@ -21,8 +22,11 @@ public final class Topics {
     // Command-style: one intended consumer, same envelope and delivery as a fact.
     public static final String NOTIFICATION_REQUESTED = "notification.requested";
     public static final String DEPLOY_ROLLBACK_TRIGGERED = "deploy.rollback.triggered";
+    public static final String BUILD_DISPATCHED = "build.dispatched";
     // Facts.
     public static final String GIT_PUSH_RECEIVED = "git.push.received";
+    public static final String BUILD_QUEUED = "build.queued";
+    public static final String BUILD_CANCELLED = "build.cancelled";
     public static final String BUILD_STARTED = "build.started";
     public static final String BUILD_SUCCEEDED = "build.succeeded";
     public static final String BUILD_FAILED = "build.failed";
@@ -48,7 +52,10 @@ public final class Topics {
     private static final Set<String> ALL = Set.of(
             NOTIFICATION_REQUESTED,
             DEPLOY_ROLLBACK_TRIGGERED,
+            BUILD_DISPATCHED,
             GIT_PUSH_RECEIVED,
+            BUILD_QUEUED,
+            BUILD_CANCELLED,
             BUILD_STARTED,
             BUILD_SUCCEEDED,
             BUILD_FAILED,
