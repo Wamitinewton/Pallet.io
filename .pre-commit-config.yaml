@@ -54,6 +54,14 @@ repos:
         files: ^services/git-integration-service/.*\.java$
         pass_filenames: false
 
+      - id: spotless-check-build-queue-service
+        name: Spotless (build-queue-service)
+        description: Java formatting/import-order — cd services/build-queue-service && ./mvnw spotless:apply to fix
+        entry: services/build-queue-service/mvnw -q -f services/build-queue-service/pom.xml spotless:check
+        language: system
+        files: ^services/build-queue-service/.*\.java$
+        pass_filenames: false
+
       - id: web-format-check
         name: Prettier (web)
         description: web formatting — cd web && make format to fix

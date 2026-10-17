@@ -32,6 +32,8 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0024](0024-edge-rate-limiting-token-bucket.md) | Edge rate limiting as a Redis token bucket: Redis-clock refill, atomic Lua script, `Retry-After` on every 429 | accepted |
 | [0025](0025-web-bff-session.md) | Web BFF session: tokens in encrypted Redis behind an opaque httpOnly cookie, single-flight refresh, `/bff` allow-list proxy with origin-checked writes | accepted |
 | [0026](0026-tenant-runtime-sandboxed-kubernetes-firecracker-deferred.md) | Tenant runtime: sandboxed `RuntimeClass` (gVisor default, Kata + Firecracker tier) behind a `WorkloadRuntime` port, self-managed Firecracker runtime deferred | proposed |
+| [0027](0027-build-queue-postgres-fair-scheduler.md) | Build queue as a Postgres-backed fair scheduler: partial unique indexes for coalescing and per-app serialization, round robin across orgs under per-org and global caps, single-active dispatcher per round via advisory lock and `LISTEN`/`NOTIFY`, dispatch pushed as `build.dispatched` | accepted |
+| [0028](0028-build-dispatch-leases-with-deadlines.md) | Dispatch leases with deadlines on the message: `buildId` as the end-to-end idempotency key, `startBy` and `maxDurationSeconds` on `build.dispatched`, redispatch on a missed start, run-lease expiry gated on backbone reachability, late results recorded | accepted |
 
 ## Still open (from `PROJECT.md`)
 

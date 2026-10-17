@@ -85,6 +85,10 @@ flowchart LR
         GHook[GitHub webhook]
     end
 
+    subgraph BQS["build-queue-service<br/>:8086"]
+        BApi[Build queue API]
+    end
+
     GH[GitHub]
 
     FE -- "Bearer JWT or anonymous" --> SEC
@@ -97,6 +101,7 @@ flowchart LR
     CB -- "Authorization header forwarded unchanged" --> ISApi
     CB --> OApi
     CB --> GApi
+    CB --> BApi
     CB -- "body forwarded byte for byte" --> GHook
     ISApi -. "validates the same JWT again, independently" .-> KC
 ```
@@ -236,7 +241,10 @@ preview (`/api/v1/org-team/invites/*`, one path segment: the token) and its API 
 repo link), and its only public paths are the GitHub webhook
 (`/api/v1/git-integration/webhooks/github`, authenticated by the service's HMAC check, never a
 bearer token) and its API docs. The webhook is also the one path with a per-route rate-limit
-override, see [Rate limiting](#rate-limiting). An
+override, see [Rate limiting](#rate-limiting). `build-queue-service` has
+`pallet.gateway.routes.build-queue-service` (`path: /api/v1/build-queue/**`, added by
+`docs/workflows/api-gateway/10-build-queue-route.md`), with `allowed-methods: [GET, POST]` (the reads
+and the cancel) and its API docs as its only public path. An
 endpoint `identity-service` adds *later* under its own existing `/api/v1/identity/**` namespace
 needs **zero** gateway routing change — only its own `public-paths`/`allowed-methods` entries if
 the new endpoint is public or introduces a new HTTP method that service didn't use before; this is
@@ -335,11 +343,15 @@ every `ExternalCall` call site's own fallback behavior — one set of numbers, o
 whether the call is `identity-service` calling Keycloak or `api-gateway` calling
 `identity-service`.
 
-`git-integration-service` is the one route with its own policy today:
+Two routes have their own policy today. `git-integration-service` has
 `pallet.resilience.policies.git-integration-service.time-limiter.timeout: 5s`. That sits above the
 service's webhook budget (p99 under 200 ms, worst case a slow insert or the 3 s Hikari wait before a
 `503`) and well under GitHub's ten-second delivery timeout, so GitHub always gets the service's own
 answer rather than a gateway timeout it would record as a failed delivery.
+`build-queue-service` has `pallet.resilience.policies.build-queue-service.time-limiter.timeout: 3s`:
+every request there is a few indexed reads or one short transaction, so 3 s is generous and keeps a
+stuck instance from holding gateway threads. Its cancel is a `POST`, so the gateway never retries it,
+even though the service treats a repeated cancel as a no-op.
 
 **Only `GET` is ever retried.** The retry filter's method allow-list defaults to `GET`, so a `POST`,
 `PATCH` or `DELETE` that fails is never re-sent by the route's retry policy. The proxy's Apache

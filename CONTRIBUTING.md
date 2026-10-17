@@ -63,6 +63,19 @@ Copy an existing service directory (`pom.xml`, `mvnw`/`mvnw.cmd`/`.mvn/`, `Makef
 nothing enforces that automatically anymore. CI discovers new services from the directory listing
 under `services/` (see the `CI` section below), so no workflow change is needed there.
 
+Give the service the next free local port (`server.port` in its `application.yaml`, `EXPOSE` in
+its `Dockerfile`) and add it to this table and the endpoint table in `AGENTS.md`:
+
+| Service | Port |
+|---|---|
+| notification-service | 8081 |
+| identity-service | 8082 |
+| api-gateway | 8083 |
+| org-team-service | 8084 |
+| git-integration-service | 8085 |
+| build-queue-service | 8086 |
+| config-server | 8888 |
+
 ## Spring Boot 4 gotchas
 
 This project is on Spring Boot 4.1 / Java 21. If you copy a snippet written for

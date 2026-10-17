@@ -43,6 +43,13 @@ pallet:
         rate-limits:
           - path: /api/v1/git-integration/webhooks/github
             mode: DISABLED
+      build-queue-service:
+        uri: ${BUILD_QUEUE_SERVICE_URI:http://localhost:8086}
+        path: /api/v1/build-queue/**
+        allowed-methods: [GET, POST]
+        public-paths:
+          - /api/v1/build-queue/v3/api-docs
+        resilience-policy: build-queue-service
     # Token bucket per org (or client IP on a public path): bursts up to `capacity`, then refills
     # continuously at capacity/window, here one request a second.
     rate-limit:
@@ -53,6 +60,8 @@ pallet:
     policies:
       git-integration-service:
         time-limiter: { timeout: 5s }
+      build-queue-service:
+        time-limiter: { timeout: 3s }
 
 spring:
   data:

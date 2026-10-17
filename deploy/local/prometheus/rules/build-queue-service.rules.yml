@@ -1,0 +1,107 @@
+groups:
+  - name: build-queue-service
+    rules:
+      # Every instance reads the queue gauges from the same database, so they're combined with max, never sum.
+      - alert: BuildQueueDispatchStalled
+        expr: |
+          max(build_queue_oldest_dispatchable_age_seconds{job="build-queue-service"}) > 300
+          and on ()
+          max(sum without (status) (build_queue_in_flight{job="build-queue-service"}))
+            < max(build_queue_capacity{job="build-queue-service"})
+          and on ()
+          min(build_queue_dispatch_paused{job="build-queue-service"}) == 0
+        for: 5m
+        labels:
+          severity: page
+          service: build-queue-service
+        annotations:
+          summary: A build nothing should be holding has waited more than five minutes for a slot
+          description: "The oldest dispatchable build has waited {{ $value | humanizeDuration }} with platform capacity free and dispatch not paused: the dispatcher is failing, its lock is held, or its query regressed."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#1-dispatch-stalled
+
+      - alert: BuildQueueSaturated
+        expr: |
+          max(sum without (status) (build_queue_in_flight{job="build-queue-service"}))
+            >= max(build_queue_capacity{job="build-queue-service"})
+        for: 15m
+        labels:
+          severity: ticket
+          service: build-queue-service
+        annotations:
+          summary: Every build slot has been in use for fifteen minutes
+          description: "{{ $value }} builds in flight at dispatch.global-concurrency. A capacity signal, not a fault."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#2-saturated
+
+      - alert: BuildQueueRedispatching
+        expr: sum(rate(build_queue_dispatched_total{job="build-queue-service", attempt!="1"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: ticket
+          service: build-queue-service
+        annotations:
+          summary: Builds keep missing their start deadline and being redispatched
+          description: "{{ $value | humanize }} redispatches/s: build-service isn't picking builds up before startBy."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#3-redispatching
+
+      - alert: BuildQueueLeaseExpiries
+        expr: |
+          sum(rate(build_queue_finished_total{job="build-queue-service", outcome="expired", reason=~"START_TIMEOUT|LEASE_EXPIRED"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: ticket
+          service: build-queue-service
+        annotations:
+          summary: The queue keeps giving up on dispatched or running builds
+          description: "{{ $value | humanize }} expiries/s: build-service is losing builds, never starting them or never reporting a result."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#4-lease-expiries
+
+      - alert: BuildQueueContractViolation
+        expr: |
+          sum by (kind) (increase(build_queue_events_anomaly_total{job="build-queue-service", kind=~"late_start|impossible"}[10m])) > 0
+        labels:
+          severity: page
+          service: build-queue-service
+        annotations:
+          summary: build-service reported something its contract rules out
+          description: "{{ $value }} {{ $labels.kind }} report(s) in ten minutes: a build started after the queue gave up on it, or a result arrived for a build that never left the queue."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#5-contract-violation
+
+      - alert: BuildQueueOutboxBacklog
+        expr: max(build_queue_outbox_oldest_pending_age_seconds{job="build-queue-service"}) > 60
+        for: 1m
+        labels:
+          severity: ticket
+          service: build-queue-service
+        annotations:
+          summary: Queue events, dispatches among them, are not reaching Kafka
+          description: The oldest unpublished outbox row is {{ $value | humanizeDuration }} old.
+          runbook_url: docs/build-queue-service/RUNBOOK.md#6-outbox-backlog
+
+      # A partition's lag can be reported by its previous owner until that instance's client metrics refresh.
+      - alert: BuildQueueConsumerLag
+        expr: |
+          sum(max by (partition) (kafka_consumer_fetch_manager_records_lag{job="build-queue-service", topic="git.push.received"})) > 1000
+        for: 5m
+        labels:
+          severity: ticket
+          service: build-queue-service
+        annotations:
+          summary: Intake is falling behind git.push.received
+          description: "{{ $value }} pushes waiting to be read."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#7-consumer-lag
+
+      # The platform's DLT monitor counts a dead letter on whichever service's instance holds the DLT partition.
+      - alert: BuildQueueDeadLetters
+        expr: |
+          sum by (topic) (increase(messaging_dead_letter_total{topic=~"(git\\.push\\.received|build\\.started|build\\.succeeded|build\\.failed|app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed)\\.DLT"}[10m])) > 0
+          or
+          (sum by (topic) (messaging_dead_letter_total{topic=~"(git\\.push\\.received|build\\.started|build\\.succeeded|build\\.failed|app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed)\\.DLT"} > 0)
+            unless
+           sum by (topic) (messaging_dead_letter_total{topic=~"(git\\.push\\.received|build\\.started|build\\.succeeded|build\\.failed|app\\.created|app\\.deleted|org\\.deleted|org\\.membership\\.changed)\\.DLT"} offset 10m))
+        labels:
+          severity: page
+          service: build-queue-service
+        annotations:
+          summary: An event on a topic this service consumes was dead-lettered
+          description: "{{ $labels.topic }} received a record: a malformed push, an app seen under a second org, or a listener failing every retry. Other consumers of the same topic share the DLT."
+          runbook_url: docs/build-queue-service/RUNBOOK.md#8-dead-letters
