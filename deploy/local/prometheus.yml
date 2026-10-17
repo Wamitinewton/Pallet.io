@@ -37,3 +37,13 @@ scrape_configs:
           - "host.docker.internal:8085"
         labels:
           env: local
+
+  # Two instances in the local chaos walk (docs/build-queue-service/RUNBOOK.md); 8096 is down otherwise.
+  - job_name: build-queue-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - "host.docker.internal:8086"
+          - "host.docker.internal:8096"
+        labels:
+          env: local

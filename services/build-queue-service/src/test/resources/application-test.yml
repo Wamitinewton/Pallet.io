@@ -1,0 +1,80 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+  cloud:
+    config:
+      enabled: false
+  kafka:
+    consumer:
+      group-id: build-queue-service-test-${random.uuid}
+      auto-offset-reset: earliest
+    producer:
+      properties:
+        max.block.ms: 3000
+        request.timeout.ms: 2000
+        delivery.timeout.ms: 3000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:1/not-used-in-tests
+
+pallet:
+  messaging:
+    publish:
+      send-timeout: 3s
+  outbox:
+    schema: build_queue
+    metrics-prefix: build_queue
+    advisory-lock-key: 7305121410
+    enabled: true
+  # Every test context consumes every push, so a limit a test relies on has to be the same in all of them.
+  build-queue:
+    dispatch:
+      # Tests drive rounds themselves; a context that wants the LISTEN/poll loop starts it for its own tests.
+      wakeup-enabled: false
+    # Whichever context claims a build.started leases the build, so the lease has to be the same in all of them.
+    build:
+      max-duration: PT3S
+    lease:
+      grace: PT1S
+      # Sweeps span every org; only the lease tests run them, by hand or by starting the schedule.
+      sweeper-enabled: false
+    # Retention spans every org; only the retention tests run it, by hand.
+    retention:
+      enabled: false
+    limits:
+      profiles:
+        default:
+          max-concurrent: 1
+          max-queued: 50
+        team:
+          max-concurrent: 3
+          max-queued: 200
+        tight:
+          max-concurrent: 1
+          max-queued: 3
+        wide:
+          max-concurrent: 20
+          max-queued: 50
+        pair:
+          max-concurrent: 2
+          max-queued: 50
+      org-profiles:
+        org-admission-full: tight
+        org-admission-neighbour: tight
+        org-dispatch-team: team
+        org-fairness-wide: wide
+        org-dispatch-loop: pair
+        org-observability-full: tight
+
+springdoc:
+  api-docs:
+    path: /build-queue/v3/api-docs
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0

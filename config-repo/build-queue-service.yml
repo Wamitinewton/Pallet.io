@@ -1,0 +1,80 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
+    username: ${POSTGRES_USER:pallet}
+    password: ${POSTGRES_PASSWORD:pallet}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    consumer:
+      group-id: build-queue-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+pallet:
+  outbox:
+    schema: build_queue
+    metrics-prefix: build_queue
+    advisory-lock-key: 7305121410
+    poll-interval: PT0.25S
+    batch-size: 100
+    max-attempts: 10
+    retention: P7D
+    broker-backoff-initial: PT1S
+    broker-backoff-max: PT30S
+    row-backoff-max: PT60S
+    lock-timeout: PT5S
+  inbox:
+    retention: P14D
+  build-queue:
+    dispatch:
+      # A promise about build-service's capacity: never set it higher than the builds it can run at once.
+      global-concurrency: 4
+      batch-size: 50
+      poll-interval: PT1S
+      start-timeout: PT5M
+      max-attempts: 3
+      paused: false
+      wakeup-enabled: true
+    build:
+      max-duration: PT30M
+    lease:
+      grace: PT5M
+      sweep-interval: PT15S
+      reachability-timeout: PT3S
+      batch-size: 100
+      sweeper-enabled: true
+    queue:
+      max-age: PT24H
+    limits:
+      default-profile: default
+      profiles:
+        default:
+          max-concurrent: 1
+          max-queued: 50
+        team:
+          max-concurrent: 3
+          max-queued: 200
+    retention:
+      terminal-builds: P30D
+      # Must outlive git.push.received's 7-day retention so a buffered push still finds its app's tombstone.
+      tombstones: P30D
+      batch-size: 500
+      # Caps each step of one run at max-batches-per-run x batch-size rows, so a backlog drains over several runs.
+      max-batches-per-run: 10
+      interval: PT1H
+      enabled: true
+    observability:
+      gauge-interval: PT15S
+
+springdoc:
+  api-docs:
+    path: /build-queue/v3/api-docs
+  swagger-ui:
+    enabled: false

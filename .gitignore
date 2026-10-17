@@ -12,6 +12,8 @@ build/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
 
 # OWASP Dependency-Check local cache
 .owasp-dependency-check/

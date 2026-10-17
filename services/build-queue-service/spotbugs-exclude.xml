@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <!-- UUIDv5 is defined over SHA-1 (RFC 9562). It derives stable names, not anything secret or integrity-bearing. -->
+    <Match>
+        <Class name="io.pallet.buildqueue.build.BuildIds"/>
+        <Bug pattern="WEAK_MESSAGE_DIGEST_SHA1"/>
+    </Match>
+    <!-- Rethrow unchanged after recording the failure: on the span the work ran in, or as the round's error result. -->
+    <Match>
+        <Or>
+            <Class name="io.pallet.buildqueue.observability.BuildSpans"/>
+            <Class name="io.pallet.buildqueue.dispatch.Dispatcher"/>
+        </Or>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+</FindBugsFilter>

@@ -84,6 +84,12 @@ path-filtered per service or `platform-common` module. Still run it locally befo
 | Service | Local endpoint |
 |---|---|
 | config-server | http://localhost:8888 |
+| notification-service | http://localhost:8081 |
+| identity-service | http://localhost:8082 |
+| api-gateway | http://localhost:8083 |
+| org-team-service | http://localhost:8084 |
+| git-integration-service | http://localhost:8085 |
+| build-queue-service | http://localhost:8086 |
 | Keycloak | http://localhost:8080 (admin/admin, realm `pallet`) |
 | Postgres | localhost:5432 (pallet/pallet) |
 | ClickHouse | http://localhost:8123 (pallet/pallet) |
