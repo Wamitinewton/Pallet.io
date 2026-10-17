@@ -38,3 +38,10 @@ keys.properties
 # Local Kubernetes / infra state
 deploy/local/*.kubeconfig
 docs/workflows
+
+# Personal LinkedIn drafts
+posts/
+
+# Local agent instructions
+CLAUDE.md
+AGENTS.md
