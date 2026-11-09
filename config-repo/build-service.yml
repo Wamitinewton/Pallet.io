@@ -1,0 +1,99 @@
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/pallet}
+    username: ${POSTGRES_USER:pallet}
+    password: ${POSTGRES_PASSWORD:pallet}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    consumer:
+      group-id: build-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+pallet:
+  outbox:
+    schema: build
+    metrics-prefix: build
+    advisory-lock-key: 7305121411
+    poll-interval: PT0.25S
+    batch-size: 100
+    max-attempts: 10
+    retention: P7D
+    broker-backoff-initial: PT1S
+    broker-backoff-max: PT30S
+    row-backoff-max: PT60S
+    lock-timeout: PT5S
+  inbox:
+    retention: P14D
+  build:
+    deployed: false
+    execution:
+      # Never below build-queue-service's dispatch.global-concurrency, or dispatches wait for a slot until they drop.
+      max-concurrent: 4
+      max-duration-cap: PT2H
+      namespace: pallet-builds
+      kubeconfig: ${BUILD_KUBECONFIG:../../deploy/local/build-service.kubeconfig}
+      ttl-after-finished: PT1H
+      resources:
+        build:
+          cpu: "2"
+          memory: 4Gi
+        ephemeral-storage: 10Gi
+      cnb-platform-api: "0.14"
+      # The step image lives in the local registry, which needs the push credential to pull from too.
+      image-pull-secrets:
+        - pallet-registry-push
+    images:
+      build-steps: pallet-registry:5000/pallet/build-steps:0.1.0
+      buildkit: docker.io/moby/buildkit:v0.34.2-rootless
+      lifecycle: docker.io/buildpacksio/lifecycle:0.21.28
+      builder: docker.io/paketobuildpacks/ubuntu-noble-builder:0.0.217
+      run: docker.io/paketobuildpacks/ubuntu-noble-run:0.0.157
+    admission:
+      poll-interval: PT1S
+    launch:
+      safety-margin: PT10S
+      poll-interval: PT1S
+      batch-size: 10
+      claim-ttl: PT1M
+      max-attempts: 5
+      deadline: PT5M
+      backoff-initial: PT2S
+      backoff-max: PT30S
+    observer:
+      resync-interval: PT30S
+      missing-grace: PT2M
+      deadline-grace: PT1M
+    source:
+      credentials: anonymous
+      github:
+        api-url: https://api.github.com
+    registry:
+      host: pallet-registry:5000
+      insecure: true
+      push-secret: pallet-registry-push
+    logs:
+      max-bytes: 5MB
+      chunk-bytes: 16KB
+      flush-interval: PT0.5S
+      lease-ttl: PT30S
+      max-followers-per-instance: 32
+      complete-timeout: PT2M
+    retention:
+      builds: P90D
+      dropped: P7D
+      logs: P30D
+      # Must outlive build.dispatched's 7-day retention so a buffered dispatch still finds its app's tombstone.
+      tombstones: P30D
+      batch-size: 500
+      max-batches-per-run: 10
+      interval: PT1H
+    observability:
+      gauge-interval: PT15S

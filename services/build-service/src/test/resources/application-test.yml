@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+  cloud:
+    config:
+      enabled: false
+  kafka:
+    consumer:
+      group-id: build-service-test-${random.uuid}
+      auto-offset-reset: earliest
+    producer:
+      properties:
+        max.block.ms: 3000
+        request.timeout.ms: 2000
+        delivery.timeout.ms: 3000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:1/not-used-in-tests
+
+pallet:
+  messaging:
+    publish:
+      send-timeout: 3s
+  outbox:
+    schema: build
+    metrics-prefix: build
+    advisory-lock-key: 7305121411
+    enabled: true
