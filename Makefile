@@ -11,8 +11,12 @@ format-check: ## Check .editorconfig conformance + Java formatting (Spotless/Pal
 ## ── Local infrastructure ────────────────────────────────────────────────
 
 .PHONY: up
-up: ## Start core infra (postgres, redis, kafka, keycloak, clickhouse, mailpit)
+up: registry-auth ## Start core infra (postgres, redis, kafka, keycloak, clickhouse, mailpit, registry)
 	docker compose --profile core up -d
+
+.PHONY: registry-auth
+registry-auth: ## Generate the local registry's user and push credential (kept if present)
+	./deploy/local/registry/generate-htpasswd.sh
 
 .PHONY: obs
 obs: ## Start the observability stack (otel-collector, prometheus, grafana, jaeger, loki)
@@ -23,7 +27,7 @@ data: ## Start vault
 	docker compose --profile data up -d
 
 .PHONY: up-all
-up-all: ## Start every profile
+up-all: registry-auth ## Start every profile
 	docker compose --profile core --profile observability --profile data --profile ui up -d
 
 .PHONY: down

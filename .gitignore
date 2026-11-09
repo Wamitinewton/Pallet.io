@@ -37,6 +37,7 @@ keys.properties
 
 # Local Kubernetes / infra state
 deploy/local/*.kubeconfig
+deploy/local/registry/auth/
 docs/workflows
 
 # Personal LinkedIn drafts

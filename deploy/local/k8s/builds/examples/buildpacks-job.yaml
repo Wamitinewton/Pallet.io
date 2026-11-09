@@ -1,0 +1,185 @@
+# One Cloud Native Buildpacks build, following the lifecycle's flow for untrusted builders: the
+# phases that touch a registry run from the trusted lifecycle image, the phases that run buildpack
+# code run from the builder image with no credential. Placeholders are the values build-service
+# fills per build; render with render.sh.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-${BUILD_ID}
+  namespace: pallet-builds
+  labels: &labels
+    app.kubernetes.io/managed-by: pallet-build-service
+    pallet.io/build-id: "${BUILD_ID}"
+    pallet.io/app-id: "${APP_ID}"
+    pallet.io/org-id: "${ORG_ID}"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: ${ACTIVE_DEADLINE_SECONDS}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      restartPolicy: Never
+      serviceAccountName: pallet-build
+      # Pallet's step image lives in the local registry, which wants credentials to pull. Only the
+      # kubelet reads this Secret; no container sees it.
+      imagePullSecrets:
+        - name: pallet-registry-push
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      shareProcessNamespace: false
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      securityContext:
+        runAsNonRoot: true
+        # The builder's CNB group, so the lifecycle phases can write where fetch extracted.
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: fetch
+          image: "${BUILD_STEPS_IMAGE}"
+          command: ["fetch"]
+          args: ["${REPO_ID}", "${COMMIT_SHA}", "${ROOT_DIRECTORY}"]
+          env:
+            - name: PALLET_GITHUB_API_URL
+              value: "${GITHUB_API_URL}"
+          securityContext: &pallet-container
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources: &small
+            requests: {cpu: 100m, memory: 128Mi, ephemeral-storage: 256Mi}
+            limits: {cpu: 500m, memory: 256Mi, ephemeral-storage: 1Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: fetch-tmp, mountPath: /tmp}
+            - {name: source-token, mountPath: /var/run/pallet/source, readOnly: true}
+        - name: analyze
+          image: "${LIFECYCLE_IMAGE}"
+          command: ["/cnb/lifecycle/analyzer"]
+          args:
+            - -layers=/workspace/layers
+            - -run-image=${RUN_IMAGE}
+            - -uid=1001
+            - -gid=1001
+            - -insecure-registry=${INSECURE_REGISTRY}
+            - -log-level=info
+            - "${IMAGE_REF}"
+          # The analyzer refuses to start unless it can read and write the output image, so it holds
+          # the registry credential too. It runs the lifecycle image before any buildpack code runs.
+          env:
+            - name: CNB_PLATFORM_API
+              value: "${CNB_PLATFORM_API}"
+            - name: DOCKER_CONFIG
+              value: /var/run/pallet/registry
+          securityContext: &cnb-container
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources: &lifecycle
+            requests: {cpu: 250m, memory: 256Mi, ephemeral-storage: 256Mi}
+            limits: {cpu: "1", memory: 1Gi, ephemeral-storage: 1Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: lifecycle-tmp, mountPath: /tmp}
+            - {name: registry-auth, mountPath: /var/run/pallet/registry, readOnly: true}
+        - name: detect
+          image: "${BUILDER_IMAGE}"
+          command: ["/cnb/lifecycle/detector"]
+          args:
+            - -app=/workspace/src/${ROOT_DIRECTORY}
+            - -layers=/workspace/layers
+            - -platform=/workspace/platform
+            - -log-level=info
+          env: &platform-api
+            - name: CNB_PLATFORM_API
+              value: "${CNB_PLATFORM_API}"
+          securityContext: *cnb-container
+          resources: *lifecycle
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: builder-tmp, mountPath: /tmp}
+            - {name: builder-home, mountPath: /home/cnb}
+        - name: build
+          image: "${BUILDER_IMAGE}"
+          command: ["/cnb/lifecycle/builder"]
+          args:
+            - -app=/workspace/src/${ROOT_DIRECTORY}
+            - -layers=/workspace/layers
+            - -platform=/workspace/platform
+            - -log-level=info
+          env: *platform-api
+          securityContext: *cnb-container
+          resources:
+            requests: {cpu: "2", memory: 4Gi, ephemeral-storage: 10Gi}
+            limits: {cpu: "2", memory: 4Gi, ephemeral-storage: 10Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: builder-tmp, mountPath: /tmp}
+            - {name: builder-home, mountPath: /home/cnb}
+        - name: export
+          image: "${LIFECYCLE_IMAGE}"
+          command: ["/cnb/lifecycle/exporter"]
+          args:
+            - -app=/workspace/src/${ROOT_DIRECTORY}
+            - -layers=/workspace/layers
+            - -uid=1001
+            - -gid=1001
+            - -insecure-registry=${INSECURE_REGISTRY}
+            - -report=/workspace/layers/report.toml
+            - -log-level=info
+            - "${IMAGE_REF}"
+          env:
+            - name: CNB_PLATFORM_API
+              value: "${CNB_PLATFORM_API}"
+            - name: DOCKER_CONFIG
+              value: /var/run/pallet/registry
+          securityContext: *cnb-container
+          resources:
+            requests: {cpu: 500m, memory: 512Mi, ephemeral-storage: 1Gi}
+            limits: {cpu: "2", memory: 2Gi, ephemeral-storage: 4Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: lifecycle-tmp, mountPath: /tmp}
+            - {name: registry-auth, mountPath: /var/run/pallet/registry, readOnly: true}
+      containers:
+        - name: report
+          image: "${BUILD_STEPS_IMAGE}"
+          command: ["report"]
+          args: ["${IMAGE_REF}"]
+          securityContext: *pallet-container
+          resources: *small
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace, readOnly: true}
+      volumes:
+        - name: workspace
+          emptyDir: {sizeLimit: 10Gi}
+        - name: fetch-tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: lifecycle-tmp
+          emptyDir: {sizeLimit: 4Gi}
+        - name: builder-tmp
+          emptyDir: {sizeLimit: 4Gi}
+        - name: builder-home
+          emptyDir: {sizeLimit: 4Gi}
+        - name: source-token
+          secret:
+            secretName: build-${BUILD_ID}-source
+            optional: true
+            defaultMode: 0440
+        - name: registry-auth
+          secret:
+            secretName: pallet-registry-push
+            defaultMode: 0440
+            items:
+              - {key: .dockerconfigjson, path: config.json}

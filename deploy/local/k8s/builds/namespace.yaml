@@ -1,0 +1,13 @@
+# Holds only build pods, their per-build Secrets, the BuildKit config and the platform's registry
+# push credential. Rootless BuildKit needs unconfined seccomp and AppArmor, which fails the baseline
+# Pod Security level, so enforcement is privileged and the namespace's admission policy is what
+# actually constrains pods here. warn and audit stay at baseline so every relaxation is visible.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pallet-builds
+  labels:
+    pallet.io/purpose: builds
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/audit: baseline
