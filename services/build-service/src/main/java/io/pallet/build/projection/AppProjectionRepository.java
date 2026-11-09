@@ -11,6 +11,13 @@ public interface AppProjectionRepository extends Repository<AppProjection, Strin
 
     Optional<AppProjection> findByOrgIdAndAppId(String orgId, String appId);
 
+    /**
+     * The app, share-locked until the caller's transaction ends, so a concurrent deletion waits for the caller and the
+     * caller sees a deletion that committed first.
+     */
+    @Query(value = "SELECT * FROM build.apps WHERE org_id = :orgId AND app_id = :appId FOR SHARE", nativeQuery = true)
+    Optional<AppProjection> lockShared(@Param("orgId") String orgId, @Param("appId") String appId);
+
     /** @return 1 if inserted, 0 if the app was already known, in any state and under any org */
     @Modifying
     @Query(value = """

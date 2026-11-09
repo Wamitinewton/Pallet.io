@@ -26,4 +26,9 @@
         </Or>
         <Bug pattern="REDOS"/>
     </Match>
+    <!-- UUIDv5 is defined over SHA-1 (RFC 9562). It derives stable names, not anything secret or integrity-bearing. -->
+    <Match>
+        <Class name="io.pallet.build.domain.BuildIds"/>
+        <Bug pattern="WEAK_MESSAGE_DIGEST_SHA1"/>
+    </Match>
 </FindBugsFilter>

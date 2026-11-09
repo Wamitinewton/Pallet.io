@@ -854,8 +854,9 @@ recorded here and in [Changes this design needs elsewhere](#changes-this-design-
 
 1. Consume `build.dispatched` and use its `buildId` as the build's identity in every
    `build.started` / `build.succeeded` / `build.failed` it publishes. Never mint its own.
-2. Execute each `buildId` at most once. A dispatch for a `buildId` it already holds, any attempt,
-   is acknowledged and ignored.
+2. Execute each `buildId` at most once. A dispatch for a `buildId` that has started, any attempt,
+   is acknowledged and ignored; a build dropped before it started takes a later attempt. See
+   [`build-service` §Refinement to "held"](../build-service/ARCHITECTURE.md#refinement-to-held).
 3. Never start an attempt after its `startBy`. Drop it (counted); the queue will redispatch or give
    up.
 4. Stop a build at `maxDurationSeconds` and publish `build.failed` (`reason` = timeout).

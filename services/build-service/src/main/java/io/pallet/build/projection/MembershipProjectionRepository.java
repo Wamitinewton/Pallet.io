@@ -8,8 +8,27 @@ import org.springframework.data.repository.query.Param;
 
 public interface MembershipProjectionRepository extends Repository<MembershipProjection, MembershipProjection.Key> {
 
+    /** The gate's view of one caller in one org; {@code role} and {@code status} are null when there is no row. */
+    interface MembershipAccess {
+
+        String getRole();
+
+        String getStatus();
+
+        boolean getDeleted();
+    }
+
     @Query("SELECT m FROM MembershipProjection m WHERE m.key.orgId = :orgId AND m.key.userId = :userId")
     Optional<MembershipProjection> findMembership(@Param("orgId") String orgId, @Param("userId") String userId);
+
+    /** Always exactly one row, so a deleted org is reported as such whether or not a membership exists. */
+    @Query(value = """
+            SELECT m.role AS role, m.status AS status, COALESCE(o.status = 'DELETED', false) AS deleted
+              FROM (SELECT CAST(:orgId AS TEXT) AS org_id) requested
+              LEFT JOIN build.org_memberships m ON m.org_id = requested.org_id AND m.user_id = :userId
+              LEFT JOIN build.orgs o ON o.org_id = requested.org_id
+            """, nativeQuery = true)
+    MembershipAccess findAccess(@Param("orgId") String orgId, @Param("userId") String userId);
 
     /**
      * Applies one state record. The conflict branch's {@code WHERE} is the ordering guarantee: an older or equal

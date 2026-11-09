@@ -30,3 +30,11 @@ pallet:
     metrics-prefix: build
     advisory-lock-key: 7305121411
     enabled: true
+
+springdoc:
+  api-docs:
+    path: /build/v3/api-docs
+management:
+  tracing:
+    sampling:
+      probability: 1.0

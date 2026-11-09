@@ -719,19 +719,24 @@ sequenceDiagram
 
 `DispatchListener` consumes `build.dispatched`. In one transaction, inbox claim first:
 
-1. Validate: every field present, `commitSha` 40 lowercase hex, `rootDirectory` relative without
-   `..`, `maxDurationSeconds` positive and at most `execution.max-duration-cap`, `provider` is
-   `GITHUB`. A malformed dispatch is dead-lettered and alerted on; it can't be retried into
-   validity.
+1. Validate: every field present, `buildId` a lowercase UUID (it names the build's Kubernetes
+   objects), `commitSha` 40 lowercase hex, `rootDirectory` relative without `..`,
+   `maxDurationSeconds` positive and at most `execution.max-duration-cap`, `provider` is `GITHUB`,
+   and the record keyed by its `orgId`. A missing, empty or `.` `rootDirectory` is the repository
+   root, stored as `""`. A malformed dispatch is dead-lettered and alerted on; it can't be retried
+   into validity.
 2. Check the app against `apps`: an `appId` registered under a different org is a poison message
    (dead-lettered, never applied). An unknown app is inserted `ACTIVE` under the dispatch's org.
+   The org and app rows are then share-locked, so an `app.deleted` or `org.deleted` committing at
+   the same moment is either seen here or waits until this build is recorded and can tear it down.
 3. If the app or org is `DELETED`: insert the build directly as `FAILED` (`APP_DELETED` /
    `ORG_DELETED`), publish `build.failed`, done. If the build row already exists, do nothing.
 4. Otherwise, against any existing row for `buildId` (locked `FOR UPDATE`):
    - **No row**: insert `ACCEPTED` if `start_by > now() + launch.safety-margin`, otherwise insert
      `DROPPED` (counted `late`). Snapshot the app's build settings onto the row.
    - **Row in `ACCEPTED` or `DROPPED` with a lower attempt**: replace `attempt` and `start_by`, set
-     `ACCEPTED` if in time (otherwise stay or become `DROPPED`), count `reaccepted`.
+     `ACCEPTED` if in time and count `reaccepted`; otherwise stay or become `DROPPED`
+     (`drop_count + 1`) and count `late`. The settings snapshot is not refreshed.
    - **Row with the same or a higher attempt, or in a started state**: ignore, count `duplicate`.
    - A row whose `org_id`, `app_id` or `commit_sha` differs from the dispatch: poison, dead-letter.
      The queue derives `buildId` from the push, so this can't happen without a bug or a forgery.
