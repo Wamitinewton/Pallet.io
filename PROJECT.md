@@ -167,9 +167,9 @@ Every event on the backbone is a flat JSON record carrying the common envelope (
 | `build.queued` | build-queue-service | none yet | build id, app id, branch, commit sha, push event id, superseded build id |
 | `build.dispatched` | build-queue-service | build-service | build id, attempt, app id, commit sha, repo id, root directory, start-by deadline, max duration |
 | `build.cancelled` | build-queue-service | none yet | build id, app id, commit sha, reason, superseding build id |
-| `build.started` | build-service | deploy-orchestrator-service, log-service, notification-service | build id, app id |
-| `build.succeeded` | build-service | deploy-orchestrator-service, registry-service | build id, image tag, digest |
-| `build.failed` | build-service | deploy-orchestrator-service, notification-service | build id, error message |
+| `build.started` | build-service | deploy-orchestrator-service, log-service, notification-service | build id, attempt, app id, branch, commit sha, push event id |
+| `build.succeeded` | build-service | deploy-orchestrator-service, registry-service | build id, app id, commit sha, image repository, tag, digest, strategy |
+| `build.failed` | build-service | deploy-orchestrator-service, notification-service | build id, app id, commit sha, failure code, failed step, reason |
 | `deploy.step.completed` | deploy-orchestrator-service | log-service, metrics-service | deployment id, step name, duration |
 | `deploy.state.changed` | deploy-orchestrator-service | notification-service, log-service | deployment id, from state, to state |
 | `deploy.rollback.triggered` | deploy-orchestrator-service | dns-service, traffic-routing-service | deployment id, reason |
