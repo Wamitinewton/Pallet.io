@@ -1,0 +1,148 @@
+# One Dockerfile build. Placeholders are the values build-service fills per build; render with
+# render.sh. Containers run in order: fetch (source token, no tenant code), build (tenant code, no
+# credential), push (registry credential, no tenant code).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-${BUILD_ID}
+  namespace: pallet-builds
+  labels: &labels
+    app.kubernetes.io/managed-by: pallet-build-service
+    pallet.io/build-id: "${BUILD_ID}"
+    pallet.io/app-id: "${APP_ID}"
+    pallet.io/org-id: "${ORG_ID}"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: ${ACTIVE_DEADLINE_SECONDS}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      restartPolicy: Never
+      serviceAccountName: pallet-build
+      # Pallet's step image lives in the local registry, which wants credentials to pull. Only the
+      # kubelet reads this Secret; no container sees it.
+      imagePullSecrets:
+        - name: pallet-registry-push
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      shareProcessNamespace: false
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: fetch
+          image: "${BUILD_STEPS_IMAGE}"
+          command: ["fetch"]
+          args: ["${REPO_ID}", "${COMMIT_SHA}", "${ROOT_DIRECTORY}", "${DOCKERFILE_PATH}"]
+          env:
+            - name: PALLET_GITHUB_API_URL
+              value: "${GITHUB_API_URL}"
+          securityContext: &pallet-container
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 100m, memory: 128Mi, ephemeral-storage: 256Mi}
+            limits: {cpu: 500m, memory: 256Mi, ephemeral-storage: 1Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: fetch-tmp, mountPath: /tmp}
+            - {name: source-token, mountPath: /var/run/pallet/source, readOnly: true}
+        - name: build
+          image: "${BUILDKIT_IMAGE}"
+          command: ["buildctl-daemonless.sh"]
+          args:
+            - build
+            - --frontend=dockerfile.v0
+            - --local=context=/workspace/src/${ROOT_DIRECTORY}
+            - --local=dockerfile=/workspace/src/${ROOT_DIRECTORY}/${DOCKERFILE_DIR}
+            - --opt=filename=${DOCKERFILE_NAME}
+            - --output=type=oci,dest=/workspace/out/image.tar
+            - --progress=plain
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            readOnlyRootFilesystem: true
+            # rootlesskit creates the user namespace RUN steps execute in: newuidmap and newgidmap
+            # need SETUID, SETGID and privilege escalation, and unsharing namespaces needs the
+            # unconfined profiles. These relaxations are what the sandboxed runtime exists to contain.
+            allowPrivilegeEscalation: true
+            capabilities:
+              drop: ["ALL"]
+              add: ["SETUID", "SETGID"]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+          resources:
+            requests: {cpu: "2", memory: 4Gi, ephemeral-storage: 10Gi}
+            limits: {cpu: "2", memory: 4Gi, ephemeral-storage: 10Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace}
+            - {name: buildkit-state, mountPath: /home/user/.local/share/buildkit}
+            - {name: buildkit-tmp, mountPath: /home/user/.local/tmp}
+            - {name: buildkit-scratch, mountPath: /tmp}
+            - {name: buildkit-docker, mountPath: /home/user/.docker}
+            - {name: buildkit-run, mountPath: /run/user/1000}
+            - name: buildkitd-config
+              mountPath: /home/user/.config/buildkit/buildkitd.toml
+              subPath: buildkitd.toml
+              readOnly: true
+      containers:
+        - name: push
+          image: "${BUILD_STEPS_IMAGE}"
+          command: ["push"]
+          args: ["${IMAGE_REF}", "DOCKERFILE"]
+          env:
+            - name: PALLET_REGISTRY_INSECURE
+              value: "${REGISTRY_INSECURE}"
+          securityContext: *pallet-container
+          resources:
+            requests: {cpu: 100m, memory: 128Mi, ephemeral-storage: 256Mi}
+            limits: {cpu: "1", memory: 512Mi, ephemeral-storage: 1Gi}
+          volumeMounts:
+            - {name: workspace, mountPath: /workspace, readOnly: true}
+            - {name: push-tmp, mountPath: /tmp}
+            - {name: registry-auth, mountPath: /var/run/pallet/registry, readOnly: true}
+      volumes:
+        - name: workspace
+          emptyDir: {sizeLimit: 10Gi}
+        - name: fetch-tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: push-tmp
+          emptyDir: {sizeLimit: 10Gi}
+        - name: buildkit-state
+          emptyDir: {sizeLimit: 10Gi}
+        - name: buildkit-tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: buildkit-scratch
+          emptyDir: {sizeLimit: 64Mi}
+        - name: buildkit-docker
+          emptyDir: {sizeLimit: 1Mi}
+        - name: buildkit-run
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: buildkitd-config
+          configMap:
+            name: pallet-buildkitd-config
+        - name: source-token
+          secret:
+            secretName: build-${BUILD_ID}-source
+            optional: true
+            defaultMode: 0440
+        - name: registry-auth
+          secret:
+            secretName: pallet-registry-push
+            defaultMode: 0440
+            items:
+              - {key: .dockerconfigjson, path: .dockerconfigjson}

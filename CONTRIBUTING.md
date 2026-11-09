@@ -74,6 +74,7 @@ its `Dockerfile`) and add it to this table and the endpoint table in `AGENTS.md`
 | org-team-service | 8084 |
 | git-integration-service | 8085 |
 | build-queue-service | 8086 |
+| build-service | 8087 |
 | config-server | 8888 |
 
 ## Spring Boot 4 gotchas

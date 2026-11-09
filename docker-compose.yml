@@ -3,7 +3,7 @@
 # Nothing here starts by default — every service is behind a profile so a
 # working session only runs what it needs (the brief's memory concern):
 #
-#   docker compose --profile core up -d           # postgres, redis, kafka, keycloak, clickhouse
+#   docker compose --profile core up -d           # postgres, redis, kafka, keycloak, clickhouse, registry
 #   docker compose --profile observability up -d   # otel-collector, prometheus, grafana, jaeger, loki
 #   docker compose --profile data up -d            # vault
 #   docker compose --profile ui up -d              # kafka-ui
@@ -153,6 +153,26 @@ services:
       - "8025:8025"
     networks: [pallet]
 
+  registry:
+    image: registry:3.1.2
+    container_name: pallet-registry
+    profiles: ["core"]
+    restart: unless-stopped
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    ports:
+      - "5001:5000"
+    volumes:
+      - registry_data:/var/lib/registry
+      - ./deploy/local/registry/config.yml:/etc/distribution/config.yml:ro,Z
+      - ./deploy/local/registry/auth:/auth:ro,Z
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5001/debug/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [pallet]
+
   vault:
     image: hashicorp/vault:1.18
     container_name: pallet-vault
@@ -243,6 +263,7 @@ networks:
 
 volumes:
   postgres_data:
+  registry_data:
   kafka_data:
   clickhouse_data:
   grafana_data:

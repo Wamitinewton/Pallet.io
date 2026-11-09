@@ -4,6 +4,12 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: pallet
+# Per-registry hosts.toml files under certs.d are how the nodes learn that
+# pallet-registry:5000 speaks plain HTTP; bootstrap-kind.sh writes them.
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
 nodes:
   - role: control-plane
     kubeadmConfigPatches:

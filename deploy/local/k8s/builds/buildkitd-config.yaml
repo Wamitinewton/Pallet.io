@@ -1,0 +1,14 @@
+# Rootless BuildKit can't mount a fresh /proc for RUN steps inside an unprivileged pod, so it runs
+# them in the build container's own process namespace. Set here rather than through an environment
+# variable so the container that runs tenant code has no environment of Pallet's.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pallet-buildkitd-config
+  namespace: pallet-builds
+data:
+  buildkitd.toml: |
+    [worker.oci]
+      noProcessSandbox = true
+    [worker.containerd]
+      enabled = false

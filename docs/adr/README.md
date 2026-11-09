@@ -34,6 +34,7 @@ silently reversed later. See [0001](0001-record-architecture-decisions.md).
 | [0026](0026-tenant-runtime-sandboxed-kubernetes-firecracker-deferred.md) | Tenant runtime: sandboxed `RuntimeClass` (gVisor default, Kata + Firecracker tier) behind a `WorkloadRuntime` port, self-managed Firecracker runtime deferred | proposed |
 | [0027](0027-build-queue-postgres-fair-scheduler.md) | Build queue as a Postgres-backed fair scheduler: partial unique indexes for coalescing and per-app serialization, round robin across orgs under per-org and global caps, single-active dispatcher per round via advisory lock and `LISTEN`/`NOTIFY`, dispatch pushed as `build.dispatched` | accepted |
 | [0028](0028-build-dispatch-leases-with-deadlines.md) | Dispatch leases with deadlines on the message: `buildId` as the end-to-end idempotency key, `startBy` and `maxDurationSeconds` on `build.dispatched`, redispatch on a missed start, run-lease expiry gated on backbone reachability, late results recorded | accepted |
+| [0029](0029-builds-as-sandboxed-kubernetes-jobs.md) | Builds as sandboxed Kubernetes Jobs: one Job per build in a locked-down namespace, fetch / build / push as ordered containers so no credential shares a container with tenant code, rootless BuildKit for Dockerfiles and the phased CNB lifecycle for buildpacks, plain Jobs rather than Tekton or kpack; gVisor run still open | proposed |
 
 ## Still open (from `PROJECT.md`)
 

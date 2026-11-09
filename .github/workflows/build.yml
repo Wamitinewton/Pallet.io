@@ -37,7 +37,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          services_all="$(find services -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R . | jq -cs .)"
+          # A directory is a service once it has its own Maven wrapper; before that it may hold only
+          # images, samples or docs, which have nothing to build here.
+          services_all="$(find services -mindepth 2 -maxdepth 2 -type f -name mvnw -printf '%h\n' \
+            | sed 's#^services/##' | sort | jq -R . | jq -cs .)"
           echo "services_all=$services_all" >> "$GITHUB_OUTPUT"
           echo "known services: $services_all"
 
@@ -73,7 +76,7 @@ jobs:
             | sort -u | jq -R . | jq -cs .)"
           services_matrix="$(printf '%s\n' "$changed" \
             | sed -nE 's#^services/([^/]+)/.*#\1#p' \
-            | sort -u | jq -R . | jq -cs .)"
+            | sort -u | jq -R . | jq -cs --argjson known "$services_all" 'map(select(. as $s | $known | index($s)))')"
           web="$(printf '%s\n' "$changed" | grep -qE '^web/' && echo true || echo false)"
 
           echo "full=false"                        >> "$GITHUB_OUTPUT"
