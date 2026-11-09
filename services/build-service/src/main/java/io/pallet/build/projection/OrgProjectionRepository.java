@@ -10,6 +10,10 @@ public interface OrgProjectionRepository extends Repository<OrgProjection, Strin
 
     Optional<OrgProjection> findByOrgId(String orgId);
 
+    /** The org, share-locked until the caller's transaction ends; see {@code AppProjectionRepository#lockShared}. */
+    @Query(value = "SELECT * FROM build.orgs WHERE org_id = :orgId FOR SHARE", nativeQuery = true)
+    Optional<OrgProjection> lockShared(@Param("orgId") String orgId);
+
     /** Records an org on first sight; a known org, deleted or not, is left alone. */
     @Modifying
     @Query(value = """

@@ -25,4 +25,16 @@ public enum Role {
                 .filter(role -> role.wireName().equals(value))
                 .findFirst();
     }
+
+    /**
+     * The upper-case name the membership projection stores.
+     *
+     * @throws IllegalStateException for a value the projection should never have stored
+     */
+    public static Role fromReadModel(String value) {
+        return Arrays.stream(values())
+                .filter(role -> role.name().equals(value))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("unknown role in org_memberships"));
+    }
 }

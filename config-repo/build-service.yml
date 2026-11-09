@@ -97,3 +97,9 @@ pallet:
       interval: PT1H
     observability:
       gauge-interval: PT15S
+
+springdoc:
+  api-docs:
+    path: /build/v3/api-docs
+  swagger-ui:
+    enabled: false
